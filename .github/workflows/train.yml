@@ -1,0 +1,28 @@
+name: Weekly shadow training
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "19 10 * * 1"
+permissions:
+  contents: read
+concurrency:
+  group: shadow-training
+  cancel-in-progress: false
+jobs:
+  train:
+    if: vars.PILOT_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      JOBS_SECRET: ${{ secrets.JOBS_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/jobs.py export /tmp/training.json
+      - run: python scripts/train.py /tmp/training.json /tmp/model.json
+      - run: python scripts/jobs.py shadow /tmp/model.json
+      - if: always()
+        run: rm -f /tmp/training.json /tmp/model.json
