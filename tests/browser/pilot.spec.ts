@@ -31,7 +31,7 @@ test("public forecast, planner, and invitation boundary", async ({ page }) => {
     page.getByRole("heading", { name: "Favorable wind" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Plan", exact: true }).click();
-  await page.getByLabel("Window", { exact: true }).selectOption("1");
+  await page.getByRole("combobox", { name: "Window", exact: true }).selectOption("1");
   await expect(
     page.getByText("Hourly forecast containing this time"),
   ).toBeVisible();
@@ -49,8 +49,8 @@ test("independent report, editing, and boat/coach details", async ({
   await expect(page.getByText("2 · Good · east")).toBeVisible();
   await page.getByRole("button", { name: "Edit report", exact: true }).click();
   await page.getByRole("button", { name: "5 Forced off", exact: true }).click();
-  await page.getByLabel("Your boat", { exact: true }).selectOption("2x");
-  await page.getByLabel("Coaching", { exact: true }).selectOption("known");
+  await page.getByRole("combobox", { name: "Your boat", exact: true }).selectOption("2x");
+  await page.getByRole("combobox", { name: "Coaching", exact: true }).selectOption("known");
   await page.getByRole("button", { name: "Charlie", exact: true }).click();
   await page.getByRole("button", { name: "Rose", exact: true }).click();
   await expect(
