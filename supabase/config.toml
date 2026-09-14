@@ -10,13 +10,21 @@ port = 54322
 major_version = 17
 [auth]
 enabled = true
-site_url = "http://localhost:5173"
-additional_redirect_urls = ["http://127.0.0.1:5173"]
+site_url = "https://mendocean.pages.dev"
+additional_redirect_urls = ["http://localhost:5173", "http://127.0.0.1:5173"]
 enable_signup = false
 [auth.email]
 enable_signup = false
 double_confirm_changes = true
 enable_confirmations = true
+[auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 465
+user = "resend"
+pass = "env(RESEND_API_KEY)"
+admin_email = "hello@mail.katahdin.me"
+sender_name = "Mendocean"
 [auth.email.template.magic_link]
 subject = "Your Mendocean sign-in code"
 content_path = "./supabase/templates/magic_link.html"

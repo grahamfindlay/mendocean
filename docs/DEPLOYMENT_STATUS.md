@@ -1,4 +1,4 @@
-# Deployment status — September 13, 2026
+# Deployment status — September 14, 2026
 
 The backend is deployed to Supabase project `exhoyifhvultmjryisce` in `us-west-2`.
 
@@ -14,15 +14,17 @@ Completed and verified:
 - Owner's administrator account created and approved without sending email.
 - Real Open-Meteo collection completed and the public endpoint returned 192 hourly points.
 - Unauthorized account/dispatcher requests and anonymous raw-table reads rejected.
-- Production build, 37 TypeScript tests, 8 Python tests, and Edge Function type checks pass.
+- Production build, 37 TypeScript tests, 8 Python tests, and Edge Function type checks pass. All 6 desktop/mobile browser tests pass in GitHub Actions.
+- Frontend published at https://mendocean.pages.dev and live weather rendering verified. Pages is connected to `codex/mendocean-pilot`, currently its production branch; switch to `main` when the implementation is merged. Preview branch deployments are disabled.
+- Production origins and Auth site URL configured. Resend sending-only key, SMTP, and OTP template installed. Sending awaits DNS verification.
+- Web Push keys configured in Supabase and the frontend; real-device delivery is not yet tested.
 
 The first hosted weather upload exposed an SDK behavior: uploading a Blob can send its own generic MIME type instead of the explicit gzip option. Uploading compressed ArrayBuffer bytes fixes this while preserving the archive bucket's gzip-only restriction. Worker errors now identify a safe, fixed weather stage without recording credentials or provider response bodies.
 
 Not yet completed:
 
-- Custom SMTP and reminder email sender. Supabase rejected the OTP email template update because free projects using its default sender cannot customize templates. The template is prepared in `supabase/templates/magic_link.html`; apply it after custom SMTP is configured. No test emails have been sent.
-- Cloudflare Pages frontend deployment and production origin settings. The frontend remains local; server `APP_URL` currently points to localhost.
-- VAPID keys and real-device push delivery.
+- Verify `mail.katahdin.me` by adding the four records in `docs/EMAIL_DNS.md` at Porkbun. No test emails have been sent. The temporary Resend setup key is local and must be revoked after setup verification; production uses a separate sending-only key.
+- Real-device push delivery.
 - Hosted account/report/BHC end-to-end checks.
 - GitHub backup/training secrets, activation, and a restore drill.
 
