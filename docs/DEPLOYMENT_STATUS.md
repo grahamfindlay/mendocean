@@ -16,14 +16,14 @@ Completed and verified:
 - Unauthorized account/dispatcher requests and anonymous raw-table reads rejected.
 - Production build, 37 TypeScript tests, 8 Python tests, and Edge Function type checks pass. All 6 desktop/mobile browser tests pass in GitHub Actions.
 - Frontend published at https://mendocean.fyi and live weather rendering verified. Pages is connected to `codex/mendocean-pilot`, currently its production branch; switch to `main` when the implementation is merged. Preview branch deployments are disabled.
-- Production origins and Auth site URL configured. Resend sending-only key, SMTP, and OTP template installed. Sender is `hello@mail.mendocean.fyi`. SMTP authentication succeeds; sending awaits Resend domain verification.
+- Production origins and Auth site URL configured. Resend sending-only key, SMTP, and OTP template installed. Sender is `hello@mail.mendocean.fyi`. SMTP authentication succeeds and Resend has verified all four email DNS records.
 - Web Push keys configured in Supabase and the frontend; real-device delivery is not yet tested.
 
 The first hosted weather upload exposed an SDK behavior: uploading a Blob can send its own generic MIME type instead of the explicit gzip option. Uploading compressed ArrayBuffer bytes fixes this while preserving the archive bucket's gzip-only restriction. Worker errors now identify a safe, fixed weather stage without recording credentials or provider response bodies.
 
 Not yet completed:
 
-- Resend verification of `mail.mendocean.fyi` is pending. All required DNS records are installed in Cloudflare and resolve publicly. No test emails have been sent. The temporary Resend setup key is local and must be revoked after setup verification; production uses a separate sending-only key.
+- End-to-end sign-in email delivery: domain verification and SMTP authentication pass, but no test email has been sent. The temporary Resend setup key was revoked and removed from the local setup file; production uses its separate sending-only key.
 - Real-device push delivery.
 - Hosted account/report/BHC end-to-end checks.
 - GitHub backup/training secrets, activation, and a restore drill.
