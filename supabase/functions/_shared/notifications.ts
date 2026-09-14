@@ -1,7 +1,7 @@
 import webpush from "web-push";
 import { reminderEligible } from "../../../shared/reminders.ts";
 import { formatDate, formatTime } from "../../../shared/domain.ts";
-import { check, env, query, service } from "./runtime.ts";
+import { check, env, query, service, HttpError } from "./runtime.ts";
 export async function sendReminder(
   uid: string,
   outingId: string,
@@ -108,4 +108,47 @@ export async function sendReminder(
   check(
     await db.rpc("finish_delivery", { uid, outing: outingId, gen: generation }),
   );
+}
+
+export async function sendTestPush(uid: string, endpoint: string) {
+  const subscriptions = await query("push_get", { user_id: uid });
+  const subscription = subscriptions.find(
+    (s: { endpoint: string }) => s.endpoint === endpoint,
+  );
+  if (!subscription)
+    throw new HttpError(
+      400,
+      "Enable push on this device while signed into this account first.",
+    );
+  webpush.setVapidDetails(
+    env("VAPID_SUBJECT"),
+    env("VAPID_PUBLIC_KEY"),
+    env("VAPID_PRIVATE_KEY"),
+  );
+  try {
+    await webpush.sendNotification(
+      subscription,
+      JSON.stringify({
+        title: "Mendocean test notification",
+        body: "Push notifications are working on this device.",
+        url: env("APP_URL") + "/?account=1",
+        tag: "mendocean-push-test",
+      }),
+      { TTL: 300, timeout: 10000 },
+    );
+  } catch (error) {
+    if (
+      [404, 410].includes((error as { statusCode?: number }).statusCode || 0)
+    ) {
+      await query("push_delete", { endpoint });
+      throw new HttpError(
+        400,
+        "This device registration has expired. Enable push again, then retry the test.",
+      );
+    }
+    throw new HttpError(
+      502,
+      "The push service did not accept the test. Please try again.",
+    );
+  }
 }

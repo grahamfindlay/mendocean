@@ -236,6 +236,8 @@ export function SettingsForm({
   const [busy, setBusy] = useState(false);
   const [token, setToken] = useState("");
   const [club, setClub] = useState("");
+  const [pushProgress, setPushProgress] = useState("");
+  const [pushAction, setPushAction] = useState<"enable" | "test" | null>(null);
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
     setError("");
@@ -284,6 +286,10 @@ export function SettingsForm({
             <option value="push">Push notifications</option>
           </select>
         </label>
+        <p className="help">
+          Choose one reminder channel: email or push. Device setup below does
+          not change this preference. Save after changing it.
+        </p>
         <label className="checkbox">
           <input
             name="paused"
@@ -301,35 +307,111 @@ export function SettingsForm({
         disabled={busy}
         onClick={() =>
           void run(async () => {
-            if (!("PushManager" in window))
-              throw new Error(
-                "Push is unavailable here. On iPhone, add this app to the Home Screen first.",
+            setPushAction("enable");
+            setPushProgress("Checking notification support…");
+            try {
+              if (
+                !("PushManager" in window) ||
+                !("Notification" in window) ||
+                !("serviceWorker" in navigator)
+              )
+                throw new Error(
+                  "Push is unavailable here. On iPhone, add this app to the Home Screen first.",
+                );
+              const key = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+              if (!key)
+                throw new Error(
+                  "Push notifications are awaiting server setup.",
+                );
+              setPushProgress("Waiting for notification permission…");
+              const permission = await Notification.requestPermission();
+              if (permission !== "granted")
+                throw new Error(
+                  permission === "denied"
+                    ? "Notifications are blocked. Allow them for this site in your browser settings, then try again."
+                    : "Permission was not granted. Click Enable push again to retry.",
+                );
+              setPushProgress("Registering this device…");
+              await navigator.serviceWorker.register("/sw.js");
+              let readyTimeout: ReturnType<typeof setTimeout> | undefined;
+              const sw = await Promise.race([
+                navigator.serviceWorker.ready,
+                new Promise<never>(
+                  (_, reject) =>
+                    (readyTimeout = setTimeout(
+                      () =>
+                        reject(
+                          new Error(
+                            "Device setup is taking too long. Reload the page and try again.",
+                          ),
+                        ),
+                      15000,
+                    )),
+                ),
+              ]).finally(() => clearTimeout(readyTimeout));
+              const bytes = Uint8Array.from(
+                atob(key.replace(/-/g, "+").replace(/_/g, "/")),
+                (c) => c.charCodeAt(0),
               );
-            const key = import.meta.env.VITE_VAPID_PUBLIC_KEY;
-            if (!key)
-              throw new Error("Push notifications are awaiting server setup.");
-            const permission = await Notification.requestPermission();
-            if (permission !== "granted")
-              throw new Error("Notification permission was not granted.");
-            await navigator.serviceWorker.register("/sw.js");
-            const sw = await navigator.serviceWorker.ready;
-            const bytes = Uint8Array.from(
-              atob(key.replace(/-/g, "+").replace(/_/g, "/")),
-              (c) => c.charCodeAt(0),
-            );
-            const subscription = await sw.pushManager.subscribe({
-              userVisibleOnly: true,
-              applicationServerKey: bytes,
-            });
-            await api("push", { subscription: subscription.toJSON() });
-            setMessage(
-              "This device is ready for push reminders. Choose Push notifications above.",
-            );
+              const subscription =
+                (await sw.pushManager.getSubscription()) ||
+                (await sw.pushManager.subscribe({
+                  userVisibleOnly: true,
+                  applicationServerKey: bytes,
+                }));
+              await api("push", { subscription: subscription.toJSON() });
+              setPushProgress(
+                "This device is registered. Send a test below. For practice reminders, choose Push notifications above and save preferences.",
+              );
+            } catch (e) {
+              setPushProgress((e as Error).message);
+              throw e;
+            } finally {
+              setPushAction(null);
+            }
           })
         }
       >
-        Enable push on this device
+        {pushAction === "enable"
+          ? "Setting up notifications…"
+          : "Enable push on this device"}
       </button>
+      <button
+        className="text-button"
+        disabled={busy}
+        onClick={() =>
+          void run(async () => {
+            setPushAction("test");
+            try {
+              if (!("serviceWorker" in navigator) || !("PushManager" in window))
+                throw new Error("Enable push on this device first.");
+              const sw = await navigator.serviceWorker.getRegistration();
+              const subscription = await sw?.pushManager.getSubscription();
+              if (!subscription)
+                throw new Error("Enable push on this device first.");
+              setPushProgress("Sending a test to this device…");
+              await api("push/test", { endpoint: subscription.endpoint });
+              setPushProgress(
+                "Test accepted by your push service. Look for a Mendocean notification. If it does not appear, check browser/OS notification settings and Focus or Do Not Disturb.",
+              );
+            } catch (e) {
+              setPushProgress((e as Error).message);
+              throw e;
+            } finally {
+              setPushAction(null);
+            }
+          })
+        }
+      >
+        {pushAction === "test"
+          ? "Sending test…"
+          : "Send test notification to this device"}
+      </button>
+      {pushProgress && (
+        <p className="notice" role="status">
+          {pushProgress}
+        </p>
+      )}
       <hr />
       <h3>Boathouse Connect</h3>
       <p className="help">

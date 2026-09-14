@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sendTestPush } from "../_shared/notifications.ts";
 import { outingSchema, reportSchema } from "../../../shared/domain.ts";
 import {
   HttpError,
@@ -348,6 +349,11 @@ Deno.serve(async (req) => {
           { generation },
         );
       return json(req, { saved: true });
+    }
+    if (path === "push/test") {
+      const endpoint = z.string().url().max(2048).parse(input.endpoint);
+      await sendTestPush(uid, endpoint);
+      return json(req, { accepted: true });
     }
     if (path === "push") {
       const subscription = z
