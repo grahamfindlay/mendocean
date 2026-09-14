@@ -473,3 +473,56 @@ test("weather failures retain cache; stale assessment is rejected; historical en
   );
   await tick();
 });
+
+test("queue expires old work, releases unused claims, and exhausts retries", async () => {
+  await enqueue("unknown-task");
+  await sql.query(
+    "update private.jobs set expires_at=now()-interval '1 second'",
+  );
+  await tick();
+  expect(
+    (
+      await sql.query(
+        "select status from private.jobs where kind='unknown-task'",
+      )
+    ).rows[0].status,
+  ).toBe("cancelled");
+  await enqueue("unknown-task");
+  const claimed = await db.rpc("service_query", { action: "claim", args: {} });
+  expect(claimed.error).toBeNull();
+  const ids = claimed.data.map((j: any) => j.id);
+  expect((await db.rpc("release_claims", { ids })).error).toBeNull();
+  expect(
+    (
+      await sql.query("select attempts,status from private.jobs where id=$1", [
+        ids[0],
+      ])
+    ).rows[0],
+  ).toEqual({ attempts: 0, status: "pending" });
+  await sql.query("update private.jobs set attempts=4 where status='pending'");
+  await tick();
+  const failed = (
+    await sql.query("select status,last_error from private.jobs where id=$1", [
+      ids[0],
+    ])
+  ).rows[0];
+  expect(failed.status).toBe("failed");
+  expect(failed.last_error).toContain("no credentials");
+});
+
+test("rescheduled reminder suppresses the old job and honors the new end time", async () => {
+  const o = await reminder(a);
+  await sql.query(
+    "update outings set starts_at=now()-interval '1 hour',ends_at=now()+interval '1 hour' where id=$1",
+    [o.id],
+  );
+  await tick();
+  expect((await fixtures()).deliveries).toHaveLength(0);
+  await sql.query(
+    "update outings set ends_at=now()-interval '16 minutes' where id=$1",
+    [o.id],
+  );
+  await api(a, "reminder", { outing_id: o.id, action: "enable" });
+  await tick();
+  expect((await fixtures()).deliveries).toHaveLength(1);
+});

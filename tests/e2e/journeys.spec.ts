@@ -53,7 +53,7 @@ async function loggedIn(page: Page) {
 async function startLog(page: Page) {
   await page.getByRole("button", { name: "Log", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "How was the water." }),
+    page.getByRole("heading", { name: "How was the water?" }),
   ).toBeVisible();
 }
 async function chooseRow(page: Page) {
@@ -266,5 +266,64 @@ test("persistent browser profile reopens offline and uploads queued report", asy
   } finally {
     await ctx.close();
     await rm(profile, { recursive: true, force: true });
+  }
+});
+
+test("drafts stay separate across account switches", async ({ page }) => {
+  const other = await user();
+  try {
+    await loggedIn(page);
+    await startLog(page);
+    await chooseRow(page);
+    // Wait for the debounced draft to reach IndexedDB, not for an arbitrary delay.
+    await expect
+      .poll(async () =>
+        page.evaluate(async () => {
+          const request = indexedDB.open("mendocean-private");
+          const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+          try {
+            const r = db.transaction("drafts").objectStore("drafts").count();
+            return await new Promise<number>(
+              (resolve) => (r.onsuccess = () => resolve(r.result)),
+            );
+          } finally {
+            db.close();
+          }
+        }),
+      )
+      .toBe(1);
+    await page.getByRole("button", { name: "Account", exact: true }).click();
+    await page.getByRole("button", { name: "Sign out", exact: true }).click();
+    // Use ordinary Auth OTP verification to obtain the other account's session, then install it on navigation.
+    const { data } = await other.client.auth.getSession();
+    const key =
+      "sb-" +
+      new URL(localURL("TEST_SUPABASE_URL")).hostname.split(".")[0] +
+      "-auth-token";
+    await page.evaluate(
+      ({ key, value }) => localStorage.setItem(key, JSON.stringify(value)),
+      { key, value: data.session },
+    );
+    await page.reload();
+    await startLog(page);
+    await expect(
+      page.getByText("Your unfinished draft was restored from this device."),
+    ).toHaveCount(0);
+    expect(await records(other)).toHaveLength(0);
+    const original = await actor.client.auth.getSession();
+    await page.evaluate(
+      ({ key, value }) => localStorage.setItem(key, JSON.stringify(value)),
+      { key, value: original.data.session },
+    );
+    await page.reload();
+    await startLog(page);
+    await expect(
+      page.getByText("Your unfinished draft was restored from this device."),
+    ).toBeVisible();
+  } finally {
+    await cleanupUsers([other]);
   }
 });

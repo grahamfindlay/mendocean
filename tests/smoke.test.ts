@@ -1,5 +1,4 @@
 import { test, expect } from "vitest";
-// @ts-expect-error The same dependency-free validators run under Node in production smoke.
 import {
   validateForecast,
   requireDenied,

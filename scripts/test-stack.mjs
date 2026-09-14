@@ -37,15 +37,17 @@ function run(cmd, args, opts = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { cwd: root, env, ...opts });
     let output = "";
+    let stdout = "";
     child.stdout?.on("data", (b) => {
       output += b;
+      stdout += b;
     });
     child.stderr?.on("data", (b) => {
       output += b;
     });
     child.on("error", reject);
     child.on("exit", (code) => {
-      if (code === 0) resolve(output);
+      if (code === 0) resolve(stdout);
       else {
         console.error(redact(output));
         reject(new Error(`${cmd.split("/").pop()} failed (${code})`));

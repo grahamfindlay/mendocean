@@ -8,10 +8,7 @@ export default defineConfig({
   retries: 0,
   timeout: 45000,
   expect: { timeout: 10000 },
-  reporter: [
-    ["list"],
-    ["json", { outputFile: "test-results/full-stack.json" }],
-  ],
+  reporter: "list",
   use: { baseURL: process.env.TEST_APP_URL, trace: "off", screenshot: "off" },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },

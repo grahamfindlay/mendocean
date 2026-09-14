@@ -69,13 +69,14 @@ export default function App() {
   const refresh = useCallback(async () => {
     if (!user) return;
     try {
-      const [data, items] = await Promise.all([
-        api<AccountData>("account", undefined, user.id),
-        pending(user.id),
-      ]);
+      // Device-saved reports remain visible even when the account API is offline.
+      const items = await pending(user.id);
+      if (currentUser.current !== user.id) return;
+      setQueue(items);
+      if (!navigator.onLine) return;
+      const data = await api<AccountData>("account", undefined, user.id);
       if (currentUser.current !== user.id) return;
       setAccount(data);
-      setQueue(items);
     } catch (e) {
       if (currentUser.current === user.id) setError((e as Error).message);
     }
