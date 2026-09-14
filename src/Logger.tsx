@@ -88,9 +88,6 @@ export default function Logger({
   const [largest, setLargest] = useState<number | null>(
     editing?.report.largest_boat ?? null,
   );
-  const [scope, setScope] = useState<ReportInput["scope"]>(
-    editing?.report.scope || "personal",
-  );
   const [notes, setNotes] = useState(editing?.report.notes || "");
   const [segments, setSegments] = useState<ReportInput["segments"]>(
     editing?.report.segments || [],
@@ -124,7 +121,6 @@ export default function Logger({
           setLaunched(v.launched);
           setSmallest(v.smallest);
           setLargest(v.largest);
-          setScope(v.scope);
           setNotes(v.notes);
           setSegments(v.segments);
           setRestored(true);
@@ -152,7 +148,6 @@ export default function Logger({
         launched,
         smallest,
         largest,
-        scope,
         notes,
         segments,
       });
@@ -177,7 +172,6 @@ export default function Logger({
     launched,
     smallest,
     largest,
-    scope,
     notes,
     segments,
   ]);
@@ -231,8 +225,9 @@ export default function Logger({
       const report = reportSchema.parse({
         submission_id: crypto.randomUUID(),
         expected_version: editing?.report.version || 0,
+        // Preserve legacy metadata when editing; new reports use the schema default.
+        scope: editing?.report.scope,
         outcome,
-        scope,
         reason: outcome === "stayed_ashore" ? reason : null,
         rating: outcome === "rowed" ? rating : null,
         route: outcome === "rowed" ? route : "unknown",
@@ -563,16 +558,6 @@ export default function Logger({
               </label>
             </>
           )}
-          <label>
-            This report describes
-            <select
-              value={scope}
-              onChange={(e) => setScope(e.target.value as ReportInput["scope"])}
-            >
-              <option value="personal">My experience</option>
-              <option value="whole_outing">The whole outing</option>
-            </select>
-          </label>
           {route === "both" && outcome === "rowed" && (
             <div className="field-grid">
               {(["east", "west"] as const).map((r) => (
