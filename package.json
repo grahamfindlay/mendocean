@@ -11,7 +11,11 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:db": "vitest run tests/database.test.ts",
-    "typecheck": "tsc -b && tsc -p tsconfig.tools.json"
+    "typecheck": "tsc -b && tsc -p tsconfig.tools.json",
+    "test:stack": "node scripts/test-stack.mjs",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:e2e:full": "playwright test --config playwright.full.config.ts",
+    "test:smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
@@ -26,10 +30,13 @@
     "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "^1.63.0",
     "@types/node": "^22.20.2",
+    "@types/pg": "8.15.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
+    "pg": "8.16.3",
     "prettier": "^3.9.6",
+    "supabase": "2.117.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.0"

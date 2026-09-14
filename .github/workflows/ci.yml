@@ -1,10 +1,14 @@
 name: Checks
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  check:
+  fast:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,13 +24,22 @@ jobs:
       - run: deno check --config supabase/functions/deno.json supabase/functions/api/index.ts supabase/functions/jobs/index.ts
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
       - run: python -m unittest discover -s tests -p 'test_*.py'
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
-      - uses: actions/upload-artifact@v4
-        if: failure()
+  full-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          name: browser-test-results
-          path: test-results/
-          retention-days: 7
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run test:stack
+      - name: Record outcome
+        if: always()
+        run: echo 'Full-stack lane exercises production build + isolated Supabase + synthetic upstream providers. Browser emulation does not establish real-device push delivery.' >> "$GITHUB_STEP_SUMMARY"

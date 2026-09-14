@@ -1,3 +1,4 @@
+import { liveProviders, type Providers } from "./providers.ts";
 import { normalizePractice, syncTimes } from "../../../shared/bhc.ts";
 import {
   check,
@@ -24,6 +25,7 @@ export async function bhcGet(
   path: string,
   token: string,
   args: Record<string, string | number | boolean> = {},
+  providers: Providers = liveProviders,
 ) {
   if (!PATHS.has(path)) throw new Error("BHC endpoint is not allowlisted.");
   const url = new URL("https://api.boathouseconnect.com/" + path);
@@ -32,7 +34,7 @@ export async function bhcGet(
     url.searchParams.set(key, String(value));
   // BHC requires the token in the query. Never log URLs, response bodies, or native fetch errors here.
   try {
-    const response = await fetch(url, {
+    const response = await providers.fetch(url, {
       method: "GET",
       redirect: "error",
       signal: AbortSignal.timeout(10000),
@@ -46,7 +48,12 @@ export async function bhcGet(
     );
   }
 }
-export async function syncBHC(uid: string, initial = false, afterId = 0) {
+export async function syncBHC(
+  uid: string,
+  initial = false,
+  afterId = 0,
+  providers: Providers = liveProviders,
+) {
   const connection = await query("connection_get", { user_id: uid });
   if (!connection.user_id) return;
   const lock = await query("sync_lock", { user_id: uid });
@@ -57,17 +64,27 @@ export async function syncBHC(uid: string, initial = false, afterId = 0) {
     const club = connection.club_id;
     const args = { whitelabel_id: club, custid: connection.custid };
     const upcoming = list(
-      await bhcGet("practices/getAthletePractices", token, {
-        ...args,
-        upcoming: true,
-      }),
+      await bhcGet(
+        "practices/getAthletePractices",
+        token,
+        {
+          ...args,
+          upcoming: true,
+        },
+        providers,
+      ),
     );
     // Include recent practices on every sync so the post-practice lineup refresh can still find them.
     const past = list(
-      await bhcGet("practices/getAthletePractices", token, {
-        ...args,
-        upcoming: false,
-      }),
+      await bhcGet(
+        "practices/getAthletePractices",
+        token,
+        {
+          ...args,
+          upcoming: false,
+        },
+        providers,
+      ),
     ).filter(
       (p) =>
         Number(p.end_time) * 1000 > Date.now() - (initial ? 30 : 2) * 86400000,
@@ -83,7 +100,12 @@ export async function syncBHC(uid: string, initial = false, afterId = 0) {
     let completed = 0;
     let cursor = afterId;
     const boats = list(
-      await bhcGet("equipment/getAllBoats", token, { whitelabel_id: club }),
+      await bhcGet(
+        "equipment/getAllBoats",
+        token,
+        { whitelabel_id: club },
+        providers,
+      ),
     );
     const db = service();
     for (const meta of remaining) {
@@ -98,12 +120,17 @@ export async function syncBHC(uid: string, initial = false, afterId = 0) {
         );
         return;
       }
-      const detailRaw = await bhcGet("practices/getPractices", token, {
-        ...args,
-        practice_id: Number(meta.practice_id),
-        meta_only: "No",
-        upcoming: false,
-      });
+      const detailRaw = await bhcGet(
+        "practices/getPractices",
+        token,
+        {
+          ...args,
+          practice_id: Number(meta.practice_id),
+          meta_only: "No",
+          upcoming: false,
+        },
+        providers,
+      );
       const detail = Array.isArray(detailRaw) ? detailRaw[0] || {} : detailRaw;
       const p = normalizePractice(meta, detail, connection.custid, boats);
       const outing = check(

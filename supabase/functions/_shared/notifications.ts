@@ -1,4 +1,4 @@
-import webpush from "web-push";
+import { liveProviders, type Providers } from "./providers.ts";
 import { reminderEligible } from "../../../shared/reminders.ts";
 import { formatDate, formatTime } from "../../../shared/domain.ts";
 import { check, env, query, service, HttpError } from "./runtime.ts";
@@ -6,6 +6,7 @@ export async function sendReminder(
   uid: string,
   outingId: string,
   generation = 0,
+  providers: Providers = liveProviders,
 ) {
   const db = service();
   const [pr, mr, rr, or] = await Promise.all([
@@ -29,15 +30,18 @@ export async function sendReminder(
     report = check(rr),
     outing = check(or);
   if (
-    !reminderEligible({
-      attendance: member.attendance,
-      reminder: member.reminder,
-      skipped: member.skipped,
-      hasReport: !!report,
-      paused: profile.reminders_paused,
-      channel: profile.reminder_channel,
-      endsAt: outing.ends_at,
-    })
+    !reminderEligible(
+      {
+        attendance: member.attendance,
+        reminder: member.reminder,
+        skipped: member.skipped,
+        hasReport: !!report,
+        paused: profile.reminders_paused,
+        channel: profile.reminder_channel,
+        endsAt: outing.ends_at,
+      },
+      providers.now(),
+    )
   )
     return;
   const reserved = check(
@@ -60,7 +64,7 @@ export async function sendReminder(
     const { data, error } = await db.auth.admin.getUserById(uid);
     if (error || !data.user.email)
       throw new Error("Reminder email unavailable");
-    const response = await fetch("https://api.resend.com/emails", {
+    const response = await providers.fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${env("RESEND_API_KEY")}`,
@@ -84,15 +88,10 @@ export async function sendReminder(
   } else {
     const subscriptions = await query("push_get", { user_id: uid });
     if (!subscriptions.length) throw new Error("No push device registered");
-    webpush.setVapidDetails(
-      env("VAPID_SUBJECT"),
-      env("VAPID_PUBLIC_KEY"),
-      env("VAPID_PRIVATE_KEY"),
-    );
     let sent = 0;
     for (const subscription of subscriptions) {
       try {
-        await webpush.sendNotification(
+        await providers.push(
           subscription,
           JSON.stringify({ title, body, url, tag: `outing-${outingId}` }),
           { TTL: 86400 },
@@ -110,7 +109,11 @@ export async function sendReminder(
   );
 }
 
-export async function sendTestPush(uid: string, endpoint: string) {
+export async function sendTestPush(
+  uid: string,
+  endpoint: string,
+  providers: Providers = liveProviders,
+) {
   const subscriptions = await query("push_get", { user_id: uid });
   const subscription = subscriptions.find(
     (s: { endpoint: string }) => s.endpoint === endpoint,
@@ -120,13 +123,8 @@ export async function sendTestPush(uid: string, endpoint: string) {
       400,
       "Enable push on this device while signed into this account first.",
     );
-  webpush.setVapidDetails(
-    env("VAPID_SUBJECT"),
-    env("VAPID_PUBLIC_KEY"),
-    env("VAPID_PRIVATE_KEY"),
-  );
   try {
-    await webpush.sendNotification(
+    await providers.push(
       subscription,
       JSON.stringify({
         title: "Mendocean test notification",
