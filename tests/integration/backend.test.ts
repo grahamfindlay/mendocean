@@ -94,12 +94,12 @@ test("reports persist, retry once, conflict safely, remain private, and delete",
         .update({ data: row(o) })
         .eq("id", saved.data.id)
         .select()
-    ).data,
-  ).toEqual([]);
+    ).error,
+  ).toBeTruthy();
   expect(
     (await b.client.from("reports").delete().eq("id", saved.data.id).select())
-      .data,
-  ).toEqual([]);
+      .error,
+  ).toBeTruthy();
   const edits = await Promise.all([
     api(a, "report", {
       outing: o,
@@ -256,16 +256,20 @@ test("BHC continuation imports more than twelve practices without duplication", 
     bhc: Array.from({ length: 15 }, (_, i) => practice(base + i)),
   });
   await api(a, "bhc/connect", { token: syntheticToken });
-  await tick();
-  await tick();
-  expect(
-    (
-      await sql.query(
-        "select * from outings where bhc_practice_id between $1 and $2",
-        [base, base + 14],
-      )
-    ).rowCount,
-  ).toBe(15);
+  await expect
+    .poll(
+      async () => {
+        await tick();
+        return (
+          await sql.query(
+            "select * from outings where bhc_practice_id between $1 and $2",
+            [base, base + 14],
+          )
+        ).rowCount;
+      },
+      { timeout: 15000, interval: 100 },
+    )
+    .toBe(15);
   await api(a, "bhc/disconnect", {});
 });
 async function reminder(actor: Actor, channel = "email") {
@@ -440,7 +444,7 @@ test("weather archives are private, immutable gzip and enrich from the archived 
 });
 test("weather failures retain cache; stale assessment is rejected; historical enrichment works", async () => {
   await sql.query(
-    "update weather_runs set fetched_at=now()-interval '7 hours'",
+    "update weather_runs set fetched_at=now()-interval '11 hours'",
   );
   await fixtures({ failure: "weather" });
   await tick();

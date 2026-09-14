@@ -297,7 +297,7 @@ test("drafts stay separate across account switches", async ({ page }) => {
       .toBe(1);
     await page.getByRole("button", { name: "Account", exact: true }).click();
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
-    // Use ordinary Auth OTP verification to obtain the other account's session, then install it on navigation.
+    // Reuse a legitimately authenticated test session; the OTP journey is tested separately.
     const { data } = await other.client.auth.getSession();
     const key =
       "sb-" +
