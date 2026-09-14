@@ -14,7 +14,8 @@ site_url = "https://mendocean.fyi"
 additional_redirect_urls = ["http://localhost:5173", "http://127.0.0.1:5173"]
 enable_signup = false
 [auth.email]
-enable_signup = false
+# Keep email authentication enabled; auth.enable_signup above blocks new accounts.
+enable_signup = true
 double_confirm_changes = true
 enable_confirmations = true
 [auth.email.smtp]

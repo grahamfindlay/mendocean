@@ -19,6 +19,8 @@ The gateway JWT check is off because `api` contains public routes. Every private
 
 The migrations create the tables, policies, validated report RPCs, private weather bucket, queue and model metadata. They are not a substitute for hosted Auth settings: **disable public signups** in the dashboard too, or review `supabase config diff` and apply `supabase config push`. Editing `supabase/config.toml` alone does not change hosted Auth. Review the origin settings before pushing them to a production project.
 
+Keep `[auth.email].enable_signup = true`: this controls email-provider availability in the hosted configuration. Block public registration with `[auth].enable_signup = false`. Verify `/auth/v1/settings` reports both `external.email: true` and `disable_signup: true`; a configuration diff alone does not prove sign-in works.
+
 ## 2. Frontend
 
 In Cloudflare Pages, import `grahamfindlay/mendocean` when the implementation has been pushed. Use `npm run build`, output directory `dist`, and Node 24. Set these build variables:

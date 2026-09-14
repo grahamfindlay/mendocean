@@ -31,3 +31,5 @@ Not yet completed:
 No real rowing observations or BHC tokens have been imported. No learned model is active.
 
 The custom domain uses Cloudflare DNS and HTTPS. The old `mendocean.pages.dev` address redirects in the browser to the new domain, preserving path, query, and fragment. No katahdin.me DNS changes are required.
+
+Email-provider correction: hosted email login is enabled while global signup remains disabled. Verified public Auth settings and an actual rejected signup request (`422 signup_disabled`). The prior email-provider disablement caused the reported “Email logins are disabled” error.
