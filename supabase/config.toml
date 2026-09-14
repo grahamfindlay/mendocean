@@ -10,7 +10,7 @@ port = 54322
 major_version = 17
 [auth]
 enabled = true
-site_url = "https://mendocean.pages.dev"
+site_url = "https://mendocean.fyi"
 additional_redirect_urls = ["http://localhost:5173", "http://127.0.0.1:5173"]
 enable_signup = false
 [auth.email]
@@ -23,7 +23,7 @@ host = "smtp.resend.com"
 port = 465
 user = "resend"
 pass = "env(RESEND_API_KEY)"
-admin_email = "hello@mail.katahdin.me"
+admin_email = "hello@mail.mendocean.fyi"
 sender_name = "Mendocean"
 [auth.email.template.magic_link]
 subject = "Your Mendocean sign-in code"
