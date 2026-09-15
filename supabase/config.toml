@@ -1,0 +1,37 @@
+project_id = "mendocean"
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+[db]
+port = 54322
+major_version = 17
+[auth]
+enabled = true
+site_url = "https://mendocean.fyi"
+additional_redirect_urls = ["http://localhost:5173", "http://127.0.0.1:5173"]
+enable_signup = false
+[auth.email]
+# Keep email authentication enabled; auth.enable_signup above blocks new accounts.
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+[auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 465
+user = "resend"
+pass = "env(RESEND_API_KEY)"
+admin_email = "hello@mail.mendocean.fyi"
+sender_name = "Mendocean"
+[auth.email.template.magic_link]
+subject = "Your Mendocean sign-in code"
+content_path = "./supabase/templates/magic_link.html"
+[functions.api]
+verify_jwt = false
+import_map = "./functions/deno.json"
+[functions.jobs]
+verify_jwt = false
+import_map = "./functions/deno.json"

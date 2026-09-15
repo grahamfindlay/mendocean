@@ -1,0 +1,38 @@
+name: Encrypted pilot backup
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "37 9 * * *"
+permissions:
+  contents: read
+concurrency:
+  group: pilot-backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    if: vars.PILOT_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      AGE_RECIPIENT: ${{ secrets.AGE_RECIPIENT }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get update && sudo apt-get install -y age
+      - run: python scripts/backup.py
+      - name: Export weather on Sundays and manual runs
+        run: |
+          if [ "$(date -u +%u)" = "7" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python scripts/weather_backup.py
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: encrypted-backup-${{ github.run_id }}
+          path: backup/*.age
+          retention-days: 7
+          if-no-files-found: error
