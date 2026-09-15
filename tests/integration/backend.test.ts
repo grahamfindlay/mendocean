@@ -18,6 +18,7 @@ import {
   enqueue,
   practice,
   syntheticToken,
+  secret,
   type Actor,
 } from "../support/stack";
 let a: Actor, b: Actor, unapproved: Actor;
@@ -188,6 +189,23 @@ test("BHC connects, imports attendance/lineups, deduplicates shared practices, a
       [o.id],
     )
   ).rows;
+  await enqueue("enrich", null, o.id);
+  await tick();
+  const snapshot = await db.rpc("service_query", {
+    action: "training_snapshot",
+    args: {},
+  });
+  expect(snapshot.error).toBeNull();
+  const grouped = snapshot.data.rows.filter((r: any) => r.outing_id === o.id);
+  expect(grouped).toHaveLength(2);
+  expect(new Set(grouped.map((r: any) => r.user_id))).toEqual(
+    new Set([a.id, b.id]),
+  );
+  expect(
+    grouped.every(
+      (r: any) => !("notes" in r.report) && !("submission_id" in r.report),
+    ),
+  ).toBe(true);
   await fixtures({
     lineup: true,
     bhc: practices.map((p) => ({
@@ -476,6 +494,44 @@ test("weather failures retain cache; stale assessment is rejected; historical en
     "update private.jobs set due_at=now()-interval '1 second' where status='pending'",
   );
   await tick();
+});
+
+test("malformed weather cannot replace the cached forecast", async () => {
+  await sql.query(
+    "update weather_runs set fetched_at=now()-interval '30 minutes'",
+  );
+  const before = (await api(null, "weather")).data;
+  await fixtures({ failure: "weather_malformed" });
+  await tick();
+  expect((await api(null, "weather")).data).toEqual(before);
+  expect(
+    (
+      await sql.query(
+        "select status from private.jobs where kind='weather' order by id desc limit 1",
+      )
+    ).rows[0].status,
+  ).toBe("pending");
+});
+
+test("dispatcher releases its claims when the elapsed-time budget is exhausted", async () => {
+  await enqueue("weather", null, null);
+  const response = await fetch(url + "/functions/v1/jobs-budget", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + secret,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ action: "tick" }),
+  });
+  expect(response.status).toBe(200);
+  const jobs = (await sql.query("select status from private.jobs")).rows;
+  expect(jobs.length).toBeGreaterThan(0);
+  expect(jobs.every((j) => j.status === "pending")).toBe(true);
+  await tick();
+  expect(
+    (await sql.query("select id from private.jobs where status <> 'done'"))
+      .rowCount,
+  ).toBe(0);
 });
 
 test("queue expires old work, releases unused claims, and exhausts retries", async () => {

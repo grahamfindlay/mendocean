@@ -3,6 +3,7 @@ import {
   requireDenied,
   validateAuth,
 } from "../tests/smoke/checks.mjs";
+import publicConfig from "../tests/smoke/public-config.json" with { type: "json" };
 const site = "https://mendocean.fyi";
 const backend = "https://exhoyifhvultmjryisce.supabase.co";
 const expected = process.env.EXPECTED_SHA;
@@ -65,15 +66,14 @@ requireDenied(
   ).status,
 );
 // A public publishable key is needed for Auth settings, but no session/admin secret.
-const key = process.env.SMOKE_PUBLIC_KEY;
+const key = process.env.SMOKE_PUBLIC_KEY || publicConfig.supabasePublicKey;
 if (key) {
   const settings = await get(backend + "/auth/v1/settings", {
     headers: { apikey: key },
   });
   if (!settings.ok) throw new Error("auth-settings: unavailable");
   validateAuth(await settings.json());
-} else
-  console.log("Auth settings: not checked (SMOKE_PUBLIC_KEY not supplied)");
+} else throw new Error("auth-settings: public key missing");
 console.log(
   "Production read-only smoke checks passed" +
     (expected ? " for " + expected : ""),

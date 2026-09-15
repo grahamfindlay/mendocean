@@ -137,6 +137,16 @@ try {
       join(work, `supabase/functions/${name}/index.ts`),
       `import { create${name === "api" ? "Api" : "Jobs"}Handler } from './handler.ts';\nimport { fixtureProviders } from '../_shared/fixture-provider.ts';\nDeno.serve(create${name === "api" ? "Api" : "Jobs"}Handler(fixtureProviders));\n`,
     );
+  mkdirSync(join(work, "supabase/functions/jobs-budget"));
+  writeFileSync(
+    join(work, "supabase/functions/jobs-budget/index.ts"),
+    `import { createJobsHandler } from '../jobs/handler.ts';
+import { fixtureProviders } from '../_shared/fixture-provider.ts';
+Deno.serve((req) => {
+  let elapsed = 0;
+  return createJobsHandler(fixtureProviders, () => elapsed += 46000)(req);
+});\n`,
+  );
   writeFileSync(
     join(work, "supabase/config.toml"),
     `project_id = "${id}"
@@ -169,6 +179,9 @@ enabled = false
 verify_jwt = false
 import_map = "./functions/deno.json"
 [functions.jobs]
+verify_jwt = false
+import_map = "./functions/deno.json"
+[functions.jobs-budget]
 verify_jwt = false
 import_map = "./functions/deno.json"
 `,

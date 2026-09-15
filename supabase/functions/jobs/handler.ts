@@ -17,7 +17,10 @@ import {
 import { syncBHC } from "../_shared/bhc.ts";
 import { sendReminder } from "../_shared/notifications.ts";
 import { localDateTime } from "../../../shared/domain.ts";
-export function createJobsHandler(providers: Providers = liveProviders) {
+export function createJobsHandler(
+  providers: Providers = liveProviders,
+  elapsed: () => number = () => performance.now(),
+) {
   return async (req: Request): Promise<Response> => {
     try {
       if (
@@ -47,7 +50,7 @@ export function createJobsHandler(providers: Providers = liveProviders) {
       }
       if (input.action !== "tick")
         return json(req, { error: "Unknown action" }, 400);
-      const started = Date.now();
+      const started = elapsed();
       const now = new Date(providers.now());
       const stamp = Math.floor(now.getTime() / 1800000);
       await enqueue("weather", null, null, now, `weather:${stamp}`);
@@ -64,7 +67,7 @@ export function createJobsHandler(providers: Providers = liveProviders) {
       const jobs = await query("claim");
       const results = [];
       for (const [index, job] of jobs.entries()) {
-        if (Date.now() - started > 45000) {
+        if (elapsed() - started > 45000) {
           check(
             await service().rpc("release_claims", {
               ids: jobs.slice(index).map((j: { id: number }) => j.id),
