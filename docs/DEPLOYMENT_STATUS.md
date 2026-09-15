@@ -14,8 +14,8 @@ Completed and verified:
 - Owner's administrator account created and approved without sending email.
 - Real Open-Meteo collection completed and the public endpoint returned 192 hourly points.
 - Unauthorized account/dispatcher requests and anonymous raw-table reads rejected.
-- Production build, 37 TypeScript tests, 8 Python tests, and Edge Function type checks pass. All 6 desktop/mobile browser tests pass in GitHub Actions.
-- Frontend published at https://mendocean.fyi and live weather rendering verified. Pages is connected to `codex/mendocean-pilot`, currently its production branch; switch to `main` when the implementation is merged. Preview branch deployments are disabled.
+- Production build, 41 fast TypeScript/PostgreSQL tests, 8 Python tests, and Edge Function type checks pass. CI also runs 6 preview browser cases, 23 real Supabase integration tests, and 25 production-build browser cases (plus 2 explicitly excluded persistent-profile variants).
+- Frontend published at https://mendocean.fyi and live weather rendering verified. Pages is connected to `main`, which contains the merged pilot baseline. Preview branch deployments are disabled.
 - Production origins and Auth site URL configured. Resend sending-only key, SMTP, and OTP template installed. Sender is `hello@mail.mendocean.fyi`. SMTP authentication succeeds and Resend has verified all four email DNS records.
 - Owner confirmed receiving a sign-in code and successfully signing in. Owner also connected BHC and granted push permission; import results still need comparison with BHC.
 - Web Push keys configured in Supabase and the frontend; the owner confirmed successful desktop push delivery on September 14.
@@ -33,3 +33,7 @@ No synthetic rowing observations were inserted into production. No learned model
 The custom domain uses Cloudflare DNS and HTTPS. The old `mendocean.pages.dev` address redirects in the browser to the new domain, preserving path, query, and fragment. No katahdin.me DNS changes are required.
 
 Email-provider correction: hosted email login is enabled while global signup remains disabled. Verified public Auth settings and an actual rejected signup request (`422 signup_disabled`). The prior email-provider disablement caused the reported “Email logins are disabled” error.
+
+## Test automation rollout
+
+The Docker Desktop stack and read-only live API/Auth/browser smoke checks pass. The testing pull request is #2, targeting main. Required-check activation and the post-merge smoke result are recorded in the pull request and final delivery report; see `TESTING.md` for exact coverage and limits.

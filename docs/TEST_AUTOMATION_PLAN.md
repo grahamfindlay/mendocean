@@ -1,6 +1,6 @@
 # Test automation improvement plan
 
-Status: proposed, September 14, 2026. This document plans the work; it does not activate tests, deployments, or monitoring.
+Approved plan, September 14, 2026. Implementation and verification are recorded in `TESTING.md`, `DEPLOYMENT_STATUS.md`, and pull request #2.
 
 The objective is to replace most of the remaining manual technical checks with repeatable automation. Graham's pilot use should concentrate on accurate prefilling, understandable interactions, and fast logging. Completion means demonstrating the application working across its real internal services, with clear limits on what simulated providers and browser emulation establish.
 

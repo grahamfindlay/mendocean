@@ -25,7 +25,7 @@ Smoke failures distinguish frontend availability, API availability, authorizatio
 
 `EXPECTED_SHA` makes the smoke command wait up to ten minutes for the exact deployed `build.json` commit before checking behavior. `SMOKE_PUBLIC_KEY` optionally overrides the public Supabase key for Auth-settings verification; it is not an administrator credential. The repository includes the same public anonymous key distributed with the frontend in `tests/smoke/public-config.json`; `SMOKE_PUBLIC_KEY` can override it. A missing key fails the check. No administrator credential is used.
 
-Scheduled workflows run from GitHub's default branch. The production branch is currently `codex/mendocean-pilot`; adding a schedule to another branch alone does not activate it. Verify the default-branch workflow, deployment event environment name, repository variable, and required release checks when activating production smoke. Never treat merely committed workflow files as active monitoring.
+Scheduled workflows run from GitHub's default branch, `main`. Pages now targets `main`. A push to main starts smoke with an exact build-identifier wait; this avoids depending on the Cloudflare deployment-event environment name. Both `fast` and `full-stack` are the required release checks. Activate protection only after three clean CI runs; verify activation in the release record.
 
 ## Limited live acceptance
 
@@ -46,3 +46,5 @@ The suite found and fixes three application defects: database timestamp offsets 
 On macOS, if Docker Desktop installed its CLI under the user directory, run `PATH="$HOME/.docker/bin:$PATH" npm run test:stack`. The container fixture hostname uses Docker Desktop host networking; Linux CI uses its bridge gateway.
 
 Smoke runs after pushes to `main`, waiting for the exact deployed build identifier, as well as on a twice-daily schedule and manual dispatch. Failed checks appear in the repository Actions tab and use the owner's existing GitHub Actions notification preferences; no separate notification subscription is created. Public API and Auth smoke passed locally against production; deployment activation is recorded in `DEPLOYMENT_STATUS.md`.
+
+Three consecutive clean CI executions at `cc2f889` established repeatability: [push run](https://github.com/grahamfindlay/mendocean/actions/runs/34927422839), [PR run attempt 1](https://github.com/grahamfindlay/mendocean/actions/runs/34927424846/attempts/1), and [PR run attempt 2](https://github.com/grahamfindlay/mendocean/actions/runs/34927424846/attempts/2). Each passed both lanes, including all 23 integration and 25 browser cases. The first PR full-stack lane took 4 minutes 30 seconds, including installation/startup. Earlier assertion failures remain visible in Actions; no test-level retry masks them.
