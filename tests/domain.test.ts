@@ -4,6 +4,7 @@ import {
   chicagoToISO,
   circularMean,
   reportSchema,
+  outingSchema,
   weatherFreshness,
   windStatus,
   windZone,
@@ -192,5 +193,24 @@ it("rejects non-rowing boat observations in the shared validator", () => {
     reportSchema.safeParse(
       report({ outcome: "did_not_attend", rating: null, boat_class: "1x" }),
     ).success,
+  ).toBe(false);
+});
+
+it("accepts PostgREST timestamp offsets when editing imported or existing outings", () => {
+  const input = {
+    id: "20000000-0000-4000-8000-000000000099",
+    kind: "official",
+    title: "Practice",
+    starts_at: "2026-09-14T12:00:00+00:00",
+    ends_at: "2026-09-14T13:00:00+00:00",
+  };
+  expect(outingSchema.safeParse(input).success).toBe(true);
+  expect(
+    outingSchema.safeParse({ ...input, ends_at: "2026-09-14T08:00:00-05:00" })
+      .success,
+  ).toBe(true);
+  expect(
+    outingSchema.safeParse({ ...input, ends_at: "2026-09-14T13:00:00+02:00" })
+      .success,
   ).toBe(false);
 });

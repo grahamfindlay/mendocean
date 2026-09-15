@@ -310,8 +310,8 @@ test("drafts stay separate across account switches", async ({ page }) => {
     await page.reload();
     await startLog(page);
     await expect(
-      page.getByText("Your unfinished draft was restored from this device."),
-    ).toHaveCount(0);
+      page.getByRole("button", { name: "2 Good", exact: true }),
+    ).toHaveAttribute("aria-pressed", "false");
     expect(await records(other)).toHaveLength(0);
     const original = await actor.client.auth.getSession();
     await page.evaluate(
@@ -323,7 +323,69 @@ test("drafts stay separate across account switches", async ({ page }) => {
     await expect(
       page.getByText("Your unfinished draft was restored from this device."),
     ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "2 Good", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
   } finally {
     await cleanupUsers([other]);
   }
+});
+
+test("push setup explains dismissed permission and tests only the saved device", async ({
+  page,
+}) => {
+  const endpoint = "https://web.push.apple.com/" + crypto.randomUUID();
+  await page.addInitScript((endpoint) => {
+    let permissionRequests = 0;
+    let subscription: any = null;
+    Object.defineProperty(window, "Notification", {
+      configurable: true,
+      value: class {
+        static async requestPermission() {
+          return ++permissionRequests === 1 ? "default" : "granted";
+        }
+      },
+    });
+    Object.defineProperty(window, "PushManager", {
+      configurable: true,
+      value: class {},
+    });
+    Object.defineProperty(ServiceWorkerRegistration.prototype, "pushManager", {
+      configurable: true,
+      get: () => ({
+        getSubscription: async () => subscription,
+        subscribe: async () =>
+          (subscription = {
+            endpoint,
+            toJSON: () => ({
+              endpoint,
+              keys: { auth: "synthetic", p256dh: "synthetic" },
+            }),
+          }),
+      }),
+    });
+  }, endpoint);
+  await loggedIn(page);
+  await page.getByRole("button", { name: "Account", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Enable push on this device", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText(
+    "Permission was not granted",
+  );
+  await page
+    .getByRole("button", { name: "Enable push on this device", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText(
+    "This device is registered",
+  );
+  await page
+    .getByRole("button", {
+      name: "Send test notification to this device",
+      exact: true,
+    })
+    .click();
+  await expect(page.getByRole("status")).toContainText("Test accepted");
+  const state = await fixtures();
+  expect(state.deliveries.some((d: any) => d.target === endpoint)).toBe(true);
 });

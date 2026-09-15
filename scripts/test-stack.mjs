@@ -9,7 +9,7 @@ import {
   readdirSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
 import { startFixtures } from "../tests/support/fixture-server.mjs";
 const root = resolve(".");
@@ -29,6 +29,7 @@ const children = [];
 let fixtures;
 let cleanupStarted = false;
 const sensitive = [];
+const diagnostics = [];
 const redact = (text) =>
   sensitive
     .reduce((s, k) => (k ? s.split(k).join("[redacted]") : s), String(text))
@@ -47,6 +48,7 @@ function run(cmd, args, opts = {}) {
     });
     child.on("error", reject);
     child.on("exit", (code) => {
+      if (!args.includes("status")) diagnostics.push(redact(output));
       if (code === 0) resolve(stdout);
       else {
         console.error(redact(output));
@@ -101,7 +103,7 @@ try {
   for (const dir of ["migrations", "templates", "functions"])
     cpSync(join(root, "supabase", dir), join(work, "supabase", dir), {
       recursive: true,
-      filter: (src) => !src.endsWith(".env"),
+      filter: (src) => !basename(src).startsWith(".env"),
     });
   cpSync(join(root, "shared"), join(work, "supabase/functions/_shared/app"), {
     recursive: true,
@@ -142,7 +144,7 @@ port = 54322
 major_version = 17
 [studio]
 enabled = false
-[inbucket]
+[local_smtp]
 port = 54324
 [auth]
 site_url = "http://127.0.0.1:4175"
@@ -234,7 +236,10 @@ import_map = "./functions/deno.json"
     ...env,
     VITE_SUPABASE_URL: status.API_URL,
     VITE_SUPABASE_ANON_KEY: status.ANON_KEY,
-    VITE_VAPID_PUBLIC_KEY: "synthetic",
+    VITE_VAPID_PUBLIC_KEY: Buffer.concat([
+      Buffer.from([4]),
+      randomBytes(64),
+    ]).toString("base64url"),
     VITE_BUILD_SHA: process.env.GITHUB_SHA || "local-test",
   };
   console.log("Building production frontend against isolated services.");
@@ -255,6 +260,11 @@ import_map = "./functions/deno.json"
 } catch (e) {
   console.error(e.message);
   for (const c of children) console.error(c.diagnostic());
+  mkdirSync(join(root, "test-results"), { recursive: true });
+  writeFileSync(
+    join(root, "test-results/stack.log"),
+    redact(diagnostics.join("\n")),
+  );
   process.exitCode = 1;
 } finally {
   await cleanup();
