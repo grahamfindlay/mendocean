@@ -1,0 +1,35 @@
+name: Production smoke
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Commit expected on mendocean.fyi (optional for an operational check)
+        type: string
+  deployment_status:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '23 1,13 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: production-smoke
+  cancel-in-progress: false
+jobs:
+  smoke:
+    if: github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Verify public site and authorization boundaries
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha || github.event.deployment.sha || (github.event_name == 'push' && github.sha) }}
+          SMOKE_PUBLIC_KEY: ${{ vars.SMOKE_PUBLIC_KEY }}
+        run: node scripts/smoke.mjs
+      - run: npx playwright test --config playwright.smoke.config.ts

@@ -1,3 +1,4 @@
+import { liveProviders, type Providers } from "./providers.ts";
 import { normalizeWeather, weatherURL } from "../../../shared/weather.ts";
 import {
   LOCATION,
@@ -10,7 +11,7 @@ export class WeatherCollectionError extends Error {
     super(`Weather collection failed: ${stage}`);
   }
 }
-export async function collectWeather() {
+export async function collectWeather(providers: Providers = liveProviders) {
   let stage = "read_latest";
   try {
     const db = service();
@@ -24,7 +25,7 @@ export async function collectWeather() {
     );
     if (last && Date.now() - Date.parse(last.fetched_at) < 29 * 60000) return;
     stage = "fetch_provider";
-    const response = await fetch(weatherURL(), {
+    const response = await providers.fetch(weatherURL(), {
       signal: AbortSignal.timeout(20000),
     });
     if (!response.ok)
@@ -102,7 +103,10 @@ export function weatherFeatures(hours: WeatherHour[], start: string) {
     })),
   };
 }
-export async function enrichOuting(id: string) {
+export async function enrichOuting(
+  id: string,
+  providers: Providers = liveProviders,
+) {
   const db = service();
   const outing = check(
     await db.from("outings").select("*").eq("id", id).single(),
@@ -151,7 +155,9 @@ export async function enrichOuting(id: string) {
         url.searchParams.set(k, v);
     url.searchParams.set("start_date", start);
     url.searchParams.set("end_date", end);
-    const response = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    const response = await providers.fetch(url, {
+      signal: AbortSignal.timeout(20000),
+    });
     if (!response.ok) throw new Error("Historical weather not yet available");
     forecast = normalizeWeather(await response.json());
     kind = "historical_forecast";

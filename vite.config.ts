@@ -18,6 +18,16 @@ export default defineConfig({
           origin = value ? new URL(value).origin : "";
         },
         closeBundle() {
+          writeFileSync(
+            resolve(output, "build.json"),
+            JSON.stringify({
+              commit:
+                process.env.CF_PAGES_COMMIT_SHA ||
+                process.env.GITHUB_SHA ||
+                process.env.VITE_BUILD_SHA ||
+                "local",
+            }),
+          );
           const path = resolve(output, "_headers");
           const headers = readFileSync(path, "utf8");
           const policy = `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' ${origin} ${origin.replace("https:", "wss:")}; img-src 'self' data:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`;

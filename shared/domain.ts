@@ -228,12 +228,15 @@ export const outingSchema = z
     id: z.string().uuid(),
     kind: z.enum(["official", "independent"]),
     title: z.string().trim().min(1).max(120),
-    starts_at: z.string().datetime(),
-    ends_at: z.string().datetime(),
+    starts_at: z.string().datetime({ offset: true }),
+    ends_at: z.string().datetime({ offset: true }),
     planned_boat: z.enum(BOAT_CLASSES).nullable().default(null),
     reminder: z.boolean().default(false),
   })
-  .refine((v) => v.ends_at > v.starts_at, "End time must be after start time.");
+  .refine(
+    (v) => Date.parse(v.ends_at) > Date.parse(v.starts_at),
+    "End time must be after start time.",
+  );
 export type OutingInput = z.infer<typeof outingSchema>;
 export interface Outing extends OutingInput {
   owner_id: string | null;
