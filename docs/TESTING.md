@@ -23,7 +23,7 @@ GitHub Actions has independent `fast` and `full-stack` jobs. Product assertion f
 
 Smoke failures distinguish frontend availability, API availability, authorization regressions, and weather freshness. Weather older than 90 minutes is a smoke failure even if the API returns HTTP 200. Deterministic validator tests intentionally exercise stale forecasts and unexpected HTTP 200 responses on private endpoints; do not break production to test alarms.
 
-`EXPECTED_SHA` makes the smoke command wait up to ten minutes for the exact deployed `build.json` commit before checking behavior. `SMOKE_PUBLIC_KEY` supplies the public Supabase key for Auth-settings verification; it is not an administrator credential. The smoke workflow's repository variable must be configured before counting that check as active. Without it, the command explicitly reports that Auth settings were not checked.
+`EXPECTED_SHA` makes the smoke command wait up to ten minutes for the exact deployed `build.json` commit before checking behavior. `SMOKE_PUBLIC_KEY` optionally overrides the public Supabase key for Auth-settings verification; it is not an administrator credential. The repository includes the same public anonymous key distributed with the frontend in `tests/smoke/public-config.json`; `SMOKE_PUBLIC_KEY` can override it. A missing key fails the check. No administrator credential is used.
 
 Scheduled workflows run from GitHub's default branch. The production branch is currently `codex/mendocean-pilot`; adding a schedule to another branch alone does not activate it. Verify the default-branch workflow, deployment event environment name, repository variable, and required release checks when activating production smoke. Never treat merely committed workflow files as active monitoring.
 
@@ -36,3 +36,13 @@ Scheduled workflows run from GitHub's default branch. The production branch is c
 - Optional read-only BHC contract check: `node scripts/bhc-contract.mjs`, with `BHC_CONTRACT_TOKEN` supplied through a protected process environment and `BHC_CONTRACT_CLUB_ID` only for accounts with multiple clubs. It makes at most five allowlisted reads and prints no provider payloads or tokens. Never add the owner's token to ordinary CI.
 
 Backup activation/restore validation and learned-model activation are separate tasks; passing application tests does not establish either.
+
+## Verified local coverage (September 14, 2026)
+
+Docker Desktop on macOS: 23 real-backend integration tests and 25 production-build browser cases pass. Two persistent-profile variants are explicitly skipped because that scenario runs only in desktop Chromium. Browser execution took 34 seconds, excluding stack startup. The dispatcher budget test uses an injected monotonic elapsed clock in a test-only composition root; production has no clock override route. Shared-practice export grouping and malformed-weather cache preservation are exercised against real SQL/API handlers.
+
+The suite found and fixes three application defects: database timestamp offsets rejected during edits/imported reports, pending offline reports hidden after a failed account refresh, and reminder preferences displaying loading defaults when Account opens before its fetch completes.
+
+On macOS, if Docker Desktop installed its CLI under the user directory, run `PATH="$HOME/.docker/bin:$PATH" npm run test:stack`. The container fixture hostname uses Docker Desktop host networking; Linux CI uses its bridge gateway.
+
+Smoke runs after pushes to `main`, waiting for the exact deployed build identifier, as well as on a twice-daily schedule and manual dispatch. Failed checks appear in the repository Actions tab and use the owner's existing GitHub Actions notification preferences; no separate notification subscription is created. Public API and Auth smoke passed locally against production; deployment activation is recorded in `DEPLOYMENT_STATUS.md`.
