@@ -297,6 +297,9 @@ test("drafts stay separate across account switches", async ({ page }) => {
       .toBe(1);
     await page.getByRole("button", { name: "Account", exact: true }).click();
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Sign in", exact: true }),
+    ).toBeVisible();
     // Reuse a legitimately authenticated test session; the OTP journey is tested separately.
     const { data } = await other.client.auth.getSession();
     const key =

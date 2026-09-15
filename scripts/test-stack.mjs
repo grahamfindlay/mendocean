@@ -33,7 +33,11 @@ const diagnostics = [];
 const redact = (text) =>
   sensitive
     .reduce((s, k) => (k ? s.split(k).join("[redacted]") : s), String(text))
-    .replace(/eyJ[A-Za-z0-9_.-]+/g, "[redacted JWT]");
+    .replace(/eyJ[A-Za-z0-9_.-]+/g, "[redacted JWT]")
+    .replace(
+      /^.*"(?:DB_URL|SERVICE_ROLE_KEY)".*$/gm,
+      "[local stack credentials omitted]",
+    );
 function run(cmd, args, opts = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { cwd: root, env, ...opts });
@@ -197,7 +201,10 @@ import_map = "./functions/deno.json"
       encoding: "utf8",
     }),
   );
-  const gateway = net[0].IPAM.Config[0].Gateway;
+  // Docker Desktop runs containers inside a VM; its gateway is not the host.
+  const gateway = ["darwin", "win32"].includes(process.platform)
+    ? "host.docker.internal"
+    : net[0].IPAM.Config[0].Gateway;
   const functionEnv = `APP_URL=http://127.0.0.1:4175\nALLOWED_ORIGINS=http://127.0.0.1:4175\nJOBS_SECRET=${secret}\nBHC_ENCRYPTION_KEY=${randomBytes(32).toString("base64")}\nRESEND_API_KEY=synthetic\nEMAIL_FROM=Mendocean <test@example.test>\nFIXTURE_SECRET=${secret}\nFIXTURE_URL=http://${gateway}:54328\n`;
   writeFileSync(join(work, "functions.env"), functionEnv, { mode: 0o600 });
   background(cli, [

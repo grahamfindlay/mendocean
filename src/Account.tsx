@@ -251,6 +251,8 @@ export function SettingsForm({
       setBusy(false);
     }
   };
+  // Uncontrolled fields must mount with the saved profile, not loading defaults.
+  if (!account) return <p role="status">Loading your account…</p>;
   return (
     <>
       <form
