@@ -1301,3 +1301,158 @@ button:hover:not(:disabled) {
     padding: 14px 10px;
   }
 }
+
+/* Forecast timelines share one time axis and retain exact sample inspection. */
+.weather-chart {
+  margin: 1.4rem 0;
+  padding: 1.25rem;
+  border: 1px solid var(--line, #deddd3);
+  border-radius: 14px;
+  background: #fffdf7;
+}
+.weather-chart svg {
+  display: block;
+  width: 100%;
+  touch-action: pan-y;
+  cursor: crosshair;
+  overflow: visible;
+}
+.weather-chart svg text {
+  font-size: 12px;
+  fill: #596661;
+}
+.weather-chart svg path {
+  stroke-width: 2;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+.weather-chart .chart-wind {
+  stroke: #235d51;
+}
+.weather-chart .chart-wind-fill {
+  fill: #4c8b7450;
+  stroke: none;
+}
+.weather-chart .chart-gust {
+  stroke: #7b939b;
+  stroke-dasharray: 5 4;
+}
+.weather-chart .chart-gust-fill {
+  fill: #8fa8b224;
+  stroke: none;
+}
+.weather-chart .chart-temp {
+  stroke: #a36e22;
+}
+.weather-chart .chart-rain {
+  stroke: #487eae;
+}
+.weather-chart .chart-rain-fill {
+  fill: #487eae33;
+  stroke: none;
+}
+.chart-grid {
+  stroke: #e0e3dc;
+}
+.chart-cursor {
+  stroke: #56645d;
+  stroke-dasharray: 2 4;
+}
+.chart-legend {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.8rem;
+}
+.chart-legend span {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.chart-legend i {
+  width: 20px;
+  border-top: 3px solid #235d51;
+}
+.chart-legend .gust-key {
+  border-top: 2px dashed #7b939b;
+}
+.chart-slider {
+  font-size: 0.8rem;
+  display: block;
+  margin: 0.5rem 0;
+}
+.chart-slider input {
+  width: 100%;
+  padding: 0;
+  accent-color: #235d51;
+}
+.chart-reading {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.8rem;
+  background: #f2f3ea;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  min-height: 125px;
+}
+.chart-reading time {
+  font-weight: 650;
+}
+.chart-reading .wind-speed {
+  font-size: 1rem;
+}
+.day-picker {
+  display: flex;
+  overflow-x: auto;
+  gap: 0.4rem;
+  margin: 1rem 0;
+  padding-bottom: 0.3rem;
+}
+.day-picker button {
+  white-space: nowrap;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid #d4d9cd;
+  border-radius: 7px;
+  background: transparent;
+}
+.day-picker button[aria-pressed="true"] {
+  background: #235d51;
+  color: white;
+}
+.sample-details > summary {
+  cursor: pointer;
+  padding: 1rem 0;
+  font-weight: 600;
+}
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(145px, 1fr));
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.6rem;
+}
+.comparison-grid article {
+  border: 1px solid #deddd3;
+  border-radius: 10px;
+  padding: 0.8rem;
+  font-size: 0.8rem;
+}
+.comparison-grid article p {
+  margin: 0.4rem 0;
+}
+.comparison-grid .wind-speed {
+  font-size: 1rem;
+}
+@media (max-width: 600px) {
+  .weather-chart {
+    padding: 0.8rem;
+  }
+  .weather-chart svg {
+    min-width: 0;
+  }
+  .weather-chart .section-heading {
+    display: block;
+  }
+  .weather-chart svg text {
+    font-size: 11px;
+  }
+}

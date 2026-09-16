@@ -12,6 +12,7 @@ import {
   reminderPresentation,
   type ReminderProfile,
 } from "../shared/reminders";
+import { windowSamples, sampleMinutes } from "../shared/timeline";
 import { WindSpeed, Gust } from "./WindReading";
 export type ReportFilter = "All" | "Unlogged" | "Logged";
 export default function OutingsView({
@@ -95,11 +96,14 @@ export default function OutingsView({
           const report = o.reports?.[0];
           const phase = outingPhase(o, now);
           const reminder = reminderPresentation(o, profile, now);
-          const hour = weather?.hours.find(
-            (h) =>
-              Date.parse(h.time) <= Date.parse(o.starts_at) &&
-              Date.parse(o.starts_at) < Date.parse(h.time) + 3600000,
-          );
+          const preview = weather
+            ? windowSamples(
+                weather,
+                Date.parse(o.starts_at),
+                Date.parse(o.starts_at),
+              )
+            : null;
+          const hour = preview?.covered ? preview.samples[0] : undefined;
           return (
             <article className="outing-card" key={o.id}>
               <div className="card-top">
@@ -145,7 +149,10 @@ export default function OutingsView({
                   weather &&
                   weatherFreshness(weather.fetched_at, now) !== "expired" ? (
                     <>
-                      <small>Hourly forecast · {formatTime(hour.time)}</small>
+                      <small>
+                        {sampleMinutes(hour)}-minute forecast ·{" "}
+                        {formatTime(hour.time)}
+                      </small>
                       <span>
                         <WindSpeed hour={hour} /> <Gust value={hour.gust} /> ·{" "}
                         {hour.temperature?.toFixed(0) ?? "—"}°F

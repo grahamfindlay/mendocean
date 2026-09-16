@@ -1,3 +1,4 @@
+import { timelineSamples } from "./timeline.ts";
 import type { Forecast, Outing } from "./domain.ts";
 
 export function outingPhase(
@@ -27,7 +28,7 @@ export function sortedOutings(
     );
 }
 export function forecastSamples(weather: Forecast, now: number) {
-  const hours = [...weather.hours].sort(
+  const hours = timelineSamples(weather).sort(
     (a, b) => Date.parse(a.time) - Date.parse(b.time),
   );
   const candidates = [...(weather.current ? [weather.current] : []), ...hours]

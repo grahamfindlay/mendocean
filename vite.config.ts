@@ -51,7 +51,7 @@ export default defineConfig({
               });
               if (!response.ok) throw new Error("Weather provider unavailable");
               cached = normalizeWeather(await response.json());
-              expires = Date.now() + 1800000;
+              expires = Date.now() + 900000;
             }
             res.setHeader("Content-Type", "application/json");
             res.end(JSON.stringify(cached));

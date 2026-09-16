@@ -17,6 +17,15 @@ import type {
 } from "../shared/model";
 import { forecastSamples, weatherDescription } from "../shared/presentation";
 import { api, supabase } from "./client";
+import WeatherChart from "./WeatherChart";
+import {
+  timelineSamples,
+  nearTerm,
+  windowSamples,
+  forecastDays,
+  comparisonTimes,
+  sampleMinutes,
+} from "../shared/timeline";
 import { Gust, WindCompass, WindSpeed } from "./WindReading";
 
 export function HourRow({
@@ -53,7 +62,8 @@ export function HourRow({
           Rain chance <b>{hour.probability ?? "—"}%</b>
         </span>
         <span>
-          Preceding hour precipitation <b>{hour.precipitation ?? "—"} in</b>
+          Preceding {sampleMinutes(hour)} min precipitation{" "}
+          <b>{hour.precipitation ?? "—"} in</b>
         </span>
         <span>
           Visibility{" "}
@@ -96,6 +106,7 @@ export default function ForecastView({
     localDateTime(new Date(Date.now() + 86400000).toISOString()).slice(0, 11) +
       "07:00",
   );
+  const [selectedDay, setSelectedDay] = useState("");
   const [duration, setDuration] = useState("90");
   const [basis, setBasis] = useState<"pooled" | "mine">("pooled");
   const [context, setContext] = useState<AssessmentContext>(defaultContext);
@@ -193,14 +204,48 @@ export default function ForecastView({
   } catch {
     /* Input validation below. */
   }
-  const selected = weather.hours.filter(
-    (h) =>
-      Date.parse(h.time) >= Math.floor(start / 3600000) * 3600000 &&
-      Date.parse(h.time) < start + Number(duration) * 60000,
+  const window = windowSamples(
+    weather,
+    start,
+    start + (Number(duration) === 1 ? 0 : Number(duration) * 60000),
   );
-  const days = [
-    ...new Set(upcoming.map((h) => localDateTime(h.time).slice(0, 10))),
-  ].slice(0, 5);
+  const selected = window.samples;
+  const days = forecastDays(weather, now);
+  const day = days.includes(selectedDay) ? selectedDay : days[0];
+  const daySamples = timelineSamples(weather).filter((h) =>
+    localDateTime(h.time).startsWith(day),
+  );
+  const near = nearTerm(weather, now);
+  const comparisons = comparisonTimes(weather, when, now);
+  const dayView = (
+    <>
+      <div className="day-picker" role="group" aria-label="Forecast day">
+        {days.map((d) => (
+          <button
+            key={d}
+            aria-pressed={day === d}
+            onClick={() => setSelectedDay(d)}
+          >
+            {formatDate(d + "T12:00:00Z")}
+          </button>
+        ))}
+      </div>
+      <WeatherChart
+        key={day}
+        samples={daySamples}
+        expired={expired}
+        title={day ? formatDate(day + "T12:00:00Z") : "Daily forecast"}
+      />
+      <details className="sample-details">
+        <summary>All samples for this day</summary>
+        <div className="hour-table">
+          {daySamples.map((h) => (
+            <HourRow key={h.time} hour={h} expired={expired} />
+          ))}
+        </div>
+      </details>
+    </>
+  );
   const windowOptions = ["1", "60", "90", "120"];
   return (
     <>
@@ -228,7 +273,9 @@ export default function ForecastView({
                 <p className="valid-time">
                   {weather.current?.time === current.time
                     ? "Current estimate"
-                    : "Hourly estimate"}{" "}
+                    : sampleMinutes(current) === 15
+                      ? "15-minute estimate"
+                      : "Hourly estimate"}{" "}
                   for{" "}
                   <time dateTime={current.time}>
                     {formatTime(current.time)}
@@ -253,9 +300,7 @@ export default function ForecastView({
                     Air <b>{current.temperature?.toFixed(0) ?? "—"}°F</b>
                   </span>
                   <span>
-                    {weather.current?.time === current.time
-                      ? "Precipitation · 15 min"
-                      : "Precipitation · hour"}{" "}
+                    {`Precipitation · ${weather.current?.time === current.time ? 15 : sampleMinutes(current)} min`}{" "}
                     <b>{current.precipitation ?? "—"} in</b>
                   </span>
                 </div>
@@ -272,10 +317,18 @@ export default function ForecastView({
           )}
           <div className="section-heading">
             <h2>The next few hours</h2>
-            <span>Tap an hour for details</span>
+            <span>15-minute steps where available, then hourly</span>
           </div>
+          <WeatherChart
+            samples={[
+              ...(current ? [current] : []),
+              ...near.filter((h) => Date.parse(h.time) <= now + 2 * 3600000),
+            ]}
+            expired={expired}
+            title="Your next two hours"
+          />
           <section className="hour-table">
-            {upcoming.slice(0, 6).map((h) => (
+            {near.map((h) => (
               <HourRow key={h.time} hour={h} expired={expired} />
             ))}
             {!upcoming.length && (
@@ -290,24 +343,7 @@ export default function ForecastView({
           </div>
         </>
       )}
-      {tab === "Hourly" && (
-        <div className="day-sections">
-          {days.slice(0, 3).map((day) => (
-            <section key={day}>
-              <div className="section-heading">
-                <h2>{formatDate(day + "T12:00:00Z")}</h2>
-              </div>
-              <div className="hour-table">
-                {upcoming
-                  .filter((h) => localDateTime(h.time).startsWith(day))
-                  .map((h) => (
-                    <HourRow key={h.time} hour={h} expired={expired} />
-                  ))}
-              </div>
-            </section>
-          ))}
-        </div>
-      )}
+      {tab === "Hourly" && dayView}
       {tab === "Forecast" && (
         <>
           <section className="form-card">
@@ -418,10 +454,28 @@ export default function ForecastView({
             <span>
               <Clock size={14} />{" "}
               {Number(duration) === 1
-                ? "Hourly forecast containing this time"
+                ? "Samples at or around the selected time"
                 : duration + " minutes"}
             </span>
           </div>
+          <p className="help">
+            {Number.isFinite(start) &&
+              `${formatDate(new Date(start).toISOString())} · ${formatTime(new Date(start).toISOString())}${Number(duration) === 1 ? "" : `–${formatDate(new Date(start + Number(duration) * 60000).toISOString())}, ${formatTime(new Date(start + Number(duration) * 60000).toISOString())}`}. `}
+            Actual samples include the selection’s boundaries; values are not
+            interpolated to your chosen minute.
+          </p>
+          {!window.covered && (
+            <p className="alert">
+              Full forecast coverage is unavailable for this selection.
+              Available samples are shown below.
+            </p>
+          )}
+          <WeatherChart
+            key={when + duration}
+            samples={selected}
+            expired={expired}
+            title="Selected forecast"
+          />
           <section className="hour-table">
             {selected.length ? (
               selected.map((h) => (
@@ -455,29 +509,47 @@ export default function ForecastView({
               <p className="help">
                 Based on {estimate.outings} distinct outings ·{" "}
                 {effectiveBasis === "mine" ? "Only your data" : "Pooled data"} ·
-                Selected start time · Assessment: {estimate.source}
+                Hourly weather near selected start · Assessment:{" "}
+                {estimate.source}
               </p>
             </section>
           )}
           {estimateError && <p className="help">{estimateError}</p>}
           <div className="section-heading">
-            <h2>Five days around {when.slice(11)}</h2>
-            <span>Hourly samples</span>
+            <h2>Five days at {when.slice(11)}</h2>
+            <span>Select a day for its timeline</span>
           </div>
-          <section className="hour-table">
-            {upcoming
-              .filter(
-                (h) =>
-                  localDateTime(h.time).slice(11, 13) === when.slice(11, 13),
-              )
-              .slice(0, 5)
-              .map((h) => (
-                <div key={h.time}>
-                  <p className="day-label">{formatDate(h.time)}</p>
-                  <HourRow hour={h} expired={expired} />
-                </div>
-              ))}
-          </section>
+          <div className="comparison-grid">
+            {comparisons.map((c) => (
+              <article key={c.day}>
+                <button
+                  className="text-button"
+                  onClick={() => setSelectedDay(c.day)}
+                >
+                  {formatDate(c.day + "T12:00:00Z")}
+                </button>
+                {c.covered ? (
+                  c.samples.map((h) => (
+                    <div key={h.time}>
+                      <small>
+                        {formatTime(h.time)} · {sampleMinutes(h)} min
+                      </small>
+                      <p>
+                        <WindSpeed hour={h} expired={expired} />{" "}
+                        <Gust value={h.gust} />
+                      </p>
+                      <span>
+                        {h.temperature ?? "—"}°F · {weatherDescription(h.code)}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p>Forecast not available.</p>
+                )}
+              </article>
+            ))}
+          </div>
+          {dayView}
           {outings.some((o) => Date.parse(o.ends_at) > now) && (
             <>
               <div className="section-heading">
@@ -521,6 +593,10 @@ export default function ForecastView({
           )}
         </>
       )}
+      <p className="help">
+        {weather.resolution_note ||
+          "Hourly model estimates; 15-minute data are not available in this cached forecast."}
+      </p>
       <aside className="method-note">
         <span>
           Weather: <a href="https://open-meteo.com/">{weather.provider}</a> ·

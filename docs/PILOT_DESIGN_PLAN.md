@@ -1,6 +1,6 @@
 # Pilot design review and implementation plan
 
-Reviewed September 15, 2026 against the current application, Hannah's source and live dashboard, and provider documentation. Milestone 1 implementation and verification are recorded in [PILOT_DESIGN_M1_DELIVERY.md](PILOT_DESIGN_M1_DELIVERY.md). Milestones 2–4 remain planned.
+Reviewed September 15, 2026 against the current application, Hannah's source and live dashboard, and provider documentation. Milestone 1 implementation and verification are recorded in [PILOT_DESIGN_M1_DELIVERY.md](PILOT_DESIGN_M1_DELIVERY.md). Milestone 2 implementation is recorded in [PILOT_DESIGN_M2_DELIVERY.md](PILOT_DESIGN_M2_DELIVERY.md). Milestones 3–4 remain planned.
 
 ## Recommendation
 

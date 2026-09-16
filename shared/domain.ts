@@ -261,6 +261,7 @@ export interface Coach {
   name: string;
 }
 export interface WeatherHour {
+  interval_minutes?: 15 | 60;
   time: string;
   wind: number | null;
   direction: number | null;
@@ -277,6 +278,8 @@ export interface Forecast {
   model_version: string;
   hours: WeatherHour[];
   current: WeatherHour | null;
+  quarter_hours?: WeatherHour[];
+  resolution_note?: string;
   source_kind: "modeled" | "fixture";
   evidence?: { outings: number; ratings: number[] };
 }
