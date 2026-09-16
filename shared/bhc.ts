@@ -107,3 +107,45 @@ export function syncTimes(
     Date.parse(p.ends_at) + 600000,
   ].filter((t): t is number => t !== null && t > now);
 }
+
+export type AttendanceChoice = "attending" | "declined";
+export interface AttendanceState {
+  attendance: "attending" | "declined" | "unknown";
+  allowed: boolean;
+  reason: string | null;
+  opens_at: string | null;
+  deadline: string | null;
+  checked_at: string;
+}
+export function attendanceState(
+  meta: BHCRecord,
+  now = Date.now(),
+): AttendanceState {
+  const timestamp = (v: unknown) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n * 1000 : null;
+  };
+  const start = timestamp(meta.attendance_window_start);
+  const end = timestamp(meta.attendance_window_end);
+  const practice = timestamp(meta.start_time);
+  const reason =
+    !practice || now >= practice
+      ? "This practice has started. Manage attendance in Boathouse Connect."
+      : start && now < start
+        ? "Attendance selection has not opened yet."
+        : end && now >= end
+          ? "The attendance deadline has passed. Request changes in Boathouse Connect."
+          : meta.set_attendance_allowed !== true || !start || !end
+            ? "Boathouse Connect is not allowing attendance changes here."
+            : null;
+  return {
+    attendance: bhcAttendance(
+      meta.current_attendance_status ?? meta.attendance_plan,
+    ),
+    allowed: reason === null,
+    reason,
+    opens_at: start ? new Date(start).toISOString() : null,
+    deadline: end ? new Date(end).toISOString() : null,
+    checked_at: new Date(now).toISOString(),
+  };
+}

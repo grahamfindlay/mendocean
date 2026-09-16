@@ -18,6 +18,7 @@ import {
 } from "../shared/domain";
 import ForecastView, { type ForecastSelection } from "./ForecastView";
 import OutingsView, { type ReportFilter } from "./OutingsView";
+import AttendanceEditor from "./AttendanceEditor";
 import { useClock } from "./useClock";
 import { canLog, outingPhase } from "../shared/presentation";
 import Logger from "./Logger";
@@ -72,6 +73,7 @@ export default function App() {
   const [queue, setQueue] = useState<PendingReport[]>([]);
   const [editing, setEditing] = useState<{ outing: Outing; report: Report }>();
   const [planned, setPlanned] = useState(false);
+  const [attendanceOuting, setAttendanceOuting] = useState<Outing>();
   const [selectedOuting, setSelectedOuting] = useState<string | undefined>(
     new URLSearchParams(location.search).get("log") || undefined,
   );
@@ -423,6 +425,8 @@ export default function App() {
               <OutingsView
                 outings={account.outings}
                 profile={account.profile}
+                bhcConnected={account.bhc.connected}
+                onAttendance={setAttendanceOuting}
                 now={now}
                 user={user.id}
                 weather={weather}
@@ -511,6 +515,16 @@ export default function App() {
             setAuthOpen(false);
             setMessage("You’re signed in.");
           }}
+        />
+      )}
+      {attendanceOuting && user && (
+        <AttendanceEditor
+          key={user.id + attendanceOuting.id}
+          outing={attendanceOuting}
+          user={user.id}
+          now={now}
+          onClose={() => setAttendanceOuting(undefined)}
+          onRefresh={refresh}
         />
       )}
       {settings && user && (
