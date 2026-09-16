@@ -94,3 +94,31 @@ it("uses a qualified context without leaking a pooled context into personal fore
     }).launch_probability,
   ).toBeNull();
 });
+
+it("exposes only validated contexts for the current user, never model coefficients", async () => {
+  const { assessmentCapabilities } = await import("../shared/model");
+  const bundle = {
+    ...model,
+    pooled: {
+      ...model.pooled,
+      contextual: {
+        "east|2x|Charlie": model.pooled,
+        "west|any|none": {
+          launch: { eligible: false, outings: 5 },
+          water: { eligible: false, outings: 5 },
+        },
+      },
+    },
+    personal: { alice: model.pooled },
+  };
+  expect(assessmentCapabilities(null, null)).toEqual({ pooled: [], mine: [] });
+  const publicCaps = assessmentCapabilities(bundle, null);
+  expect(publicCaps.pooled).toEqual([
+    context,
+    { route: "east", boat: "2x", coach: "Charlie" },
+  ]);
+  expect(publicCaps.mine).toEqual([]);
+  expect(assessmentCapabilities(bundle, "bob").mine).toEqual([]);
+  expect(assessmentCapabilities(bundle, "alice").mine).toEqual([context]);
+  expect(JSON.stringify(publicCaps)).not.toMatch(/coefficients|alice/);
+});

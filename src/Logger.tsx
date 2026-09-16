@@ -17,6 +17,8 @@ import {
   type Report,
   type ReportInput,
 } from "../shared/domain";
+import { canLog } from "../shared/presentation";
+import { useClock } from "./useClock";
 import { clearDraft, draft, flush, stage } from "./outbox";
 export default function Logger({
   user,
@@ -33,6 +35,8 @@ export default function Logger({
   initialOuting?: string;
   onSaved: (message: string) => void;
 }) {
+  const now = useClock();
+  const initial = outings.find((o) => o.id === initialOuting);
   const [selected, setSelected] = useState(
     editing?.outing.id || initialOuting || "new",
   );
@@ -49,7 +53,7 @@ export default function Logger({
     localDateTime(
       editing?.report.actual_start ||
         editing?.outing.starts_at ||
-        outings.find((o) => o.id === initialOuting)?.starts_at ||
+        initial?.starts_at ||
         new Date(Date.now() - 5400000).toISOString(),
     ),
   );
@@ -57,7 +61,11 @@ export default function Logger({
     localDateTime(
       editing?.report.actual_end ||
         editing?.outing.ends_at ||
-        outings.find((o) => o.id === initialOuting)?.ends_at ||
+        (initial
+          ? new Date(
+              Math.min(Date.parse(initial.ends_at), Date.now()),
+            ).toISOString()
+          : undefined) ||
         new Date().toISOString(),
     ),
   );
@@ -65,13 +73,16 @@ export default function Logger({
     editing?.outing.title || "Independent row",
   );
   const [boat, setBoat] = useState<ReportInput["boat_class"]>(
-    editing?.report.boat_class ?? null,
+    editing?.report.boat_class ??
+      (initial?.planned_boat as ReportInput["boat_class"]) ??
+      null,
   );
   const [reason, setReason] = useState<ReportInput["reason"]>(
     editing?.report.reason ?? "unknown",
   );
   const [coachState, setCoachState] = useState<ReportInput["coach_state"]>(
-    editing?.report.coach_state || (initialOuting ? "unknown" : "uncoached"),
+    editing?.report.coach_state ||
+      (initial?.kind === "official" ? "unknown" : "uncoached"),
   );
   const [coachIds, setCoachIds] = useState<string[]>(
     editing?.report.coach_ids || [],
@@ -105,7 +116,9 @@ export default function Logger({
       .then((v) => {
         if (v) {
           setSelected(
-            outings.some((o) => o.id === v.selected) ? v.selected : "new",
+            outings.some((o) => o.id === v.selected && canLog(o, Date.now()))
+              ? v.selected
+              : "new",
           );
           setOutcome(v.outcome);
           setRating(v.rating);
@@ -188,10 +201,14 @@ export default function Logger({
     const o = outings.find((o) => o.id === id);
     if (o) {
       setStart(localDateTime(o.starts_at));
-      setEnd(localDateTime(o.ends_at));
-      setCoachState("unknown");
+      setEnd(
+        localDateTime(
+          new Date(Math.min(Date.parse(o.ends_at), Date.now())).toISOString(),
+        ),
+      );
+      setCoachState(o.kind === "official" ? "unknown" : "uncoached");
       setCoachIds([]);
-      setCoachCount(null);
+      setCoachCount(o.kind === "official" ? null : 0);
       setBoat(o.planned_boat as ReportInput["boat_class"]);
     } else {
       setCoachState("uncoached");
@@ -217,7 +234,7 @@ export default function Logger({
         });
       if (Date.parse(chicagoToISO(start)) > Date.now())
         throw new Error(
-          "This outing has not started yet. Use “Plan an outing” to schedule it.",
+          "This outing has not started yet. Use “Add independent outing” to schedule it.",
         );
       const extremes = launched.length
         ? boatExtremes(launched)
@@ -249,7 +266,7 @@ export default function Logger({
       onSaved(
         result.remaining.length
           ? "Saved on this device. Waiting to upload; you can retry from My outings."
-          : "Report saved. Thank you for sharing what you saw.",
+          : "Report saved.",
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to save report.");
@@ -261,9 +278,8 @@ export default function Logger({
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">EVERY ROW TEACHES US SOMETHING</p>
+          <p className="eyebrow">A SMALL EFFORT. A BETTER FORECAST.</p>
           <h1>{editing ? "Edit your report." : "How was the water?"}</h1>
-          <p>Practice, solo row, or a plan called off. They all count.</p>
         </div>
       </div>
       {restored && (
@@ -284,8 +300,11 @@ export default function Logger({
               {outings
                 .filter(
                   (o) =>
-                    Date.parse(o.starts_at) < Date.now() + 86400000 &&
+                    (canLog(o, now) || editing?.outing.id === o.id) &&
                     (!o.reports?.length || editing?.outing.id === o.id),
+                )
+                .sort(
+                  (a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at),
                 )
                 .map((o) => (
                   <option key={o.id} value={o.id}>

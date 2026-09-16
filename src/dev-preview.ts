@@ -26,6 +26,7 @@ export async function previewAPI(path: string, body: any) {
     if (!outing) {
       outing = {
         ...body.outing,
+        attendance: "attending",
         owner_id: USER,
         bhc_practice_id: null,
         version: 1,
@@ -59,6 +60,7 @@ export async function previewAPI(path: string, body: any) {
   if (path === "outing") {
     const outing = {
       ...body,
+      attendance: "attending",
       owner_id: USER,
       bhc_practice_id: null,
       version: 1,

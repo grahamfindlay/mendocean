@@ -18,7 +18,8 @@ import {
   userClient,
 } from "../_shared/runtime.ts";
 import { bhcGet, list } from "../_shared/bhc.ts";
-import { assess } from "../../../shared/model.ts";
+import { assess, assessmentCapabilities } from "../../../shared/model.ts";
+import { reminderScheduleError } from "../../../shared/reminders.ts";
 import { weatherFeatures } from "../_shared/weather.ts";
 const uuid = z.string().uuid();
 export function createApiHandler(providers: Providers = liveProviders) {
@@ -43,6 +44,18 @@ export function createApiHandler(providers: Providers = liveProviders) {
             "The first weather forecast has not arrived yet.",
           );
         return json(req, run.summary);
+      }
+      if (path === "assessment/capabilities" && req.method === "GET") {
+        const { data } = await userClient(
+          req.headers.get("authorization") || "",
+        ).auth.getUser();
+        return json(
+          req,
+          assessmentCapabilities(
+            await query("model_active"),
+            data.user?.id || null,
+          ),
+        );
       }
       if (path === "assessment" && req.method === "POST") {
         const input = z
@@ -111,22 +124,29 @@ export function createApiHandler(providers: Providers = liveProviders) {
         return m;
       };
       const ownOutings = async () => {
-        const [or, mr, rr] = await Promise.all([
+        const [or, mr, rr, states] = await Promise.all([
           client
             .from("outings")
             .select("*")
             .order("starts_at", { ascending: false }),
           client.from("outing_members").select("*"),
           client.from("reports").select("*"),
+          db.rpc("reminder_states", { uid }),
         ]);
         const members = check(mr) || [];
         const reports = check(rr) || [];
+        const reminderStates = check(states) || [];
         return (check(or) || []).map((o) => {
           const m = members.find((m) => m.outing_id === o.id);
           return {
             ...o,
             attendance: m?.attendance,
             reminder: m?.reminder,
+            skipped: m?.skipped,
+            reminder_state:
+              reminderStates.find(
+                (s: { outing_id: string }) => s.outing_id === o.id,
+              ) || null,
             planned_boat: m?.planned_boat || o.planned_boat,
             reports: reports
               .filter((r) => r.outing_id === o.id)
@@ -314,7 +334,7 @@ export function createApiHandler(providers: Providers = liveProviders) {
             action: z.enum(["skip", "enable", "snooze"]),
           })
           .parse(input);
-        await member(parsed.outing_id);
+        const membership = await member(parsed.outing_id);
         const outing = check(
           await client
             .from("outings")
@@ -323,6 +343,38 @@ export function createApiHandler(providers: Providers = liveProviders) {
             .single(),
         );
         if (!outing) throw new HttpError(404, "Outing not found.");
+        if (parsed.action !== "skip") {
+          const reports = check(
+            await client
+              .from("reports")
+              .select("id")
+              .eq("outing_id", outing.id)
+              .eq("user_id", uid),
+          );
+          const reason = reminderScheduleError(
+            {
+              ...outing,
+              attendance: membership.attendance,
+              reports: reports || [],
+            },
+            profile,
+            parsed.action,
+            providers.now(),
+          );
+          if (reason) throw new HttpError(409, reason);
+          const states = check(await db.rpc("reminder_states", { uid }));
+          if (
+            parsed.action === "enable" &&
+            states?.find(
+              (s: { outing_id: string; sent_at: string | null }) =>
+                s.outing_id === outing.id,
+            )?.sent_at
+          )
+            throw new HttpError(
+              409,
+              "A logging reminder was already sent. Choose a one-hour reminder to receive another.",
+            );
+        }
         check(
           await db
             .from("outing_members")
@@ -346,9 +398,12 @@ export function createApiHandler(providers: Providers = liveProviders) {
             uid,
             outing.id,
             parsed.action === "snooze"
-              ? new Date(Date.now() + 3600000)
+              ? new Date(providers.now() + 3600000)
               : new Date(
-                  Math.max(Date.now(), Date.parse(outing.ends_at) + 900000),
+                  Math.max(
+                    providers.now(),
+                    Date.parse(outing.ends_at) + 900000,
+                  ),
                 ),
             `reminder:${uid}:${outing.id}:${Date.now()}`,
             { generation },
@@ -359,6 +414,15 @@ export function createApiHandler(providers: Providers = liveProviders) {
         const endpoint = z.string().url().max(2048).parse(input.endpoint);
         await sendTestPush(uid, endpoint, providers);
         return json(req, { accepted: true });
+      }
+      if (path === "push/status") {
+        const endpoint = z.string().url().max(2048).parse(input.endpoint);
+        const subscriptions = await query("push_get", { user_id: uid });
+        return json(req, {
+          registered: subscriptions.some(
+            (s: { endpoint: string }) => s.endpoint === endpoint,
+          ),
+        });
       }
       if (path === "push") {
         const subscription = z

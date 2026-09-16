@@ -1,20 +1,24 @@
 import { useEffect, useState } from "react";
-import { ArrowDown, ArrowRight, Clock, Wind } from "lucide-react";
+import { ArrowRight, Clock } from "lucide-react";
 import {
-  BOAT_CLASSES,
-  STATUS_LABELS,
   directionLabel,
   formatDate,
   formatTime,
   localDateTime,
   chicagoToISO,
   weatherFreshness,
-  windStatus,
   type Forecast,
   type WeatherHour,
   type Outing,
 } from "../shared/domain";
+import type {
+  AssessmentCapabilities,
+  AssessmentContext,
+} from "../shared/model";
+import { forecastSamples, weatherDescription } from "../shared/presentation";
 import { api, supabase } from "./client";
+import { Gust, WindCompass, WindSpeed } from "./WindReading";
+
 export function HourRow({
   hour,
   expired = false,
@@ -22,50 +26,39 @@ export function HourRow({
   hour: WeatherHour;
   expired?: boolean;
 }) {
-  const status = expired
-    ? "unavailable"
-    : windStatus(hour.wind, hour.direction);
   return (
     <details className="hour-detail">
       <summary className="hour-row">
         <time dateTime={hour.time}>{formatTime(hour.time)}</time>
-        <span className={"condition " + status}>
-          <i />
-          {STATUS_LABELS[status]}
-        </span>
         <span className="wind-cell">
-          <ArrowDown
-            size={16}
-            style={{ transform: `rotate(${hour.direction ?? 0}deg)` }}
-          />
-          {hour.wind?.toFixed(1) ?? "—"}{" "}
-          <small>mph {directionLabel(hour.direction)}</small>
-          <small className="mobile-gust">
-            Gust {hour.gust?.toFixed(0) ?? "—"} mph
-          </small>
+          <WindSpeed hour={hour} expired={expired} />
+          <span className="wind-direction">
+            From {directionLabel(hour.direction)}
+          </span>
         </span>
-        <span className="gust-cell">
-          {hour.gust?.toFixed(0) ?? "—"} <small>gust</small>
+        <Gust value={hour.gust} />
+        <span>{hour.temperature?.toFixed(0) ?? "—"}°F</span>
+        <span className="weather-description">
+          {weatherDescription(hour.code)}
         </span>
-        <span>{hour.temperature?.toFixed(0) ?? "—"}°</span>
       </summary>
       <div className="hour-more">
         <span>
-          Gusts <b>{hour.gust?.toFixed(1) ?? "—"} mph</b>
+          Conditions <b>{weatherDescription(hour.code)}</b>
         </span>
         <span>
-          Air <b>{hour.temperature?.toFixed(0) ?? "—"}°F</b>
+          Gusts <b>{hour.gust?.toFixed(1) ?? "—"} mph</b>
         </span>
         <span>
           Rain chance <b>{hour.probability ?? "—"}%</b>
         </span>
         <span>
-          Precipitation <b>{hour.precipitation ?? "—"} in</b>
+          Preceding hour precipitation <b>{hour.precipitation ?? "—"} in</b>
         </span>
         <span>
           Visibility{" "}
           <b>
-            {hour.visibility === null
+            {hour.visibility == null
               ? "—"
               : (hour.visibility / 1609.344).toFixed(1)}{" "}
             mi
@@ -75,48 +68,110 @@ export function HourRow({
     </details>
   );
 }
+export interface ForecastSelection {
+  starts_at: string;
+  ends_at: string;
+  id: string;
+}
+const defaultContext = { route: "either", boat: "any", coach: "none" };
+const emptyCapabilities: AssessmentCapabilities = { pooled: [], mine: [] };
 export default function ForecastView({
   weather,
   tab,
   outings,
   onLog,
+  now,
+  selection,
+  userId,
 }: {
   weather: Forecast;
   tab: string;
   outings: Outing[];
   onLog: () => void;
+  now: number;
+  selection?: ForecastSelection;
+  userId?: string;
 }) {
   const [when, setWhen] = useState(
     localDateTime(new Date(Date.now() + 86400000).toISOString()).slice(0, 11) +
       "07:00",
   );
   const [duration, setDuration] = useState("90");
-  const [route, setRoute] = useState("either");
-  const [boat, setBoat] = useState("any");
-  const [basis, setBasis] = useState("pooled");
-  const [coach, setCoach] = useState("none");
+  const [basis, setBasis] = useState<"pooled" | "mine">("pooled");
+  const [context, setContext] = useState<AssessmentContext>(defaultContext);
+  const [capabilities, setCapabilities] = useState(emptyCapabilities);
   const [estimate, setEstimate] = useState<{
     source: string;
     reason: string | null;
     launch_probability: number | null;
     water_probabilities: number[] | null;
-    forced_off_probability: number | null;
     outings: number;
   } | null>(null);
   const [estimateError, setEstimateError] = useState("");
   useEffect(() => {
+    if (selection) {
+      setWhen(localDateTime(selection.starts_at));
+      setDuration(
+        String(
+          Math.max(
+            1,
+            Math.round(
+              (Date.parse(selection.ends_at) -
+                Date.parse(selection.starts_at)) /
+                60000,
+            ),
+          ),
+        ),
+      );
+    }
+  }, [selection]);
+  useEffect(() => {
+    let active = true;
+    setCapabilities(emptyCapabilities);
+    setBasis("pooled");
+    setContext(defaultContext);
+    if (supabase)
+      void api<AssessmentCapabilities>("assessment/capabilities")
+        .then((v) => {
+          if (active) setCapabilities(v);
+        })
+        .catch(() => {
+          /* Weather remains useful if model metadata is unavailable. */
+        });
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+  const effectiveBasis = capabilities[basis].length
+    ? basis
+    : capabilities.pooled.length
+      ? "pooled"
+      : "mine";
+  const contexts = capabilities[effectiveBasis];
+  const effectiveContext =
+    contexts.find((c) => JSON.stringify(c) === JSON.stringify(context)) ||
+    contexts[0] ||
+    defaultContext;
+  const { route, boat, coach } = effectiveContext;
+  useEffect(() => {
     let active = true;
     setEstimate(null);
     setEstimateError("");
-    if (tab !== "Plan" || !supabase) return;
+    if (tab !== "Forecast" || !supabase || !contexts.length) return;
     const timer = setTimeout(() => {
-      let time;
+      let time: string;
       try {
         time = chicagoToISO(when);
       } catch {
         return;
       }
-      void api<any>("assessment", { time, basis, route, boat, coach })
+      void api<typeof estimate>("assessment", {
+        time,
+        basis: effectiveBasis,
+        route,
+        boat,
+        coach,
+      })
         .then((v) => {
           if (active) setEstimate(v);
         })
@@ -128,20 +183,16 @@ export default function ForecastView({
       active = false;
       clearTimeout(timer);
     };
-  }, [tab, when, basis, route, boat, coach]);
-  const fresh = weatherFreshness(weather.fetched_at);
+  }, [tab, when, effectiveBasis, route, boat, coach, contexts.length, userId]);
+  const fresh = weatherFreshness(weather.fetched_at, now);
   const expired = fresh === "expired";
-  const upcoming = weather.hours.filter(
-    (h) => Date.parse(h.time) >= Date.now() - 1800000,
-  );
-  const current = weather.current ?? upcoming[0];
-  const status = expired
-    ? "unavailable"
-    : windStatus(current?.wind, current?.direction);
+  const { upcoming, current } = forecastSamples(weather, now);
   let start = NaN;
   try {
     start = Date.parse(chicagoToISO(when));
-  } catch {}
+  } catch {
+    /* Input validation below. */
+  }
   const selected = weather.hours.filter(
     (h) =>
       Date.parse(h.time) >= Math.floor(start / 3600000) * 3600000 &&
@@ -150,76 +201,75 @@ export default function ForecastView({
   const days = [
     ...new Set(upcoming.map((h) => localDateTime(h.time).slice(0, 10))),
   ].slice(0, 5);
+  const windowOptions = ["1", "60", "90", "120"];
   return (
     <>
-      <div className="page-heading">
+      <div className="page-heading concise-heading">
         <div>
-          <p className="eyebrow">
-            {tab === "Plan"
-              ? "MAKE TIME FOR THE WATER"
-              : "A LITTLE LOCAL KNOWLEDGE"}
-          </p>
-          <h1>
-            {tab === "Now"
-              ? "Before you push off."
-              : tab === "Hourly"
-                ? "Find your window."
-                : "Plan your next row."}
-          </h1>
-          <p>
-            {tab === "Now"
-              ? "Wind, water, and a better feel for your next row."
-              : "All times are local to Madison. Wind speeds are in mph."}
-          </p>
+          <h1>{tab}</h1>
+          {tab === "Forecast" && (
+            <p>Choose a date and time, or an outing, to see its forecast.</p>
+          )}
         </div>
-        <Wind size={40} className="heading-icon" />
       </div>
       {fresh !== "fresh" && (
         <div className="alert">
           {expired
-            ? "This forecast has expired. Wind assessments are unavailable until a fresh forecast arrives."
+            ? "This forecast has expired. Wind colors are unavailable until a fresh forecast arrives."
             : "This forecast is more than two hours old. Conditions may have changed."}
         </div>
       )}
-      {tab === "Now" && current && (
+      {tab === "Now" && (
         <>
-          <section className={"current-panel panel-" + status}>
-            <div>
-              <p className="eyebrow">
-                JAMES MADISON PARK · {formatTime(current.time)}
-              </p>
-              <h2 className={"big-status " + status}>
-                {STATUS_LABELS[status]}
-              </h2>
-              <p className="wind-reading">
-                {current.wind?.toFixed(1) ?? "—"}
-                <span> mph from {directionLabel(current.direction)}</span>
-              </p>
-              <div className="weather-facts">
-                <span>
-                  Gusts <b>{current.gust?.toFixed(0) ?? "—"} mph</b>
-                </span>
-                <span>
-                  Air <b>{current.temperature?.toFixed(0) ?? "—"}°F</b>
-                </span>
-                <span>
-                  Rain <b>{current.precipitation ?? "—"} in</b>
-                </span>
+          {current ? (
+            <section className="current-panel">
+              <div className="current-weather">
+                <p className="eyebrow">JAMES MADISON PARK</p>
+                <p className="valid-time">
+                  {weather.current?.time === current.time
+                    ? "Current estimate"
+                    : "Hourly estimate"}{" "}
+                  for{" "}
+                  <time dateTime={current.time}>
+                    {formatTime(current.time)}
+                  </time>
+                </p>
+                <div className="current-wind">
+                  <WindCompass direction={current.direction} />
+                  <div>
+                    <WindSpeed hour={current} expired={expired} />
+                    <p>
+                      From {directionLabel(current.direction)}
+                      {current.direction !== null &&
+                        ` (${Math.round(current.direction)}°)`}
+                    </p>
+                  </div>
+                </div>
+                <div className="weather-facts">
+                  <span>
+                    Gusts <b>{current.gust?.toFixed(0) ?? "—"} mph</b>
+                  </span>
+                  <span>
+                    Air <b>{current.temperature?.toFixed(0) ?? "—"}°F</b>
+                  </span>
+                  <span>
+                    {weather.current?.time === current.time
+                      ? "Precipitation · 15 min"
+                      : "Precipitation · hour"}{" "}
+                    <b>{current.precipitation ?? "—"} in</b>
+                  </span>
+                </div>
+                <p className="current-description">
+                  {weatherDescription(current.code)}
+                </p>
               </div>
-            </div>
-            <div
-              className="compass-mark"
-              aria-label={"Wind from " + directionLabel(current.direction)}
-            >
-              <span>N</span>
-              <ArrowDown
-                size={76}
-                strokeWidth={1.1}
-                style={{ transform: `rotate(${current.direction ?? 0}deg)` }}
-              />
-              <small>{directionLabel(current.direction)} · WIND FROM</small>
-            </div>
-          </section>
+            </section>
+          ) : (
+            <p className="empty">
+              A current estimate is unavailable. Upcoming forecasts are shown
+              below.
+            </p>
+          )}
           <div className="section-heading">
             <h2>The next few hours</h2>
             <span>Tap an hour for details</span>
@@ -228,13 +278,12 @@ export default function ForecastView({
             {upcoming.slice(0, 6).map((h) => (
               <HourRow key={h.time} hour={h} expired={expired} />
             ))}
+            {!upcoming.length && (
+              <p className="empty">No upcoming forecast is available.</p>
+            )}
           </section>
           <div className="log-callout">
-            <div>
-              <p className="eyebrow">JUST BACK?</p>
-              <h2>How was the water?</h2>
-              <p>Your ten-second report helps the next row.</p>
-            </div>
+            <h2>How was the water?</h2>
             <button className="button" onClick={onLog}>
               Log a row <ArrowRight size={17} />
             </button>
@@ -259,12 +308,12 @@ export default function ForecastView({
           ))}
         </div>
       )}
-      {tab === "Plan" && (
+      {tab === "Forecast" && (
         <>
           <section className="form-card">
             <div className="field-grid">
               <label>
-                Start time
+                Start time · Madison
                 <input
                   type="datetime-local"
                   value={when}
@@ -281,105 +330,89 @@ export default function ForecastView({
                   <option value="60">1 hour</option>
                   <option value="90">90 minutes</option>
                   <option value="120">2 hours</option>
-                </select>
-              </label>
-              <label>
-                Route
-                <select
-                  value={route}
-                  onChange={(e) => setRoute(e.target.value)}
-                >
-                  <option value="either">Either direction</option>
-                  <option value="east">East</option>
-                  <option value="west">West</option>
-                </select>
-              </label>
-              <label>
-                Boat
-                <select value={boat} onChange={(e) => setBoat(e.target.value)}>
-                  <option value="any">Any boat</option>
-                  {BOAT_CLASSES.map((b) => (
-                    <option key={b}>{b}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Use observations
-                <select
-                  value={basis}
-                  onChange={(e) => setBasis(e.target.value)}
-                >
-                  <option value="pooled">Everyone’s data</option>
-                  <option value="mine">Only my data</option>
-                </select>
-              </label>
-              <label>
-                Coach factor
-                <select
-                  value={coach}
-                  onChange={(e) => setCoach(e.target.value)}
-                >
-                  <option value="none">No coach factor</option>
-                  <option value="uncoached">Uncoached</option>
-                  {[
-                    "Charlie",
-                    "Rose",
-                    "Heather",
-                    "Taylan",
-                    "Alicia",
-                    "Helena",
-                    "Sam",
-                    "Camille",
-                    "Lexi",
-                  ].map((c) => (
-                    <option key={c}>{c}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <p className="help">
-              The initial wind rule applies to all routes, boats, and coaches.{" "}
-              {basis === "mine"
-                ? "Personal estimates will use only your reports."
-                : "Pooled estimates will count each outing once."}{" "}
-              Personalized estimates will appear after there is enough validated
-              data.
-            </p>
-          </section>
-          {estimate && (
-            <section className="form-card">
-              <h2>
-                {estimate.source === "heuristic"
-                  ? "Using Hannah’s wind rule"
-                  : "What logged outings suggest"}
-              </h2>
-              {estimate.reason ? (
-                <p className="help">{estimate.reason}</p>
-              ) : (
-                <>
-                  <p>
-                    {estimate.launch_probability !== null
-                      ? `${Math.round(estimate.launch_probability * 100)}% estimated rowing rate in similar conditions.`
-                      : ""}
-                  </p>
-                  {estimate.water_probabilities && (
-                    <p>
-                      Water ratings:{" "}
-                      {estimate.water_probabilities
-                        .map((p, i) => `${i + 1}: ${Math.round(p * 100)}%`)
-                        .join(" · ")}
-                    </p>
+                  {!windowOptions.includes(duration) && (
+                    <option value={duration}>{duration} minutes</option>
                   )}
-                  <p className="help">
-                    Based on {estimate.outings} distinct outings ·{" "}
-                    {basis === "mine" ? "Only your data" : "Pooled data"} · This
-                    estimate is for the selected start time.
-                  </p>
-                </>
+                </select>
+              </label>
+              {!!capabilities.mine.length && (
+                <label>
+                  Use observations
+                  <select
+                    value={effectiveBasis}
+                    onChange={(e) =>
+                      setBasis(e.target.value as "pooled" | "mine")
+                    }
+                  >
+                    {!!capabilities.pooled.length && (
+                      <option value="pooled">Everyone’s data</option>
+                    )}
+                    <option value="mine">Only my data</option>
+                  </select>
+                </label>
               )}
-            </section>
-          )}
-          {estimateError && <p className="help">{estimateError}</p>}
+              {(["route", "boat", "coach"] as const).map((field) => {
+                const options = [...new Set(contexts.map((c) => c[field]))];
+                if (
+                  options.length < 2 &&
+                  (!options[0] || options[0] === defaultContext[field])
+                )
+                  return null;
+                return (
+                  <label key={field}>
+                    {
+                      { route: "Route", boat: "Boat", coach: "Coach factor" }[
+                        field
+                      ]
+                    }
+                    <select
+                      value={effectiveContext[field]}
+                      onChange={(e) => {
+                        const matches = contexts.filter(
+                          (c) => c[field] === e.target.value,
+                        );
+                        matches.sort((a, b) =>
+                          Object.keys(defaultContext).reduce(
+                            (score, key) =>
+                              score +
+                              Number(
+                                b[key as keyof AssessmentContext] ===
+                                  effectiveContext[
+                                    key as keyof AssessmentContext
+                                  ],
+                              ) -
+                              Number(
+                                a[key as keyof AssessmentContext] ===
+                                  effectiveContext[
+                                    key as keyof AssessmentContext
+                                  ],
+                              ),
+                            0,
+                          ),
+                        );
+                        setContext(matches[0]);
+                      }}
+                    >
+                      {options.map((v) => (
+                        <option key={v} value={v}>
+                          {(
+                            {
+                              either: "Either direction",
+                              any: "Any boat",
+                              none: "No coach factor",
+                              east: "East",
+                              west: "West",
+                              uncoached: "Uncoached",
+                            } as Record<string, string>
+                          )[v] || v}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                );
+              })}
+            </div>
+          </section>
           <div className="section-heading">
             <h2>Your selected window</h2>
             <span>
@@ -396,38 +429,66 @@ export default function ForecastView({
               ))
             ) : (
               <p className="empty">
-                Choose a time within the next seven days. A forecast is not
-                available for this selection.
+                {Number.isFinite(start)
+                  ? "Forecast not available for this selection."
+                  : "Choose a valid Madison date and time."}
               </p>
             )}
           </section>
+          {estimate && estimate.source !== "heuristic" && !expired && (
+            <section className="form-card assessment-result">
+              <h2>What logged outings suggest</h2>
+              {estimate.launch_probability !== null && (
+                <p>
+                  {Math.round(estimate.launch_probability * 100)}% estimated
+                  rowing rate in similar conditions.
+                </p>
+              )}
+              {estimate.water_probabilities && (
+                <p>
+                  Water ratings:{" "}
+                  {estimate.water_probabilities
+                    .map((p, i) => `${i + 1}: ${Math.round(p * 100)}%`)
+                    .join(" · ")}
+                </p>
+              )}
+              <p className="help">
+                Based on {estimate.outings} distinct outings ·{" "}
+                {effectiveBasis === "mine" ? "Only your data" : "Pooled data"} ·
+                Selected start time · Assessment: {estimate.source}
+              </p>
+            </section>
+          )}
+          {estimateError && <p className="help">{estimateError}</p>}
           <div className="section-heading">
-            <h2>Five days at {when.slice(11)}</h2>
-            <span>Same start time each day</span>
+            <h2>Five days around {when.slice(11)}</h2>
+            <span>Hourly samples</span>
           </div>
           <section className="hour-table">
-            {days.map((day) => {
-              const h = upcoming.find(
+            {upcoming
+              .filter(
                 (h) =>
-                  localDateTime(h.time).slice(0, 13) ===
-                  day + "T" + when.slice(11, 13),
-              );
-              return h ? (
-                <div key={day}>
+                  localDateTime(h.time).slice(11, 13) === when.slice(11, 13),
+              )
+              .slice(0, 5)
+              .map((h) => (
+                <div key={h.time}>
                   <p className="day-label">{formatDate(h.time)}</p>
                   <HourRow hour={h} expired={expired} />
                 </div>
-              ) : null;
-            })}
+              ))}
           </section>
-          {!!outings.length && (
+          {outings.some((o) => Date.parse(o.ends_at) > now) && (
             <>
               <div className="section-heading">
-                <h2>Scheduled outings</h2>
+                <h2>Your upcoming outings</h2>
               </div>
               <div className="outing-grid">
                 {outings
-                  .filter((o) => Date.parse(o.starts_at) > Date.now())
+                  .filter((o) => Date.parse(o.ends_at) > now)
+                  .sort(
+                    (a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at),
+                  )
                   .map((o) => (
                     <button
                       className="outing-card"
@@ -436,10 +497,13 @@ export default function ForecastView({
                         setWhen(localDateTime(o.starts_at));
                         setDuration(
                           String(
-                            Math.round(
-                              (Date.parse(o.ends_at) -
-                                Date.parse(o.starts_at)) /
-                                60000,
+                            Math.max(
+                              1,
+                              Math.round(
+                                (Date.parse(o.ends_at) -
+                                  Date.parse(o.starts_at)) /
+                                  60000,
+                              ),
                             ),
                           ),
                         );
@@ -458,15 +522,24 @@ export default function ForecastView({
         </>
       )}
       <aside className="method-note">
-        <b>Starting with Hannah’s local wind rule.</b> These are wind
-        assessments, not measured water conditions or probabilities of a safe
-        row. Gusts, storms, cold water, visibility, and your crew still matter.{" "}
         <span>
+          Weather: <a href="https://open-meteo.com/">{weather.provider}</a> ·
           Updated {formatDate(weather.fetched_at)},{" "}
-          {formatTime(weather.fetched_at)} ·{" "}
-          <a href="https://open-meteo.com/">Open-Meteo</a> ·{" "}
-          {weather.model_version}
+          {formatTime(weather.fetched_at)}
         </span>
+        <details>
+          <summary>Wind colors: Hannah’s heuristic</summary>
+          <p>Version: {weather.model_version}</p>
+          <p className="wind-key">
+            <span className="favorable">○ Below threshold</span>
+            <span className="caution">△ Intermediate range</span>
+            <span className="unfavorable">◇ Above threshold</span>
+          </p>
+          <p>
+            Thresholds depend on wind direction. Wind colors describe the
+            heuristic, not measured water conditions.
+          </p>
+        </details>
       </aside>
     </>
   );

@@ -242,6 +242,8 @@ export interface Outing extends OutingInput {
   owner_id: string | null;
   bhc_practice_id: number | null;
   attendance?: string;
+  skipped?: boolean;
+  reminder_state?: { due_at: string | null; sent_at: string | null };
   version: number;
   reports?: Report[];
   planned_coaches?: string[];

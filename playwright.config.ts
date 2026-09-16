@@ -1,9 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
+const port = Number(process.env.TEST_PREVIEW_PORT || 4173);
+const previewURL = `http://127.0.0.1:${port}`;
 export default defineConfig({
   testDir: "tests/browser",
+  outputDir: "test-results/preview",
   fullyParallel: true,
   retries: process.env.CI ? 1 : 0,
-  use: { baseURL: "http://127.0.0.1:4173", trace: "retain-on-failure" },
+  use: { baseURL: previewURL, trace: "retain-on-failure" },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },
     {
@@ -12,8 +15,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run dev -- --port 4173",
-    url: "http://127.0.0.1:4173",
-    reuseExistingServer: !process.env.CI,
+    command: `npm run dev -- --port ${port} --strictPort`,
+    url: previewURL,
+    reuseExistingServer: false,
   },
 });

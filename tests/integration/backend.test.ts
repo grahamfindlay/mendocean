@@ -586,3 +586,75 @@ test("rescheduled reminder suppresses the old job and honors the new end time", 
   await tick();
   expect((await fixtures()).deliveries).toHaveLength(1);
 });
+
+test("reminder presentation is private and rejects scheduling that cannot be delivered", async () => {
+  const o = await reminder(a);
+  const state = () =>
+    api(a, "account").then(
+      (r) => r.data.outings.find((v: any) => v.id === o.id).reminder_state,
+    );
+  expect((await state()).due_at).toBeTruthy();
+  expect((await state()).sent_at).toBeNull();
+  expect(
+    (await b.client.rpc("reminder_states", { uid: a.id })).error,
+  ).toBeTruthy();
+  expect(
+    (await publicClient().rpc("reminder_states", { uid: a.id })).error,
+  ).toBeTruthy();
+  expect(JSON.stringify((await api(b, "account")).data)).not.toContain(o.id);
+  await tick();
+  expect((await state()).sent_at).toBeTruthy();
+  expect((await state()).due_at).toBeNull();
+  expect(
+    (await api(a, "reminder", { outing_id: o.id, action: "enable" })).status,
+  ).toBe(409);
+  expect(
+    (await api(a, "reminder", { outing_id: o.id, action: "snooze" })).status,
+  ).toBe(200);
+  expect((await state()).due_at).toBeTruthy();
+  expect((await state()).sent_at).toBeNull();
+  await api(a, "report", { outing: o, report: row(o) });
+  expect(
+    (await api(a, "reminder", { outing_id: o.id, action: "snooze" })).status,
+  ).toBe(409);
+  const another = await reminder(a);
+  await sql.query(
+    "update outings set starts_at=now()-interval '25 hours', ends_at=now()-interval '23 hours 30 minutes' where id=$1",
+    [another.id],
+  );
+  expect(
+    (await api(a, "reminder", { outing_id: another.id, action: "snooze" }))
+      .status,
+  ).toBe(409);
+  await sql.query(
+    "update outing_members set attendance='declined' where outing_id=$1",
+    [another.id],
+  );
+  expect(
+    (await api(a, "reminder", { outing_id: another.id, action: "enable" }))
+      .status,
+  ).toBe(409);
+});
+
+test("push registration status is scoped to the authenticated account", async () => {
+  const endpoint = "https://web.push.apple.com/" + randomUUID();
+  await api(a, "push", {
+    subscription: {
+      endpoint,
+      keys: { auth: "synthetic", p256dh: "synthetic" },
+    },
+  });
+  expect((await api(a, "push/status", { endpoint })).data).toEqual({
+    registered: true,
+  });
+  expect((await api(b, "push/status", { endpoint })).data).toEqual({
+    registered: false,
+  });
+  expect((await api(null, "push/status", { endpoint })).status).toBe(401);
+});
+
+test("model capabilities stay public without exposing personal data or coefficients", async () => {
+  const result = await api(null, "assessment/capabilities");
+  expect(result.status).toBe(200);
+  expect(result.data).toEqual({ pooled: [], mine: [] });
+});
