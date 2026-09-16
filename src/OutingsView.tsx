@@ -220,6 +220,39 @@ export default function OutingsView({
                       </>
                     )}
                   </p>
+                  {o.reminder &&
+                    !o.skipped &&
+                    !reminder.settings &&
+                    !!o.reminder_state?.channels?.length && (
+                      <ul className="channel-status">
+                        {o.reminder_state.channels.map((c) => (
+                          <li key={c.channel}>
+                            {c.channel === "email" ? "Email" : "Push"}:{" "}
+                            {c.status === "sent"
+                              ? "Sent"
+                              : c.status === "not_requested"
+                                ? "Not requested for this reminder"
+                                : c.error === "no_device"
+                                  ? "No registered device"
+                                  : c.error === "quota"
+                                    ? "Sending limit reached"
+                                    : c.status === "retrying"
+                                      ? "Retry scheduled"
+                                      : c.status === "failed"
+                                        ? "Could not send"
+                                        : "Pending"}
+                            {c.channel === "push" &&
+                              c.devices_sent > 0 &&
+                              c.status !== "sent" &&
+                              ` · ${c.devices_sent} device${c.devices_sent === 1 ? "" : "s"} already accepted`}
+                            {c.status === "retrying" &&
+                              (c.error === "no_device" ||
+                                c.error === "quota") &&
+                              " · Retry scheduled"}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   {phase !== "past" &&
                     !reminder.settings &&
                     reminder.toggle && (
@@ -228,8 +261,15 @@ export default function OutingsView({
                         ends.
                       </small>
                     )}
+                  {reminder.partial && reminder.snooze && (
+                    <small>
+                      Requesting another reminder sends all your selected
+                      channels again.
+                    </small>
+                  )}
                   <div className="card-actions">
-                    {reminder.settings && (
+                    {(reminder.settings ||
+                      o.reminder_state?.channels?.some((c) => c.error)) && (
                       <button className="text-button" onClick={onSettings}>
                         Reminder settings
                       </button>
@@ -253,7 +293,7 @@ export default function OutingsView({
                         disabled={busy}
                         onClick={() => onReminder(o, "snooze")}
                       >
-                        {reminder.sent
+                        {reminder.sent || reminder.partial
                           ? "Remind me again in 1 hour"
                           : "Remind me to log in 1 hour"}
                       </button>

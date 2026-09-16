@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import {
   user,
+  createOuting,
   api,
   db,
   sql,
@@ -180,8 +181,9 @@ test("offline submission reconnects once; preferences persist", async ({
   await waitForWorker(page);
   await page.getByRole("button", { name: "Account", exact: true }).click();
   await page
-    .getByRole("combobox", { name: "Reminders", exact: true })
-    .selectOption("push");
+    .getByRole("checkbox", { name: "Push notifications", exact: true })
+    .check();
+  await page.getByRole("checkbox", { name: "Email", exact: true }).check();
   await page
     .getByRole("button", { name: "Save preferences", exact: true })
     .click();
@@ -201,8 +203,27 @@ test("offline submission reconnects once; preferences persist", async ({
   await page.reload();
   await page.getByRole("button", { name: "Account", exact: true }).click();
   await expect(
-    page.getByRole("combobox", { name: "Reminders", exact: true }),
-  ).toHaveValue("push");
+    page.getByRole("checkbox", { name: "Push notifications", exact: true }),
+  ).toBeChecked();
+  await expect(
+    page.getByRole("checkbox", { name: "Email", exact: true }),
+  ).toBeChecked();
+  await page
+    .getByRole("checkbox", { name: "Push notifications", exact: true })
+    .uncheck();
+  await page.getByRole("checkbox", { name: "Email", exact: true }).uncheck();
+  await page
+    .getByRole("button", { name: "Save preferences", exact: true })
+    .click();
+  await expect(page.getByText("Preferences saved.")).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: "Account", exact: true }).click();
+  await expect(
+    page.getByRole("checkbox", { name: "Push notifications", exact: true }),
+  ).not.toBeChecked();
+  await expect(
+    page.getByRole("checkbox", { name: "Email", exact: true }),
+  ).not.toBeChecked();
 });
 test("concurrent edit presents a recoverable conflict", async ({ page }) => {
   await loggedIn(page);
@@ -549,4 +570,50 @@ test("production timeline offers quarter-hour inspection and selectable daily fo
   );
   await page.getByText("All samples for this day", { exact: true }).click();
   await expect(page.locator(".hour-row").first()).toBeVisible();
+});
+
+test("partial reminder delivery is visible without implying device registration", async ({
+  page,
+}) => {
+  await api(actor, "settings", {
+    display_name: "Synthetic",
+    reminder_channels: ["email", "push"],
+    reminders_paused: false,
+  });
+  await createOuting(actor, { reminder: true });
+  await fixtures({
+    failure: null,
+    failed_targets: [],
+    deliveries: [],
+    attempts: [],
+  });
+  await tick();
+  await loggedIn(page);
+  await page.getByRole("button", { name: "My outings", exact: true }).click();
+  await page.getByRole("button", { name: "Past", exact: true }).click();
+  await expect(
+    page.getByText("Logging reminder partially sent", { exact: false }),
+  ).toBeVisible();
+  await expect(page.locator(".channel-status")).toContainText("Email: Sent");
+  await expect(page.locator(".channel-status")).toContainText(
+    "Push: No registered device",
+  );
+  await expect(
+    page.getByRole("button", {
+      name: "Remind me again in 1 hour",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Account", exact: true }).click();
+  await expect(
+    page.getByRole("checkbox", { name: "Email", exact: true }),
+  ).toBeChecked();
+  await expect(
+    page.getByRole("checkbox", { name: "Push notifications", exact: true }),
+  ).toBeChecked();
+  await expect(
+    page.getByText("Push is selected, but no device is registered.", {
+      exact: false,
+    }),
+  ).toBeVisible();
 });

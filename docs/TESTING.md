@@ -58,3 +58,7 @@ Preview tests reserve port 4173 and fail if it is occupied; set `TEST_PREVIEW_PO
 ## Milestone 2 coverage (September 16, 2026)
 
 The local suite passes 52 fast tests, 8 Python tests, 14 preview browser cases, 27 real-backend integration tests and 34 production-build browser cases, with the same two deliberate persistent-profile exclusions. New coverage checks quarter-hour ingestion/archive/cache cadence, minute-specific windows and five-day comparisons, hourly fallback, rain interval/rate semantics, missing samples, DST/midnight, keyboard chart inspection and daily selection across Chromium/WebKit. See `PILOT_DESIGN_M2_DELIVERY.md` for resolution and interpolation policy.
+
+## Milestone 3 coverage (September 16, 2026)
+
+The suite passes 54 fast tests, 14 preview browser cases, 35 real-backend integration tests and 37 production-build browser cases, with the same two deliberate persistent-profile exclusions. New coverage exercises migration without extra opt-ins, independent channel choices, partial delivery, per-device push recovery, stable email retry payloads, channel quotas, leases, generation changes, preference changes and report suppression. Tests use synthetic email/push providers and do not send pilot notifications. See `PILOT_DESIGN_M3_DELIVERY.md` for retry guarantees and their limits.

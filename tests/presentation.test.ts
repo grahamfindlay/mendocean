@@ -152,3 +152,50 @@ test("weather descriptions distinguish missing codes from clear skies", () => {
   expect(weatherDescription(65)).toBe("Rain");
   expect(weatherDescription(95)).toBe("Thunderstorms");
 });
+
+test("multiple reminder channels treat an explicit empty selection as off and surface partial delivery", () => {
+  const both = {
+    reminder_channel: "email",
+    reminder_channels: ["email", "push"],
+    reminders_paused: false,
+  };
+  expect(reminderScheduleError(past, both, "enable", now)).toBeNull();
+  expect(
+    reminderScheduleError(
+      past,
+      { ...both, reminder_channels: [] },
+      "enable",
+      now,
+    ),
+  ).toContain("Choose");
+  const state = reminderPresentation(
+    {
+      ...past,
+      reminder: true,
+      reminder_state: {
+        sent_at: null,
+        due_at: "2026-09-15T14:30:00Z",
+        channels: [
+          {
+            channel: "email",
+            sent_at: "2026-09-15T14:00:00Z",
+            error: null,
+            status: "sent",
+            devices_sent: 0,
+          },
+          {
+            channel: "push",
+            sent_at: null,
+            error: "no_device",
+            status: "retrying",
+            devices_sent: 0,
+          },
+        ],
+      },
+    },
+    both,
+    now,
+  );
+  expect(state?.text).toBe("Logging reminder partially sent");
+  expect(state?.snooze).toBe(true);
+});
