@@ -46,7 +46,7 @@ if (!forecast.ok) throw new Error("weather-api: unavailable");
 validateForecast(await forecast.json());
 for (const path of ["account", "export"])
   requireDenied((await get(backend + "/functions/v1/api/" + path)).status);
-for (const path of ["report", "push/test"])
+for (const path of ["report", "push/test", "bhc/attendance"])
   requireDenied(
     (
       await get(backend + "/functions/v1/api/" + path, {

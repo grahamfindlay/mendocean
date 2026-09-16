@@ -32,6 +32,8 @@ export default function OutingsView({
   onShare,
   onReminder,
   onSettings,
+  onAttendance,
+  bhcConnected,
   busy,
 }: {
   outings: Outing[];
@@ -50,6 +52,8 @@ export default function OutingsView({
   onShare: (outing: Outing) => void;
   onReminder: (outing: Outing, action: "skip" | "enable" | "snooze") => void;
   onSettings: () => void;
+  onAttendance: (outing: Outing) => void;
+  bhcConnected: boolean;
   busy: boolean;
 }) {
   const visible = sortedOutings(outings, view, now).filter(
@@ -164,6 +168,20 @@ export default function OutingsView({
                 </div>
               )}
               <div className="card-actions">
+                {o.kind === "official" &&
+                  phase === "future" &&
+                  bhcConnected && (
+                    <button
+                      className="text-button"
+                      disabled={busy}
+                      onClick={() => onAttendance(o)}
+                    >
+                      {o.attendance_deadline &&
+                      now >= Date.parse(o.attendance_deadline)
+                        ? "Attendance details"
+                        : "Change attendance"}
+                    </button>
+                  )}
                 {phase !== "past" && (
                   <button className="text-button" onClick={() => onForecast(o)}>
                     View forecast

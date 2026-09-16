@@ -1,6 +1,6 @@
 # Pilot design review and implementation plan
 
-Reviewed September 15, 2026 against the current application, Hannah's source and live dashboard, and provider documentation. Milestone 1 implementation and verification are recorded in [PILOT_DESIGN_M1_DELIVERY.md](PILOT_DESIGN_M1_DELIVERY.md). Milestone 2 implementation is recorded in [PILOT_DESIGN_M2_DELIVERY.md](PILOT_DESIGN_M2_DELIVERY.md). Milestone 3 implementation is recorded in [PILOT_DESIGN_M3_DELIVERY.md](PILOT_DESIGN_M3_DELIVERY.md). Milestone 4 remains planned.
+Reviewed September 15, 2026 against the current application, Hannah's source and live dashboard, and provider documentation. Implementation and verification are recorded in [Milestone 1](PILOT_DESIGN_M1_DELIVERY.md), [Milestone 2](PILOT_DESIGN_M2_DELIVERY.md), [Milestone 3](PILOT_DESIGN_M3_DELIVERY.md), and [Milestone 4](PILOT_DESIGN_M4_DELIVERY.md). M4's real-provider attendance write check requires an owner-selected practice and choice.
 
 ## Recommendation
 

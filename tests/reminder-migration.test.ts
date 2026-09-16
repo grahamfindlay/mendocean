@@ -10,7 +10,9 @@ test("migration preserves exact preferences, sent history and in-flight provider
     const migrations = readdirSync("supabase/migrations")
       .filter((n) => n.endsWith(".sql") && !n.includes("_storage"))
       .sort();
-    for (const name of migrations.filter((n) => !n.includes("multi_channel")))
+    for (const name of migrations.filter(
+      (n) => n < "202609160001_multi_channel_reminders.sql",
+    ))
       await db.exec(
         readFileSync("supabase/migrations/" + name, "utf8").replace(
           "create extension if not exists pgcrypto;",

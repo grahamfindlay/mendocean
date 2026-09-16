@@ -18,6 +18,7 @@ import {
   userClient,
 } from "../_shared/runtime.ts";
 import { bhcGet, list } from "../_shared/bhc.ts";
+import { manageAttendance } from "../_shared/attendance.ts";
 import { assess, assessmentCapabilities } from "../../../shared/model.ts";
 import {
   reminderScheduleError,
@@ -144,6 +145,7 @@ export function createApiHandler(providers: Providers = liveProviders) {
           return {
             ...o,
             attendance: m?.attendance,
+            attendance_deadline: m?.deadline || null,
             reminder: m?.reminder,
             skipped: m?.skipped,
             reminder_state:
@@ -223,6 +225,32 @@ export function createApiHandler(providers: Providers = liveProviders) {
       if (req.method !== "POST")
         throw new HttpError(405, "Method not allowed.");
       const input = await body(req);
+      if (path === "bhc/attendance") {
+        const parsed = z
+          .object({
+            outing_id: uuid,
+            change: z
+              .object({
+                attendance: z.enum(["attending", "declined"]),
+                expected: z.enum(["attending", "declined", "unknown"]),
+                request_id: uuid,
+              })
+              .strict()
+              .optional(),
+          })
+          .strict()
+          .parse(input);
+        await member(parsed.outing_id);
+        return json(
+          req,
+          await manageAttendance(
+            uid,
+            parsed.outing_id,
+            parsed.change,
+            providers,
+          ),
+        );
+      }
       if (path === "outing") {
         const outing = outingSchema.parse(input);
         if (outing.kind !== "independent")

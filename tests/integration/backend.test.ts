@@ -936,3 +936,220 @@ test("email quota does not block push and successful push is not repeated after 
     ]);
   }
 });
+
+async function editablePractice() {
+  const id = 900000 + Math.floor(Math.random() * 100000);
+  const p = {
+    ...practice(id, "unknown"),
+    start_time: Math.floor(Date.now() / 1000) + 86400,
+    end_time: Math.floor(Date.now() / 1000) + 90000,
+    attendance_window_start: Math.floor(Date.now() / 1000) - 3600,
+    attendance_window_end: Math.floor(Date.now() / 1000) + 3600,
+    set_attendance_allowed: true,
+  };
+  await fixtures({ bhc: [p] });
+  await api(a, "bhc/connect", { token: syntheticToken });
+  await tick();
+  const o = (
+    await sql.query("select * from outings where bhc_practice_id=$1", [id])
+  ).rows[0];
+  return { p, o };
+}
+const attendanceChange = (
+  o: any,
+  attendance = "attending",
+  expected = "unknown",
+  request_id = randomUUID(),
+) => ({ outing_id: o.id, change: { attendance, expected, request_id } });
+const attendanceWrites = async () =>
+  (await fixtures()).calls.filter(
+    (c: any) => c.path === "/practices/setAttendance",
+  );
+test("BHC attendance writes only own eligible practice, confirms readback and adjusts reminders", async () => {
+  const { o } = await editablePractice();
+  const state = await api(a, "bhc/attendance", { outing_id: o.id });
+  expect(state.data.state).toMatchObject({
+    allowed: true,
+    attendance: "unknown",
+  });
+  expect((await api(null, "bhc/attendance", attendanceChange(o))).status).toBe(
+    401,
+  );
+  expect((await api(b, "bhc/attendance", attendanceChange(o))).status).toBe(
+    404,
+  );
+  expect(
+    (await api(a, "bhc/attendance", { ...attendanceChange(o), custid: 999 }))
+      .status,
+  ).toBe(400);
+  expect(
+    (await api(a, "bhc/attendance", attendanceChange(o, "unknown"))).status,
+  ).toBe(400);
+  expect(
+    (await api(a, "bhc/attendance", attendanceChange(await createOuting(a))))
+      .status,
+  ).toBe(400);
+  expect(await attendanceWrites()).toHaveLength(0);
+  await api(a, "settings", {
+    display_name: "Fixture",
+    reminder_channels: ["email"],
+    reminders_paused: false,
+  });
+  const body = attendanceChange(o);
+  expect((await api(a, "bhc/attendance", body)).data.outcome).toBe("confirmed");
+  expect((await api(a, "bhc/attendance", body)).data.outcome).toBe("confirmed");
+  expect(await attendanceWrites()).toHaveLength(1);
+  expect(
+    (
+      await sql.query(
+        "select attendance,reminder from outing_members where user_id=$1 and outing_id=$2",
+        [a.id, o.id],
+      )
+    ).rows[0],
+  ).toEqual({ attendance: "attending", reminder: true });
+  expect(
+    (
+      await sql.query(
+        "select * from private.jobs where user_id=$1 and outing_id=$2 and kind='reminder' and status='pending'",
+        [a.id, o.id],
+      )
+    ).rowCount,
+  ).toBe(1);
+  expect(
+    (
+      await api(
+        a,
+        "bhc/attendance",
+        attendanceChange(o, "declined", "attending"),
+      )
+    ).data.outcome,
+  ).toBe("confirmed");
+  expect(
+    (
+      await sql.query(
+        "select * from private.jobs where user_id=$1 and outing_id=$2 and kind='reminder' and status='pending'",
+        [a.id, o.id],
+      )
+    ).rowCount,
+  ).toBe(0);
+  await sql.query(
+    "update outing_members set skipped=true where user_id=$1 and outing_id=$2",
+    [a.id, o.id],
+  );
+  expect(
+    (
+      await api(
+        a,
+        "bhc/attendance",
+        attendanceChange(o, "attending", "declined"),
+      )
+    ).data.outcome,
+  ).toBe("confirmed");
+  expect(
+    (
+      await sql.query(
+        "select reminder,skipped from outing_members where user_id=$1 and outing_id=$2",
+        [a.id, o.id],
+      )
+    ).rows[0],
+  ).toEqual({ reminder: false, skipped: true });
+  await api(a, "bhc/disconnect", {});
+  expect((await api(a, "bhc/attendance", attendanceChange(o))).status).toBe(
+    409,
+  );
+});
+test("BHC attendance rejects stale status, closed windows and provider restrictions without a write", async () => {
+  const { o, p } = await editablePractice();
+  for (const patch of [
+    { attendance_window_end: Math.floor(Date.now() / 1000) },
+    { attendance_window_start: Math.floor(Date.now() / 1000) + 600 },
+    { set_attendance_allowed: false },
+    { set_attendance_allowed: undefined },
+  ]) {
+    await fixtures({ bhc: [{ ...p, ...patch }] });
+    expect(
+      (await api(a, "bhc/attendance", attendanceChange(o))).data.outcome,
+    ).toBe("blocked");
+  }
+  await fixtures({
+    bhc: [{ ...p, current_attendance_status: "Not Attending" }],
+  });
+  expect(
+    (await api(a, "bhc/attendance", attendanceChange(o))).data.outcome,
+  ).toBe("conflict");
+  await fixtures({ bhc: [] });
+  expect((await api(a, "bhc/attendance", attendanceChange(o))).status).toBe(
+    409,
+  );
+  expect(await attendanceWrites()).toHaveLength(0);
+  await api(a, "bhc/disconnect", {});
+});
+test.each([
+  "attendance_after_accept",
+  "attendance_rejected",
+  "attendance_closed",
+  "attendance_noop",
+  "attendance_unreadable",
+])(
+  "BHC attendance reconciles %s and never replays a write",
+  async (failure) => {
+    const { o } = await editablePractice();
+    await fixtures({ failure });
+    const body = attendanceChange(o);
+    const result = await api(a, "bhc/attendance", body);
+    expect(result.status).toBe(200);
+    expect(result.data.outcome).toBe(
+      failure === "attendance_after_accept" ? "confirmed" : "unconfirmed",
+    );
+    await fixtures({ failure: null });
+    const again = await api(a, "bhc/attendance", body);
+    expect(again.status).toBe(200);
+    expect(await attendanceWrites()).toHaveLength(1);
+    if (["attendance_after_accept", "attendance_unreadable"].includes(failure))
+      expect(again.data.state.attendance).toBe("attending");
+    else expect(again.data.state.attendance).toBe("unknown");
+    await api(a, "bhc/disconnect", {});
+  },
+);
+test("BHC sync lock serializes attendance writes and service RPCs reject ordinary users", async () => {
+  const { o } = await editablePractice();
+  await sql.query(
+    "update private.bhc_connections set sync_locked_until=now()+interval '1 minute' where user_id=$1",
+    [a.id],
+  );
+  expect((await api(a, "bhc/attendance", attendanceChange(o))).status).toBe(
+    409,
+  );
+  expect(await attendanceWrites()).toHaveLength(0);
+  await sql.query(
+    "update private.bhc_connections set sync_locked_until=null where user_id=$1",
+    [a.id],
+  );
+  const results = await Promise.all([
+    api(a, "bhc/attendance", attendanceChange(o)),
+    api(a, "bhc/attendance", attendanceChange(o)),
+  ]);
+  expect(results.some((r) => r.data.outcome === "confirmed")).toBe(true);
+  expect(await attendanceWrites()).toHaveLength(1);
+  expect(
+    (
+      await a.client.rpc("claim_bhc_attendance", {
+        uid: a.id,
+        request: randomUUID(),
+        outing: o.id,
+        choice: "attending",
+      })
+    ).error,
+  ).toBeTruthy();
+  expect(
+    (
+      await a.client.rpc("apply_bhc_attendance", {
+        uid: a.id,
+        outing: o.id,
+        choice: "attending",
+        deadline: null,
+      })
+    ).error,
+  ).toBeTruthy();
+  await api(a, "bhc/disconnect", {});
+});

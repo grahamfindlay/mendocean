@@ -62,3 +62,7 @@ The local suite passes 52 fast tests, 8 Python tests, 14 preview browser cases, 
 ## Milestone 3 coverage (September 16, 2026)
 
 The suite passes 54 fast tests, 14 preview browser cases, 35 real-backend integration tests and 37 production-build browser cases, with the same two deliberate persistent-profile exclusions. New coverage exercises migration without extra opt-ins, independent channel choices, partial delivery, per-device push recovery, stable email retry payloads, channel quotas, leases, generation changes, preference changes and report suppression. Tests use synthetic email/push providers and do not send pilot notifications. See `PILOT_DESIGN_M3_DELIVERY.md` for retry guarantees and their limits.
+
+## Milestone 4 coverage (September 16, 2026)
+
+The suite passes 55 fast tests, 43 real-backend integration tests and 40 production-build browser cases, with the same two deliberate persistent-profile exclusions. Attendance changes use a synthetic BHC provider: successful and rejected writes, deadline changes, interrupted acceptance, failed readback, stale clients, replay/concurrency protection and reminder adjustments are covered. Real BHC contract verification is read-only by default. A production attendance write requires the owner's deliberate practice/status choice; see `PILOT_DESIGN_M4_DELIVERY.md`.

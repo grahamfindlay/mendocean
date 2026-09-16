@@ -617,3 +617,77 @@ test("partial reminder delivery is visible without implying device registration"
     }),
   ).toBeVisible();
 });
+
+test("attendance changes persist in BHC, closed windows and uncertain sends stay explicit", async ({
+  page,
+}) => {
+  const id = 2000000 + Math.floor(Math.random() * 100000);
+  const p = {
+    ...practice(id, "unknown"),
+    start_time: Math.floor(Date.now() / 1000) + 86400,
+    end_time: Math.floor(Date.now() / 1000) + 90000,
+    attendance_window_start: Math.floor(Date.now() / 1000) - 3600,
+    attendance_window_end: Math.floor(Date.now() / 1000) + 3600,
+    set_attendance_allowed: true,
+  };
+  await fixtures({ bhc: [p], failure: null, calls: [] });
+  await api(actor, "bhc/connect", { token: syntheticToken });
+  await tick();
+  await loggedIn(page);
+  await page.getByRole("button", { name: "My outings", exact: true }).click();
+  const card = page.locator(".outing-card").filter({ hasText: p.name });
+  await card
+    .getByRole("button", { name: "Change attendance", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("Status checked with BHC.")).toBeVisible();
+  await dialog.getByLabel("Your attendance").selectOption("attending");
+  await dialog.getByRole("button", { name: "Save attendance in BHC" }).click();
+  await expect(dialog.getByText("Attendance updated in BHC.")).toBeVisible();
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(card.locator(".attendance-badge")).toHaveText("Attending");
+  await page.reload();
+  await page.getByRole("button", { name: "My outings", exact: true }).click();
+  await expect(card.locator(".attendance-badge")).toHaveText("Attending");
+  await card
+    .getByRole("button", { name: "Change attendance", exact: true })
+    .click();
+  await expect(dialog.getByText("Status checked with BHC.")).toBeVisible();
+  await fixtures({ failure: "attendance_unreadable" });
+  await dialog.getByLabel("Your attendance").selectOption("declined");
+  await dialog.getByRole("button", { name: "Save attendance in BHC" }).click();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "could not be confirmed",
+  );
+  await expect(
+    dialog.getByRole("button", { name: "Save attendance in BHC" }),
+  ).toHaveCount(0);
+  await fixtures({ failure: null });
+  await dialog.getByRole("button", { name: "Check BHC status" }).click();
+  await expect(dialog.getByText("In BHC: Not attending")).toBeVisible();
+  const writes = (await fixtures()).calls.filter(
+    (c: any) => c.path === "/practices/setAttendance",
+  );
+  expect(writes).toHaveLength(2);
+  await fixtures({
+    bhc: [
+      {
+        ...p,
+        attendance_window_end: Math.floor(Date.now() / 1000) - 1,
+        current_attendance_status: "Not Attending",
+      },
+    ],
+  });
+  await dialog.getByRole("button", { name: "Check BHC status" }).click();
+  await expect(
+    dialog.getByText(/The attendance deadline has passed/),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Save attendance in BHC" }),
+  ).toHaveCount(0);
+  await page.context().setOffline(true);
+  await dialog.getByRole("button", { name: "Check BHC status" }).click();
+  await expect(dialog.getByRole("alert")).toContainText("not saved offline");
+  await page.context().setOffline(false);
+  await api(actor, "bhc/disconnect", {});
+});

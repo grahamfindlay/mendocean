@@ -25,8 +25,20 @@ export function startFixtures(secret, port = 54328) {
         if (state.failure === 'after_accept') { state.failure = null; return reply(503, {}); }
         return reply(200, {id:'synthetic-delivery'});
       }
-      state.calls.push({host:url.hostname,path:url.pathname}); // Never retain token-bearing URLs.
+      state.calls.push({host:url.hostname,path:url.pathname,method:data.method}); // Never retain token-bearing URLs.
       if (url.hostname === 'api.boathouseconnect.com') {
+        if (url.pathname === '/practices/setAttendance') {
+          const form = new URLSearchParams(data.body);
+          if (data.method !== 'POST' || form.has('custid') || form.get('whitelabel_id') !== '1' || form.get('token') !== 'synthetic-bhc-token-for-tests-only') return reply(400,{});
+          const p = state.bhc.find(p=>String(p.practice_id)===form.get('practice_id'));
+          if (p && state.failure === 'attendance_closed') p.attendance_window_end=Math.floor(Date.now()/1000);
+          if (!p || state.failure === 'attendance_rejected' || state.failure === 'attendance_closed') return reply(403,{status:'error'});
+          if (state.failure !== 'attendance_noop') p.current_attendance_status=form.get('attendance');
+          if (state.failure === 'attendance_after_accept') return reply(599,{});
+          if (state.failure === 'attendance_unreadable') state.failure='attendance_read_failed';
+          return reply(200,{status:'success'});
+        }
+        if (state.failure === 'attendance_read_failed') return reply(503,{});
         if (state.failure === 'bhc' || url.searchParams.get('token')?.startsWith('invalid')) return reply(401, {});
         if (state.failure === 'malformed') return reply(200, {unexpected:true});
         if (url.pathname === '/authenticate/checkApiKey') return reply(200, {custid:101});

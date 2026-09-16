@@ -8,7 +8,9 @@ export const fixtureProviders: Providers = {
     const url = new URL(String(input));
     if (!["api.boathouseconnect.com", "api.open-meteo.com", "historical-forecast-api.open-meteo.com", "api.resend.com"].includes(url.hostname))
       throw new Error("Unexpected upstream destination");
-    return await fetch(endpoint + "/upstream", { method: "POST", headers, body: JSON.stringify({ url: url.href, method: init?.method || "GET", body: init?.body, headers: init?.headers }) });
+    const response = await fetch(endpoint + "/upstream", { method: "POST", headers, body: JSON.stringify({ url: url.href, method: init?.method || "GET", body: init?.body, headers: init?.headers }) });
+    if (response.status === 599) throw new Error("Synthetic transport interruption after provider acceptance");
+    return response;
   },
   push: async (subscription, payload, options) => {
     const response = await fetch(endpoint + "/push", { method: "POST", headers, body: JSON.stringify({ subscription, payload, options }) });
