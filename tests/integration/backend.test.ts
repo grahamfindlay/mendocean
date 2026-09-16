@@ -427,6 +427,12 @@ test("weather archives are private, immutable gzip and enrich from the archived 
     gunzipSync(Buffer.from(await download.data!.arrayBuffer())).toString(),
   );
   expect(forecast.hours.length).toBeGreaterThan(120);
+  expect(forecast.quarter_hours).toHaveLength(196);
+  expect(forecast.quarter_hours[0].interval_minutes).toBe(15);
+  expect(forecast.quarter_hours[0].probability).toBeNull();
+  expect((await api(null, "weather")).data.quarter_hours).toEqual(
+    forecast.quarter_hours,
+  );
   expect(
     (
       await publicClient()
@@ -657,4 +663,18 @@ test("model capabilities stay public without exposing personal data or coefficie
   const result = await api(null, "assessment/capabilities");
   expect(result.status).toBe(200);
   expect(result.data).toEqual({ pooled: [], mine: [] });
+});
+
+test("weather collector refreshes after a quarter hour and shares its recent cache", async () => {
+  await sql.query(
+    "update weather_runs set fetched_at=now()-interval '16 minutes'",
+  );
+  const before = (await api(null, "weather")).data.fetched_at;
+  await tick();
+  const fresh = (await api(null, "weather")).data;
+  expect(fresh.fetched_at).not.toBe(before);
+  expect(fresh.quarter_hours.length).toBeGreaterThan(8);
+  await enqueue("weather", null, null);
+  await tick();
+  expect((await api(null, "weather")).data.fetched_at).toBe(fresh.fetched_at);
 });

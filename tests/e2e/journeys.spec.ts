@@ -526,3 +526,27 @@ test("Forecast offers only supported model contexts and places fitted results af
     await sql.query("delete from private.model_runs where id=$1", [id]);
   }
 });
+
+test("production timeline offers quarter-hour inspection and selectable daily forecasts", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const chart = page.getByRole("region", {
+    name: "Your next two hours",
+    exact: true,
+  });
+  await expect(chart).toBeVisible();
+  await chart.getByRole("slider").press("ArrowRight");
+  await expect(chart.getByRole("slider")).toHaveValue("1");
+  await expect(chart.locator(".chart-reading")).toContainText(
+    "preceding 15 min",
+  );
+  await page.getByRole("button", { name: "Hourly", exact: true }).click();
+  await page.locator(".day-picker button").nth(1).click();
+  await expect(page.locator(".day-picker button").nth(1)).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByText("All samples for this day", { exact: true }).click();
+  await expect(page.locator(".hour-row").first()).toBeVisible();
+});

@@ -57,7 +57,7 @@ The app’s Account screen lets the administrator create additional invited acco
 
 Create two Supabase Vault entries: `mendocean_project_url` and `mendocean_jobs_secret`. The second must match the Edge Function’s `JOBS_SECRET`. Run `supabase/setup_cron.sql` once. It schedules a dispatcher every five minutes; each queued action has its own due time and deduplication key. Re-running the named schedule updates the same cron job.
 
-Run a first dispatch, then confirm that public weather appears and that scheduled invocations succeed. The dispatcher fetches weather every 30 minutes, polls BHC daily during the 16:00 Madison hour, and runs deadline/start/end refreshes already in the queue.
+Run a first dispatch, then confirm that public weather appears and that scheduled invocations succeed. The dispatcher fetches weather every 15 minutes, polls BHC daily during the 16:00 Madison hour, and runs deadline/start/end refreshes already in the queue.
 
 Reference: [Supabase scheduling with Cron, pg_net and Vault](https://supabase.com/docs/guides/functions/schedule-functions).
 

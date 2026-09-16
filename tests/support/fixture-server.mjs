@@ -40,7 +40,9 @@ export function startFixtures(secret, port = 54328) {
         const base = Math.floor(Date.now()/3600000)*3600 - 86400;
         const defaults = {wind_speed_10m:7,wind_direction_10m:180,wind_gusts_10m:10,temperature_2m:65,precipitation:0,precipitation_probability:0,visibility:16000,weather_code:0};
         const time = Array.from({length:192},(_,i)=>base+i*3600);
-        return reply(200, {hourly:{time,...Object.fromEntries(Object.entries(defaults).map(([k,v])=>[k,time.map(()=>v)]))},current:{time:base+86400,...defaults}});
+        const fineTime = Array.from({length:196},(_,i)=>Math.floor(Date.now()/900000)*900-3600+i*900);
+        const minutely_15 = {time:fineTime,...Object.fromEntries(Object.entries(defaults).filter(([k])=>k!=='precipitation_probability').map(([k,v])=>[k,fineTime.map(()=>v)]))};
+        return reply(200, {minutely_15,hourly:{time,...Object.fromEntries(Object.entries(defaults).map(([k,v])=>[k,time.map(()=>v)]))},current:{time:base+86400,...defaults}});
       }
     }
     reply(500, {error:'Unexpected fixture request'});

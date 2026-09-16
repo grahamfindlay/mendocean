@@ -23,7 +23,8 @@ export async function collectWeather(providers: Providers = liveProviders) {
         .limit(1)
         .maybeSingle(),
     );
-    if (last && Date.now() - Date.parse(last.fetched_at) < 29 * 60000) return;
+    if (last && providers.now() - Date.parse(last.fetched_at) < 14 * 60000)
+      return;
     stage = "fetch_provider";
     const response = await providers.fetch(weatherURL(), {
       signal: AbortSignal.timeout(20000),
@@ -31,7 +32,10 @@ export async function collectWeather(providers: Providers = liveProviders) {
     if (!response.ok)
       throw new WeatherCollectionError(`provider_http_${response.status}`);
     stage = "normalize";
-    const forecast = normalizeWeather(await response.json());
+    const forecast = normalizeWeather(
+      await response.json(),
+      new Date(providers.now()).toISOString(),
+    );
     const id = crypto.randomUUID();
     const path = forecast.fetched_at.slice(0, 10) + "/" + id + ".json.gz";
     stage = "compress";
@@ -151,7 +155,16 @@ export async function enrichOuting(
     );
     const common = new URL(weatherURL()).searchParams;
     for (const [k, v] of common)
-      if (!["current", "forecast_days", "past_days"].includes(k))
+      if (
+        ![
+          "current",
+          "forecast_days",
+          "past_days",
+          "minutely_15",
+          "forecast_minutely_15",
+          "past_minutely_15",
+        ].includes(k)
+      )
         url.searchParams.set(k, v);
     url.searchParams.set("start_date", start);
     url.searchParams.set("end_date", end);
@@ -159,7 +172,10 @@ export async function enrichOuting(
       signal: AbortSignal.timeout(20000),
     });
     if (!response.ok) throw new Error("Historical weather not yet available");
-    forecast = normalizeWeather(await response.json());
+    forecast = normalizeWeather(
+      await response.json(),
+      new Date(providers.now()).toISOString(),
+    );
     kind = "historical_forecast";
   }
   const features = weatherFeatures(forecast.hours, effectiveStart);

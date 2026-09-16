@@ -104,7 +104,7 @@ export default function App() {
   }, [user]);
   useEffect(() => {
     refreshWeather();
-    const timer = setInterval(refreshWeather, 30 * 60000);
+    const timer = setInterval(refreshWeather, 5 * 60000);
     const onReturn = () => {
       if (
         document.visibilityState === "visible" &&

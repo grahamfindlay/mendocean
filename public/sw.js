@@ -1,4 +1,4 @@
-const SHELL = "mendocean-shell-v3";
+const SHELL = "mendocean-shell-v4";
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {

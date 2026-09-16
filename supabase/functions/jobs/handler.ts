@@ -52,8 +52,8 @@ export function createJobsHandler(
         return json(req, { error: "Unknown action" }, 400);
       const started = elapsed();
       const now = new Date(providers.now());
-      const stamp = Math.floor(now.getTime() / 1800000);
-      await enqueue("weather", null, null, now, `weather:${stamp}`);
+      const stamp = Math.floor(now.getTime() / 900000);
+      await enqueue("weather", null, null, now, `weather:15m:${stamp}`);
       const local = localDateTime(now.toISOString());
       if (local.slice(11, 13) === "16")
         for (const c of await query("connections"))

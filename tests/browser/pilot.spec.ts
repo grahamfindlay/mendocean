@@ -35,7 +35,7 @@ test("public forecast, planner, and invitation boundary", async ({ page }) => {
     .getByRole("combobox", { name: "Window", exact: true })
     .selectOption("1");
   await expect(
-    page.getByText("Hourly forecast containing this time"),
+    page.getByText("Samples at or around the selected time"),
   ).toBeVisible();
   await page.getByRole("button", { name: "Log", exact: true }).click();
   await expect(page.getByText("The pilot is invitation-only.")).toBeVisible();
@@ -246,4 +246,92 @@ test("wind bearing indicates source direction and a current sample keeps its val
     "Hourly estimate for 10:00 AM",
   );
   await expect(page.locator(".hour-row time")).toHaveText(["11:00 AM"]);
+});
+
+test("quarter-hour charts inspect real samples and preserve minute-specific forecasts", async ({
+  page,
+}) => {
+  const now = Date.parse("2026-09-15T14:24:00Z"),
+    base = Date.parse("2026-09-15T14:00:00Z");
+  await page.clock.install({ time: now });
+  const row = (time: number, interval: number) => ({
+    time: new Date(time).toISOString(),
+    interval_minutes: interval,
+    wind: 7,
+    direction: 350,
+    gust: 12,
+    temperature: 65,
+    precipitation: 0.1,
+    probability: interval === 60 ? 30 : null,
+    visibility: null,
+    code: 2,
+  });
+  await page.route("**/api/weather", (r) =>
+    r.fulfill({
+      json: {
+        fetched_at: new Date(now).toISOString(),
+        provider: "Test fixture",
+        source_kind: "fixture",
+        model_version: "hannah-1.0.0",
+        current: null,
+        hours: Array.from({ length: 168 }, (_, i) =>
+          row(base + i * 3600000, 60),
+        ),
+        quarter_hours: Array.from({ length: 192 }, (_, i) =>
+          row(base + i * 900000, 15),
+        ),
+      },
+    }),
+  );
+  await page.goto("/");
+  await expect(page.locator(".valid-time")).toHaveText(
+    "15-minute estimate for 9:15 AM",
+  );
+  await expect(page.locator(".hour-row time").first()).toHaveText("9:30 AM");
+  const chart = page.getByRole("region", {
+    name: "Your next two hours",
+    exact: true,
+  });
+  await chart.getByRole("slider").press("ArrowRight");
+  await expect(chart.locator(".chart-reading time")).toContainText("9:30 AM");
+  await expect(chart.locator(".chart-reading")).toContainText(
+    "0.1 in / preceding 15 min",
+  );
+  await expect(chart.locator(".chart-reading")).toContainText("0.40 in/h");
+  await expect(chart.locator(".chart-reading")).not.toContainText(
+    "rain chance",
+  );
+  await page.getByRole("button", { name: "Forecast", exact: true }).click();
+  await page.getByLabel("Start time · Madison").fill("2026-09-15T09:43");
+  await page
+    .getByRole("combobox", { name: "Window", exact: true })
+    .selectOption("1");
+  const selectedChart = page.getByRole("region", {
+    name: "Selected forecast",
+    exact: true,
+  });
+  await expect(selectedChart.locator(".chart-reading time")).toContainText(
+    "9:30 AM",
+  );
+  await selectedChart.getByRole("slider").press("End");
+  await expect(selectedChart.locator(".chart-reading time")).toContainText(
+    "9:45 AM",
+  );
+  await expect(
+    page.getByRole("heading", { name: "Five days at 09:43" }),
+  ).toBeVisible();
+  await page.locator(".comparison-grid button").nth(1).click();
+  await expect(
+    page.locator(".day-picker button[aria-pressed=true]"),
+  ).toContainText("Sep 16");
+  await page.getByRole("button", { name: "Hourly", exact: true }).click();
+  await expect(
+    page.locator(".day-picker button[aria-pressed=true]"),
+  ).toContainText("Sep 16");
+  await expect(page.locator("body")).not.toHaveCSS("overflow-x", "scroll");
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
 });
