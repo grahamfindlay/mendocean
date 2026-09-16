@@ -22,6 +22,42 @@ export interface ModelBundle {
   pooled: ModelFamily;
   personal: Record<string, ModelFamily>;
 }
+export interface AssessmentContext {
+  route: string;
+  boat: string;
+  coach: string;
+}
+export interface AssessmentCapabilities {
+  pooled: AssessmentContext[];
+  mine: AssessmentContext[];
+}
+export function assessmentCapabilities(
+  bundle: ModelBundle | null,
+  user: string | null,
+): AssessmentCapabilities {
+  const contexts = (family?: ModelFamily): AssessmentContext[] => {
+    if (!bundle?.eligible || !family) return [];
+    const usable = (f: Pick<ModelFamily, "launch" | "water">) =>
+      !!(
+        (f.launch.eligible && f.launch.coefficients?.length) ||
+        (f.water.eligible && f.water.coefficients?.length)
+      );
+    const keys = [
+      ...(usable(family) ? ["either|any|none"] : []),
+      ...Object.entries(family.contextual || {})
+        .filter(([, f]) => usable(f))
+        .map(([key]) => key),
+    ];
+    return keys.map((key) => {
+      const [route, boat, coach] = key.split("|");
+      return { route, boat, coach };
+    });
+  };
+  return {
+    pooled: contexts(bundle?.pooled),
+    mine: contexts(user ? bundle?.personal[user] : undefined),
+  };
+}
 export function features(w: ModelInput): number[] | null {
   if (
     w.wind === null ||

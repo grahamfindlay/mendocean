@@ -1,3 +1,62 @@
+import type { Outing } from "./domain.ts";
+
+export interface ReminderProfile {
+  reminder_channel: string;
+  reminders_paused: boolean;
+}
+export function reminderScheduleError(
+  o: Pick<Outing, "ends_at" | "attendance"> & { reports?: readonly unknown[] },
+  profile: ReminderProfile,
+  action: "enable" | "snooze",
+  now: number,
+): string | null {
+  if (o.reports?.length) return "This outing already has a report.";
+  if (o.attendance !== "attending")
+    return "Logging reminders are available for outings you are attending.";
+  if (profile.reminders_paused)
+    return "Logging reminders are paused in Account.";
+  if (profile.reminder_channel === "none")
+    return "Choose a logging reminder channel in Account first.";
+  const end = Date.parse(o.ends_at);
+  const due = action === "snooze" ? now + 3600000 : Math.max(now, end + 900000);
+  if (action === "snooze" && now < end)
+    return "You can postpone a logging reminder after the outing ends.";
+  if (due > end + 86400000)
+    return "The logging reminder window has ended. You can still log this outing anytime.";
+  return null;
+}
+export function reminderPresentation(
+  o: Outing,
+  profile: ReminderProfile,
+  now: number,
+) {
+  if (o.reports?.length || now > Date.parse(o.ends_at) + 86400000) return null;
+  const error = reminderScheduleError(o, profile, "enable", now);
+  if (error)
+    return {
+      text: error,
+      settings: profile.reminders_paused || profile.reminder_channel === "none",
+      toggle: null,
+      snooze: false,
+    };
+  const on = o.reminder && !o.skipped;
+  const sent = o.reminder_state?.sent_at;
+  const due = on && !sent ? o.reminder_state?.due_at : null;
+  return {
+    text: !on
+      ? "Logging reminder: Off"
+      : sent
+        ? "Logging reminder sent"
+        : due
+          ? "Logging reminder scheduled"
+          : "Logging reminder: On",
+    due: due || undefined,
+    sent: on ? sent || undefined : undefined,
+    settings: false,
+    toggle: on ? ("skip" as const) : ("enable" as const),
+    snooze: !reminderScheduleError(o, profile, "snooze", now),
+  };
+}
 export function reminderEligible(
   input: {
     attendance: string;

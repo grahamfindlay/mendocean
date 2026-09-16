@@ -11,15 +11,15 @@ import {
 import type { User } from "@supabase/supabase-js";
 import { api, getWeather, previewMode, supabase } from "./client";
 import {
-  formatDate,
-  formatTime,
-  RATINGS,
   type Coach,
   type Forecast,
   type Outing,
   type Report,
 } from "../shared/domain";
-import ForecastView from "./ForecastView";
+import ForecastView, { type ForecastSelection } from "./ForecastView";
+import OutingsView, { type ReportFilter } from "./OutingsView";
+import { useClock } from "./useClock";
+import { canLog, outingPhase } from "../shared/presentation";
 import Logger from "./Logger";
 import { Auth, Modal, SettingsForm, PlanForm } from "./Account";
 import { discard, flush, pending, type PendingReport } from "./outbox";
@@ -39,8 +39,21 @@ export interface AccountData {
   };
 }
 export default function App() {
+  const now = useClock();
+  const [outingView, setOutingView] = useState<"Upcoming" | "Past">("Upcoming");
+  const [reportFilter, setReportFilter] = useState<ReportFilter>("All");
+  const [forecastSelection, setForecastSelection] =
+    useState<ForecastSelection>();
+  const weatherRequest = useRef<Promise<void> | null>(null);
+  const weatherFetchedAt = useRef(0);
   const [tab, setTab] = useState(
-    new URLSearchParams(location.search).has("log") ? "Log" : "Now",
+    new URLSearchParams(location.search).has("log")
+      ? "Log"
+      : ["Plan", "Forecast"].includes(
+            new URLSearchParams(location.search).get("tab") || "",
+          )
+        ? "Forecast"
+        : "Now",
   );
   const [weather, setWeather] = useState<Forecast | null>(null);
   const [weatherError, setWeatherError] = useState("");
@@ -61,10 +74,18 @@ export default function App() {
     new URLSearchParams(location.search).get("log") || undefined,
   );
   const refreshWeather = useCallback(() => {
+    if (weatherRequest.current) return weatherRequest.current;
     setWeatherError("");
-    getWeather()
-      .then(setWeather)
-      .catch((e) => setWeatherError(e.message));
+    weatherRequest.current = getWeather()
+      .then((data) => {
+        weatherFetchedAt.current = Date.parse(data.fetched_at);
+        setWeather(data);
+      })
+      .catch((e) => setWeatherError(e.message))
+      .finally(() => {
+        weatherRequest.current = null;
+      });
+    return weatherRequest.current;
   }, []);
   const refresh = useCallback(async () => {
     if (!user) return;
@@ -84,7 +105,20 @@ export default function App() {
   useEffect(() => {
     refreshWeather();
     const timer = setInterval(refreshWeather, 30 * 60000);
-    return () => clearInterval(timer);
+    const onReturn = () => {
+      if (
+        document.visibilityState === "visible" &&
+        Date.now() - weatherFetchedAt.current >= 15 * 60000
+      )
+        void refreshWeather();
+    };
+    window.addEventListener("focus", onReturn);
+    document.addEventListener("visibilitychange", onReturn);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", onReturn);
+      document.removeEventListener("visibilitychange", onReturn);
+    };
   }, [refreshWeather]);
   useEffect(() => {
     if (previewMode) {
@@ -105,6 +139,9 @@ export default function App() {
           !!next && new URLSearchParams(location.search).has("account"),
         );
         setPlanned(false);
+        setForecastSelection(undefined);
+        setOutingView("Upcoming");
+        setReportFilter("All");
       }
       currentUser.current = next?.id ?? null;
       setUser(next);
@@ -184,7 +221,7 @@ export default function App() {
         )}
       </header>
       <nav className="main-nav" aria-label="Main navigation">
-        {["Now", "Hourly", "Plan", "Log", "My outings"].map((name) => (
+        {["Now", "Hourly", "Forecast", "Log", "My outings"].map((name) => (
           <button
             key={name}
             className={tab === name ? "selected" : ""}
@@ -220,9 +257,12 @@ export default function App() {
         </div>
       )}
       <main>
-        {["Now", "Hourly", "Plan"].includes(tab) ? (
+        {["Now", "Hourly", "Forecast"].includes(tab) ? (
           weather ? (
             <ForecastView
+              now={now}
+              selection={forecastSelection}
+              userId={user?.id}
               weather={weather}
               tab={tab}
               outings={account?.outings || []}
@@ -250,11 +290,8 @@ export default function App() {
         ) : !user ? (
           <section className="empty-state">
             <p className="eyebrow">A SMALL EFFORT. A BETTER FORECAST.</p>
-            <h1>Your time on the water matters.</h1>
-            <p>
-              Sign in to log practices, independent rows, and attempts called
-              off. Forecasts are always public.
-            </p>
+            <h1>Log an outing</h1>
+            <p>Sign in to log practices and independent rows.</p>
             <button className="button" onClick={() => setAuthOpen(true)}>
               Sign in to log <ArrowUpRight size={16} />
             </button>
@@ -271,7 +308,9 @@ export default function App() {
             coaches={account?.coaches || []}
             editing={editing}
             initialOuting={
-              account?.outings.some((o) => o.id === selectedOuting)
+              account?.outings.some(
+                (o) => o.id === selectedOuting && canLog(o, now),
+              )
                 ? selectedOuting
                 : undefined
             }
@@ -279,6 +318,17 @@ export default function App() {
               setMessage(
                 previewMode ? "Sample report saved only on this device." : m,
               );
+              if (!editing) {
+                const saved = account?.outings.find(
+                  (o) => o.id === selectedOuting,
+                );
+                setOutingView(
+                  saved && outingPhase(saved, Date.now()) !== "past"
+                    ? "Upcoming"
+                    : "Past",
+                );
+                setReportFilter("All");
+              }
               setEditing(undefined);
               setSelectedOuting(undefined);
               setTab("My outings");
@@ -289,16 +339,14 @@ export default function App() {
           <>
             <div className="page-heading">
               <div>
-                <p className="eyebrow">YOUR TIME ON THE WATER</p>
-                <h1>My outings.</h1>
-                <p>A record of the rows you took—and the ones you didn’t.</p>
+                <h1>My outings</h1>
               </div>
               <button
                 className="button subtle"
                 onClick={() => setPlanned(true)}
               >
                 <Plus size={16} />
-                Plan an outing
+                Add independent outing
               </button>
             </div>
             {!!queue.length && (
@@ -369,148 +417,77 @@ export default function App() {
                 Refresh
               </button>
             </div>
-            {!account?.outings.length ? (
-              <section className="empty-state compact">
-                <h2>Your first outing starts here.</h2>
-                <p>
-                  Log an independent row now, or connect Boathouse Connect in
-                  Account to see your practices.
-                </p>
-                <button className="button" onClick={() => navigate("Log")}>
-                  Log an outing
-                </button>
-              </section>
+            {account ? (
+              <OutingsView
+                outings={account.outings}
+                profile={account.profile}
+                now={now}
+                user={user.id}
+                weather={weather}
+                view={outingView}
+                filter={reportFilter}
+                onView={setOutingView}
+                onFilter={setReportFilter}
+                busy={busy}
+                onSettings={() => setSettings(true)}
+                onLog={(o) => {
+                  setSelectedOuting(o.id);
+                  setTab("Log");
+                }}
+                onEdit={(outing, report) => {
+                  setEditing({ outing, report });
+                  setTab("Log");
+                }}
+                onForecast={(o) => {
+                  setForecastSelection({
+                    id: o.id,
+                    starts_at: o.starts_at,
+                    ends_at: o.ends_at,
+                  });
+                  setTab("Forecast");
+                }}
+                onDelete={(report) =>
+                  void act(async () => {
+                    if (
+                      confirm(
+                        "Delete your report? Other people’s reports will stay.",
+                      )
+                    ) {
+                      await api("report/delete", {
+                        id: report.id,
+                        version: report.version,
+                      });
+                      await refresh();
+                    }
+                  })
+                }
+                onShare={(o) =>
+                  void act(async () => {
+                    const result = await api<{ url: string }>("share", {
+                      outing_id: o.id,
+                    });
+                    await navigator.clipboard.writeText(result.url);
+                    setMessage(
+                      "Invitation link copied. It expires in seven days and requires an invited account.",
+                    );
+                  })
+                }
+                onReminder={(o, action) =>
+                  void act(async () => {
+                    await api("reminder", { outing_id: o.id, action });
+                    setMessage(
+                      action === "skip"
+                        ? "Logging reminder turned off."
+                        : action === "snooze"
+                          ? "Logging reminder scheduled for one hour from now."
+                          : "Logging reminder enabled.",
+                    );
+                    await refresh();
+                  })
+                }
+              />
             ) : (
-              <div className="outing-grid">
-                {account.outings.map((o) => {
-                  const report = o.reports?.[0];
-                  return (
-                    <article className="outing-card" key={o.id}>
-                      <div className="card-top">
-                        <span className="eyebrow">
-                          {o.kind === "official" ? "PRACTICE" : "INDEPENDENT"}
-                        </span>
-                        <span className="tag">
-                          {o.attendance || "attending"}
-                        </span>
-                      </div>
-                      <h3>{o.title}</h3>
-                      <p>
-                        {formatDate(o.starts_at)} · {formatTime(o.starts_at)}–
-                        {formatTime(o.ends_at)}
-                      </p>
-                      {report ? (
-                        <div className="report-summary">
-                          {report.outcome === "rowed"
-                            ? `${report.rating} · ${RATINGS[(report.rating || 1) - 1]} · ${report.route}`
-                            : report.outcome === "stayed_ashore"
-                              ? "Stayed ashore"
-                              : "Didn’t attend"}
-                        </div>
-                      ) : (
-                        <div className="report-summary muted">
-                          No report yet
-                        </div>
-                      )}
-                      <div className="card-actions">
-                        {report ? (
-                          <>
-                            <button
-                              className="text-button"
-                              onClick={() => {
-                                setEditing({ outing: o, report });
-                                setTab("Log");
-                              }}
-                            >
-                              Edit report
-                            </button>
-                            <button
-                              className="text-button danger"
-                              onClick={() =>
-                                void act(async () => {
-                                  if (
-                                    confirm(
-                                      "Delete your report? Other people’s reports will stay.",
-                                    )
-                                  ) {
-                                    await api("report/delete", {
-                                      id: report.id,
-                                      version: report.version,
-                                    });
-                                    await refresh();
-                                  }
-                                })
-                              }
-                            >
-                              Delete
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            className="text-button"
-                            onClick={() => {
-                              setSelectedOuting(o.id);
-                              setTab("Log");
-                            }}
-                          >
-                            Log this outing
-                          </button>
-                        )}
-                        {o.kind === "independent" && o.owner_id === user.id && (
-                          <button
-                            className="text-button"
-                            onClick={() =>
-                              void act(async () => {
-                                const result = await api<{ url: string }>(
-                                  "share",
-                                  { outing_id: o.id },
-                                );
-                                await navigator.clipboard.writeText(result.url);
-                                setMessage(
-                                  "Invitation link copied. It expires in seven days and requires an invited account.",
-                                );
-                              })
-                            }
-                          >
-                            Share
-                          </button>
-                        )}
-                        <button
-                          className="text-button"
-                          onClick={() =>
-                            void act(async () => {
-                              await api("reminder", {
-                                outing_id: o.id,
-                                action: o.reminder ? "skip" : "enable",
-                              });
-                              await refresh();
-                            })
-                          }
-                        >
-                          {o.reminder ? "Skip reminder" : "Remind me"}
-                        </button>
-                        {!report && Date.parse(o.ends_at) < Date.now() && (
-                          <button
-                            className="text-button"
-                            onClick={() =>
-                              void act(async () => {
-                                await api("reminder", {
-                                  outing_id: o.id,
-                                  action: "snooze",
-                                });
-                                setMessage("Reminder snoozed for one hour.");
-                                await refresh();
-                              })
-                            }
-                          >
-                            Remind in 1 hour
-                          </button>
-                        )}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
+              <p role="status">Loading your outings…</p>
             )}
           </>
         )}
@@ -549,15 +526,13 @@ export default function App() {
         </Modal>
       )}
       {planned && (
-        <Modal
-          title="Plan an independent outing"
-          onClose={() => setPlanned(false)}
-        >
+        <Modal title="Add independent outing" onClose={() => setPlanned(false)}>
           <PlanForm
             onSave={async (body) => {
               await api("outing", body);
               setPlanned(false);
-              setMessage("Outing planned. Return here to log after your row.");
+              setOutingView("Upcoming");
+              setMessage("Independent outing added.");
               await refresh();
             }}
           />

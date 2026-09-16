@@ -3,6 +3,7 @@ if (process.env.TEST_STACK !== "local-only")
   throw new Error("Full-stack browser tests require the isolated harness");
 export default defineConfig({
   testDir: "tests/e2e",
+  outputDir: "test-results/full",
   workers: 1,
   fullyParallel: false,
   retries: 0,

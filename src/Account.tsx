@@ -9,6 +9,7 @@ import {
   formatTime,
 } from "../shared/domain";
 import Admin from "./Admin";
+import { pushEnvironment } from "./pushSupport";
 import type { AccountData } from "./App";
 export function Modal({
   title,
@@ -168,6 +169,9 @@ export function PlanForm({
         }
       }}
     >
+      <p className="help">
+        Add a personal outing. This does not sign you up for a BHC practice.
+      </p>
       <label>
         Name
         <input
@@ -210,7 +214,7 @@ export function PlanForm({
       </label>
       <label className="checkbox">
         <input type="checkbox" name="reminder" />
-        Remind me 15 minutes after the outing
+        Remind me to log, 15 minutes after the outing ends
       </label>
       <p className="help">
         Choose an email or push reminder channel in Account.
@@ -237,6 +241,46 @@ export function SettingsForm({
   const [token, setToken] = useState("");
   const [club, setClub] = useState("");
   const [pushProgress, setPushProgress] = useState("");
+  const [registered, setRegistered] = useState(false);
+  const [deviceChecked, setDeviceChecked] = useState(false);
+  const push = pushEnvironment();
+  useEffect(() => {
+    let active = true;
+    setDeviceChecked(false);
+    setRegistered(false);
+    if (
+      !push.supported ||
+      push.permission !== "granted" ||
+      (push.ios && !push.installed) ||
+      !account
+    ) {
+      setDeviceChecked(true);
+      return;
+    }
+    void navigator.serviceWorker
+      .getRegistration()
+      .then((sw) => sw?.pushManager.getSubscription())
+      .then(async (subscription) => {
+        if (!subscription) return false;
+        return (
+          await api<{ registered: boolean }>("push/status", {
+            endpoint: subscription.endpoint,
+          })
+        ).registered;
+      })
+      .then((value) => {
+        if (active) {
+          setRegistered(!!value);
+          setDeviceChecked(true);
+        }
+      })
+      .catch(() => {
+        if (active) setDeviceChecked(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [account, push.supported, push.permission, push.ios, push.installed]);
   const [pushAction, setPushAction] = useState<"enable" | "test" | null>(null);
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -289,8 +333,8 @@ export function SettingsForm({
           </select>
         </label>
         <p className="help">
-          Choose one reminder channel: email or push. Device setup below does
-          not change this preference. Save after changing it.
+          Reminders ask you to log after an outing. Choose a delivery channel
+          and save. For push, also register this device below.
         </p>
         <label className="checkbox">
           <input
@@ -304,9 +348,65 @@ export function SettingsForm({
           Save preferences
         </button>
       </form>
+      <hr />
+      <h3>Push on this device</h3>
+      {push.ios && !push.installed ? (
+        <div className="install-guidance">
+          <p>
+            On iPhone or iPad, install Mendocean on your Home Screen to receive
+            push reminders.
+          </p>
+          <ol>
+            <li>Open mendocean.fyi in Safari and tap Share.</li>
+            <li>
+              Choose Add to Home Screen. If needed, find it under Edit Actions.
+            </li>
+            <li>Leave Open as Web App on if offered, then tap Add.</li>
+            <li>
+              Open Mendocean from its new icon, sign in, and enable push in
+              Account.
+            </li>
+          </ol>
+          <p className="help">Requires iOS/iPadOS 16.4 or later.</p>
+        </div>
+      ) : !push.supported ? (
+        <p className="help">
+          This browser does not support push notifications. Email reminders are
+          available above.
+        </p>
+      ) : push.permission === "denied" ? (
+        <p className="help">
+          Notifications are blocked. Allow Mendocean notifications in your
+          browser or device settings, then return here.
+        </p>
+      ) : (
+        <p className="help">
+          {!deviceChecked
+            ? "Checking this device…"
+            : registered
+              ? "This device is registered for push."
+              : push.permission === "granted"
+                ? "Notification permission is granted. Register this device to connect it to your account."
+                : "Enable push to grant notification permission and register this device."}
+        </p>
+      )}
+      {registered && (
+        <p className="help">
+          {account.profile.reminders_paused
+            ? "Logging reminders are paused."
+            : account.profile.reminder_channel === "push"
+              ? "Logging reminders use push notifications."
+              : "To receive logging reminders here, select Push notifications above and save preferences."}
+        </p>
+      )}
       <button
         className="text-button"
-        disabled={busy}
+        disabled={
+          busy ||
+          (push.ios && !push.installed) ||
+          !push.supported ||
+          push.permission === "denied"
+        }
         onClick={() =>
           void run(async () => {
             setPushAction("enable");
@@ -362,8 +462,10 @@ export function SettingsForm({
                   applicationServerKey: bytes,
                 }));
               await api("push", { subscription: subscription.toJSON() });
+              setRegistered(true);
+              setDeviceChecked(true);
               setPushProgress(
-                "This device is registered. Send a test below. For practice reminders, choose Push notifications above and save preferences.",
+                "This device is registered. Send a test below. For logging reminders, choose Push notifications above and save preferences.",
               );
             } catch (e) {
               setPushProgress((e as Error).message);
@@ -380,7 +482,7 @@ export function SettingsForm({
       </button>
       <button
         className="text-button"
-        disabled={busy}
+        disabled={busy || !registered || push.permission === "denied"}
         onClick={() =>
           void run(async () => {
             setPushAction("test");

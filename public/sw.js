@@ -1,4 +1,4 @@
-const SHELL = "mendocean-shell-v2";
+const SHELL = "mendocean-shell-v3";
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
@@ -12,6 +12,8 @@ self.addEventListener("install", (event) => {
       ];
       await cache.addAll([
         ...assets,
+        "/icon.svg",
+        "/icon-180.png",
         "/icon-192.png",
         "/icon-512.png",
         "/manifest.webmanifest",

@@ -140,6 +140,7 @@ test("independent row persists, reloads, edits; unwanted scope field absent", as
   await expect(page.getByText("2 · Good · east")).toBeVisible();
   await page.reload();
   await page.getByRole("button", { name: "My outings", exact: true }).click();
+  await page.getByRole("button", { name: "Past", exact: true }).click();
   await expect(page.getByText("2 · Good · east")).toBeVisible();
   await page.getByRole("button", { name: "Edit report", exact: true }).click();
   await page.getByRole("button", { name: "3 Fine", exact: true }).click();
@@ -257,10 +258,34 @@ test("persistent browser profile reopens offline and uploads queued report", asy
       offline: true,
     });
     page = ctx.pages()[0];
+    const startupErrors: string[] = [];
+    page.on("pageerror", (error) => startupErrors.push(error.message));
     await page.goto(process.env.TEST_APP_URL! + "/?log=1");
-    await expect(
-      page.getByRole("button", { name: "Account", exact: true }),
-    ).toBeVisible();
+    try {
+      await expect(
+        page.getByRole("button", { name: "Account", exact: true }),
+      ).toBeVisible();
+    } catch (error) {
+      console.log("Offline startup diagnostics", {
+        errors: startupErrors,
+        body: (await page.locator("body").innerText()).slice(0, 1200),
+        state: await page.evaluate(async () => ({
+          authStored: Object.keys(localStorage).some(
+            (k) => k.startsWith("sb-") && k.endsWith("-auth-token"),
+          ),
+          controlled: !!navigator.serviceWorker.controller,
+          cachedPaths: await Promise.all(
+            (await caches.keys()).map(async (key) => ({
+              key,
+              paths: (await (await caches.open(key)).keys()).map(
+                (r) => new URL(r.url).pathname,
+              ),
+            })),
+          ),
+        })),
+      });
+      throw error;
+    }
     await ctx.setOffline(false);
     await expect.poll(async () => (await records()).length).toBe(1);
   } finally {
@@ -341,11 +366,17 @@ test("push setup explains dismissed permission and tests only the saved device",
   await page.addInitScript((endpoint) => {
     let permissionRequests = 0;
     let subscription: any = null;
+    Object.defineProperty(navigator, "standalone", {
+      configurable: true,
+      get: () => true,
+    });
     Object.defineProperty(window, "Notification", {
       configurable: true,
       value: class {
+        static permission = "default";
         static async requestPermission() {
-          return ++permissionRequests === 1 ? "default" : "granted";
+          this.permission = ++permissionRequests === 1 ? "default" : "granted";
+          return this.permission;
         }
       },
     });
@@ -391,4 +422,107 @@ test("push setup explains dismissed permission and tests only the saved device",
   await expect(page.getByRole("status")).toContainText("Test accepted");
   const state = await fixtures();
   expect(state.deliveries.some((d: any) => d.target === endpoint)).toBe(true);
+});
+
+test("upcoming, past and saved outing actions follow server reminder state", async ({
+  page,
+}) => {
+  const future = await import("../support/stack").then((m) =>
+    m.createOuting(actor, {
+      title: "Tomorrow independent",
+      starts_at: new Date(Date.now() + 86400000).toISOString(),
+      ends_at: new Date(Date.now() + 91800000).toISOString(),
+      reminder: true,
+    }),
+  );
+  await api(actor, "settings", {
+    display_name: "Synthetic",
+    reminder_channel: "email",
+    reminders_paused: false,
+  });
+  const past = await import("../support/stack").then((m) =>
+    m.createOuting(actor, { title: "Finished independent", reminder: true }),
+  );
+  await loggedIn(page);
+  await page.getByRole("button", { name: "My outings", exact: true }).click();
+  await expect(page.getByRole("heading", { name: future.title })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Log this outing" }),
+  ).toHaveCount(0);
+  await expect(page.getByText(/Logging reminder scheduled/)).toBeVisible();
+  await page.getByRole("button", { name: "Past", exact: true }).click();
+  await expect(page.getByRole("heading", { name: past.title })).toBeVisible();
+  await page
+    .getByRole("button", { name: "Remind me to log in 1 hour" })
+    .click();
+  await expect(
+    page.getByText("Logging reminder scheduled for one hour from now."),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Log this outing" }).click();
+  await chooseRow(page);
+  await page.getByRole("button", { name: "Save report", exact: true }).click();
+  await expect(page.getByText("Report saved.", { exact: true })).toBeVisible();
+  await expect(page.locator(".outing-reminder")).toHaveCount(0);
+  await page.getByRole("button", { name: "Unlogged", exact: true }).click();
+  await expect(page.getByRole("heading", { name: past.title })).toHaveCount(0);
+  await page.getByRole("button", { name: "Logged", exact: true }).click();
+  await expect(page.getByRole("heading", { name: past.title })).toBeVisible();
+});
+
+test("Forecast offers only supported model contexts and places fitted results after weather", async ({
+  page,
+}) => {
+  const id = crypto.randomUUID();
+  const family = {
+    launch: {
+      eligible: true,
+      outings: 120,
+      coefficients: [Math.log(7 / 3), 0, 0, 0, 0, 0, 0, 0],
+    },
+    water: { eligible: false, outings: 0 },
+  };
+  const artifact = {
+    version: "validated-test-model",
+    eligible: true,
+    context: "synthetic",
+    pooled: { ...family, contextual: { "east|2x|Charlie": family } },
+    personal: {},
+  };
+  await sql.query(
+    "insert into private.model_runs(id,family,artifact,metrics,status) values($1,'synthetic',$2,'{}','active')",
+    [id, artifact],
+  );
+  try {
+    expect((await api(null, "assessment/capabilities")).data).toEqual({
+      pooled: [
+        { route: "either", boat: "any", coach: "none" },
+        { route: "east", boat: "2x", coach: "Charlie" },
+      ],
+      mine: [],
+    });
+    await loggedIn(page);
+    await page.getByRole("button", { name: "Forecast", exact: true }).click();
+    await page
+      .getByRole("combobox", { name: "Route", exact: true })
+      .selectOption("east");
+    await expect(
+      page.getByRole("combobox", { name: "Boat", exact: true }),
+    ).toHaveValue("2x");
+    await expect(
+      page.getByRole("combobox", { name: "Coach factor", exact: true }),
+    ).toHaveValue("Charlie");
+    await expect(
+      page.getByRole("combobox", { name: "Use observations", exact: true }),
+    ).toHaveCount(0);
+    await expect(page.getByText(/70% estimated rowing rate/)).toBeVisible();
+    const weather = await page
+      .getByRole("heading", { name: "Your selected window" })
+      .boundingBox();
+    const fitted = await page
+      .getByRole("heading", { name: "What logged outings suggest" })
+      .boundingBox();
+    expect(fitted!.y).toBeGreaterThan(weather!.y);
+  } finally {
+    await sql.query("delete from private.model_runs where id=$1", [id]);
+  }
 });
