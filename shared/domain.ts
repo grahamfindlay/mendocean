@@ -243,7 +243,17 @@ export interface Outing extends OutingInput {
   bhc_practice_id: number | null;
   attendance?: string;
   skipped?: boolean;
-  reminder_state?: { due_at: string | null; sent_at: string | null };
+  reminder_state?: {
+    due_at: string | null;
+    sent_at: string | null;
+    channels?: {
+      channel: "email" | "push";
+      sent_at: string | null;
+      error: string | null;
+      status: "pending" | "retrying" | "failed" | "sent" | "not_requested";
+      devices_sent: number;
+    }[];
+  };
   version: number;
   reports?: Report[];
   planned_coaches?: string[];

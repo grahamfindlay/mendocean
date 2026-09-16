@@ -9,6 +9,7 @@ import {
   formatTime,
 } from "../shared/domain";
 import Admin from "./Admin";
+import { reminderChannels } from "../shared/reminders";
 import { pushEnvironment } from "./pushSupport";
 import type { AccountData } from "./App";
 export function Modal({
@@ -216,9 +217,7 @@ export function PlanForm({
         <input type="checkbox" name="reminder" />
         Remind me to log, 15 minutes after the outing ends
       </label>
-      <p className="help">
-        Choose an email or push reminder channel in Account.
-      </p>
+      <p className="help">Choose email, push, or both in Account.</p>
       {error && <p className="alert">{error}</p>}
       <button className="button full" disabled={busy}>
         Save outing
@@ -306,7 +305,9 @@ export function SettingsForm({
           void run(async () => {
             await api("settings", {
               display_name: f.get("name"),
-              reminder_channel: f.get("channel"),
+              reminder_channels: ["email", "push"].filter(
+                (c) => f.get(c) === "on",
+              ),
               reminders_paused: f.get("paused") === "on",
             });
             setMessage("Preferences saved.");
@@ -321,21 +322,41 @@ export function SettingsForm({
             defaultValue={account?.profile.display_name}
           />
         </label>
-        <label>
-          Reminders
-          <select
-            name="channel"
-            defaultValue={account?.profile.reminder_channel || "none"}
-          >
-            <option value="none">Off</option>
-            <option value="email">Email</option>
-            <option value="push">Push notifications</option>
-          </select>
-        </label>
+        <fieldset className="reminder-choices">
+          <legend>Logging reminders</legend>
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              name="email"
+              defaultChecked={reminderChannels(account.profile).includes(
+                "email",
+              )}
+            />
+            Email
+          </label>
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              name="push"
+              defaultChecked={reminderChannels(account.profile).includes(
+                "push",
+              )}
+            />
+            Push notifications
+          </label>
+        </fieldset>
         <p className="help">
-          Reminders ask you to log after an outing. Choose a delivery channel
-          and save. For push, also register this device below.
+          Choose email, push, or both. Leave both unchecked to turn reminders
+          off. Push needs a registered device below.
         </p>
+        <details className="help">
+          <summary>When do changes take effect?</summary>
+          <p>
+            New choices apply to upcoming and unfinished reminders. Only
+            selected channels are used. To repeat a reminder already sent,
+            request another from My outings.
+          </p>
+        </details>
         <label className="checkbox">
           <input
             name="paused"
@@ -350,6 +371,13 @@ export function SettingsForm({
       </form>
       <hr />
       <h3>Push on this device</h3>
+      {reminderChannels(account.profile).includes("push") &&
+        account.push_devices === 0 && (
+          <p className="alert">
+            Push is selected, but no device is registered. Enable push on a
+            supported device below to receive push reminders.
+          </p>
+        )}
       {push.ios && !push.installed ? (
         <div className="install-guidance">
           <p>
@@ -394,7 +422,7 @@ export function SettingsForm({
         <p className="help">
           {account.profile.reminders_paused
             ? "Logging reminders are paused."
-            : account.profile.reminder_channel === "push"
+            : reminderChannels(account.profile).includes("push")
               ? "Logging reminders use push notifications."
               : "To receive logging reminders here, select Push notifications above and save preferences."}
         </p>

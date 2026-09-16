@@ -29,7 +29,18 @@ beforeAll(async () => {
   await resetJobs();
   await tick();
 });
-beforeEach(resetJobs);
+beforeEach(async () => {
+  await resetJobs();
+  // Settings changes intentionally restore unfinished reminders; isolate earlier fixtures.
+  await sql.query(
+    "update outing_members set reminder=false where user_id=any($1::uuid[])",
+    [[a.id, b.id, unapproved.id]],
+  );
+  await sql.query(
+    "delete from private.push_subscriptions where user_id=any($1::uuid[])",
+    [[a.id, b.id, unapproved.id]],
+  );
+});
 afterAll(async () => {
   await cleanupUsers([a, b, unapproved]);
   await sql.end();
@@ -339,6 +350,10 @@ test("chosen channel, repeated dispatcher, email ambiguity and snooze generation
   await fixtures({ failure: "after_accept" });
   await tick();
   expect((await fixtures()).deliveries).toHaveLength(1);
+  await sql.query(
+    "update outings set title='Changed after provider acceptance' where id=$1",
+    [o.id],
+  );
   await sql.query(
     "update private.jobs set due_at=now()-interval '1 second' where status='pending' and kind='reminder'",
   );
@@ -677,4 +692,247 @@ test("weather collector refreshes after a quarter hour and shares its recent cac
   await enqueue("weather", null, null);
   await tick();
   expect((await api(null, "weather")).data.fetched_at).toBe(fresh.fetched_at);
+});
+
+async function channels(actor: Actor, selected: string[], paused = false) {
+  const r = await api(actor, "settings", {
+    display_name: "Synthetic",
+    reminder_channels: selected,
+    reminders_paused: paused,
+  });
+  expect(r.status).toBe(200);
+}
+async function device(actor: Actor) {
+  const endpoint = "https://web.push.apple.com/" + randomUUID();
+  expect(
+    (
+      await api(actor, "push", {
+        subscription: {
+          endpoint,
+          keys: { auth: "synthetic", p256dh: "synthetic" },
+        },
+      })
+    ).status,
+  ).toBe(200);
+  return endpoint;
+}
+async function retryReminders() {
+  await sql.query(
+    "update private.jobs set due_at=now()-interval '1 second' where status='pending' and kind='reminder'",
+  );
+  await tick();
+}
+test.each(["email", "push"])(
+  "both channels: failed %s retries without repeating the successful channel",
+  async (failed) => {
+    await channels(a, ["email", "push"]);
+    await device(a);
+    const o = await createOuting(a, { reminder: true });
+    await fixtures({ failure: failed + "_failure" });
+    await tick();
+    expect((await fixtures()).deliveries).toHaveLength(1);
+    const state = (await api(a, "account")).data.outings.find(
+      (v: any) => v.id === o.id,
+    ).reminder_state;
+    expect(state.sent_at).toBeNull();
+    expect(state.channels.find((c: any) => c.channel === failed).status).toBe(
+      "retrying",
+    );
+    expect(state.channels.find((c: any) => c.channel !== failed).status).toBe(
+      "sent",
+    );
+    expect(JSON.stringify(state)).not.toContain("endpoint");
+    await fixtures({ failure: null });
+    await retryReminders();
+    await tick();
+    const sent = (await fixtures()).deliveries;
+    expect(sent.filter((d: any) => d.channel === "email")).toHaveLength(1);
+    expect(sent.filter((d: any) => d.channel === "push")).toHaveLength(1);
+    expect(
+      (
+        await sql.query(
+          "select * from private.delivery_budget where user_id=$1 and outing_id=$2",
+          [a.id, o.id],
+        )
+      ).rowCount,
+    ).toBe(2);
+    // Explicit snooze starts a new generation and intentionally sends both again.
+    await api(a, "reminder", { outing_id: o.id, action: "snooze" });
+    await retryReminders();
+    expect((await fixtures()).deliveries).toHaveLength(4);
+    await sql.query("delete from private.push_subscriptions where user_id=$1", [
+      a.id,
+    ]);
+  },
+);
+test("push checkpoints successful devices and retries only the remaining endpoint", async () => {
+  await channels(a, ["push"]);
+  const first = await device(a),
+    second = await device(a);
+  const o = await createOuting(a, { reminder: true });
+  await fixtures({ failed_targets: [second] });
+  await tick();
+  expect((await fixtures()).deliveries.map((d: any) => d.target)).toEqual([
+    first,
+  ]);
+  const state = (await api(a, "account")).data.outings.find(
+    (v: any) => v.id === o.id,
+  ).reminder_state;
+  expect(state.channels[0]).toMatchObject({
+    channel: "push",
+    status: "retrying",
+    devices_sent: 1,
+  });
+  await fixtures({ failed_targets: [] });
+  await retryReminders();
+  expect(
+    (await fixtures()).deliveries.map((d: any) => d.target).sort(),
+  ).toEqual([first, second].sort());
+  await sql.query("delete from private.push_subscriptions where user_id=$1", [
+    a.id,
+  ]);
+});
+test("no push device cannot prevent selected email, and registration retries only unfinished push", async () => {
+  await channels(a, ["email", "push"]);
+  const o = await createOuting(a, { reminder: true });
+  await tick();
+  expect((await fixtures()).deliveries.map((d: any) => d.channel)).toEqual([
+    "email",
+  ]);
+  const state = (await api(a, "account")).data.outings.find(
+    (v: any) => v.id === o.id,
+  ).reminder_state;
+  expect(state.channels.find((c: any) => c.channel === "push").error).toBe(
+    "no_device",
+  );
+  await device(a);
+  await retryReminders();
+  expect((await fixtures()).deliveries.map((d: any) => d.channel)).toEqual([
+    "email",
+    "push",
+  ]);
+  await sql.query("delete from private.push_subscriptions where user_id=$1", [
+    a.id,
+  ]);
+});
+test("neither channel, legacy preference mapping, and changed pending preferences", async () => {
+  await channels(a, []);
+  const o = await createOuting(a, { reminder: true });
+  await tick();
+  expect((await fixtures()).deliveries).toHaveLength(0);
+  expect((await api(a, "account")).data.profile.reminder_channel).toBe("none");
+  // Enabling a channel restores an unfinished reminder without changing per-outing opt-in.
+  await channels(a, ["email", "push"]);
+  await fixtures({ failure: "delivery" });
+  await tick();
+  await channels(a, ["email"]);
+  await fixtures({ failure: null });
+  await retryReminders();
+  expect((await fixtures()).deliveries.map((d: any) => d.channel)).toEqual([
+    "email",
+  ]);
+  // Completed reminders stay completed when another channel is selected later.
+  await device(a);
+  await channels(a, ["email", "push"]);
+  await tick();
+  expect((await fixtures()).deliveries).toHaveLength(1);
+  await api(a, "settings", {
+    display_name: "Synthetic",
+    reminder_channel: "push",
+    reminders_paused: false,
+  });
+  expect((await api(a, "account")).data.profile.reminder_channels).toEqual([
+    "push",
+  ]);
+  await sql.query("delete from private.push_subscriptions where user_id=$1", [
+    a.id,
+  ]);
+});
+test("a report submitted after partial delivery suppresses the pending channel", async () => {
+  await channels(a, ["email", "push"]);
+  await device(a);
+  const o = await createOuting(a, { reminder: true });
+  await fixtures({ failure: "push_failure" });
+  await tick();
+  await api(a, "report", { outing: o, report: row(o) });
+  await fixtures({ failure: null });
+  await retryReminders();
+  expect((await fixtures()).deliveries.map((d: any) => d.channel)).toEqual([
+    "email",
+  ]);
+  await sql.query("delete from private.push_subscriptions where user_id=$1", [
+    a.id,
+  ]);
+});
+test("channel leases fence duplicate jobs, stale tokens and snooze generations", async () => {
+  await channels(a, ["email", "push"]);
+  await device(a);
+  const o = await createOuting(a, { reminder: true });
+  const args = { uid: a.id, outing: o.id, gen: 0, target_channel: "email" };
+  const [one, two] = await Promise.all([
+    db.rpc("reserve_reminder_channel", args),
+    db.rpc("reserve_reminder_channel", args),
+  ]);
+  expect([one.data.allowed, two.data.allowed].filter(Boolean)).toHaveLength(1);
+  const allowed = one.data.allowed ? one.data : two.data;
+  expect(
+    (await b.client.rpc("reserve_reminder_channel", args)).error,
+  ).toBeTruthy();
+  await db.rpc("finish_reminder_channel", {
+    ...args,
+    token: randomUUID(),
+    failure: null,
+  });
+  expect((await db.rpc("reserve_reminder_channel", args)).data.busy).toBe(true);
+  await api(a, "reminder", { outing_id: o.id, action: "snooze" });
+  expect(
+    (await db.rpc("reminder_channel_active", { ...args, token: allowed.token }))
+      .data,
+  ).toBe(false);
+  await db.rpc("finish_reminder_channel", {
+    ...args,
+    token: allowed.token,
+    failure: null,
+  });
+  await retryReminders();
+  expect((await fixtures()).deliveries).toHaveLength(2);
+  // Two independently queued jobs still cannot repeat accepted channels.
+  await enqueue("reminder", a.id, o.id, { generation: 1 });
+  await Promise.all([tick(), tick()]);
+  expect((await fixtures()).deliveries).toHaveLength(2);
+  await sql.query("delete from private.push_subscriptions where user_id=$1", [
+    a.id,
+  ]);
+});
+test("email quota does not block push and successful push is not repeated after quota clears", async () => {
+  await channels(a, ["email", "push"]);
+  await device(a);
+  const o = await createOuting(a, { reminder: true });
+  await sql.query(
+    "insert into private.delivery_budget(user_id,outing_id,generation,channel) select $1,$2,n,'email' from generate_series(100,179) n",
+    [b.id, o.id],
+  );
+  try {
+    await tick();
+    expect((await fixtures()).deliveries.map((d: any) => d.channel)).toEqual([
+      "push",
+    ]);
+    await sql.query(
+      "delete from private.delivery_budget where user_id=$1 and outing_id=$2",
+      [b.id, o.id],
+    );
+    await retryReminders();
+    expect((await fixtures()).deliveries.map((d: any) => d.channel)).toEqual([
+      "push",
+      "email",
+    ]);
+  } finally {
+    await sql.query(
+      "delete from private.delivery_budget where user_id=$1 and outing_id=$2",
+      [b.id, o.id],
+    );
+    await sql.query("delete from private.push_subscriptions where user_id=$1", [
+      a.id,
+    ]);
+  }
 });

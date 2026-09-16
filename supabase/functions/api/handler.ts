@@ -19,7 +19,10 @@ import {
 } from "../_shared/runtime.ts";
 import { bhcGet, list } from "../_shared/bhc.ts";
 import { assess, assessmentCapabilities } from "../../../shared/model.ts";
-import { reminderScheduleError } from "../../../shared/reminders.ts";
+import {
+  reminderScheduleError,
+  reminderChannels,
+} from "../../../shared/reminders.ts";
 import { weatherFeatures } from "../_shared/weather.ts";
 const uuid = z.string().uuid();
 export function createApiHandler(providers: Providers = liveProviders) {
@@ -177,6 +180,7 @@ export function createApiHandler(providers: Providers = liveProviders) {
           );
         return json(req, {
           profile,
+          push_devices: (await query("push_get", { user_id: uid })).length,
           outings: await ownOutings(),
           coaches: check(
             await client.from("coaches").select("id,name").order("name"),
@@ -213,6 +217,7 @@ export function createApiHandler(providers: Providers = liveProviders) {
         return json(req, {
           exported_at: new Date().toISOString(),
           profile,
+          push_devices: (await query("push_get", { user_id: uid })).length,
           outings: await ownOutings(),
         });
       if (req.method !== "POST")
@@ -284,11 +289,27 @@ export function createApiHandler(providers: Providers = liveProviders) {
         const settings = z
           .object({
             display_name: z.string().trim().max(100),
-            reminder_channel: z.enum(["none", "email", "push"]),
+            reminder_channel: z.enum(["none", "email", "push"]).optional(),
+            reminder_channels: z
+              .array(z.enum(["email", "push"]))
+              .max(2)
+              .optional(),
             reminders_paused: z.boolean(),
           })
+          .refine(
+            (v) =>
+              (v.reminder_channels !== undefined) !==
+              (v.reminder_channel !== undefined),
+            "Choose reminder channels.",
+          )
           .parse(input);
         check(await db.from("profiles").update(settings).eq("id", uid));
+        if (
+          profile.reminders_paused !== settings.reminders_paused ||
+          reminderChannels(profile).sort().join() !==
+            reminderChannels(settings).sort().join()
+        )
+          check(await db.rpc("refresh_reminder_jobs", { uid }));
         return json(req, { saved: true });
       }
       if (path === "share") {
@@ -449,6 +470,7 @@ export function createApiHandler(providers: Providers = liveProviders) {
         )
           throw new HttpError(400, "Unsupported push service.");
         await query("push_put", { user_id: uid, subscription });
+        check(await db.rpc("refresh_reminder_jobs", { uid }));
         return json(req, { saved: true });
       }
       if (path === "bhc/connect") {

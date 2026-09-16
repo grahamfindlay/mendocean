@@ -9,6 +9,7 @@ export async function previewAPI(path: string, body: any) {
   if (path === "account")
     return {
       outings,
+      push_devices: 0,
       coaches: COACH_NAMES.map((name, i) => ({
         name,
         id: `30000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,

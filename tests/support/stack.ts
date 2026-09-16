@@ -93,6 +93,7 @@ export async function resetJobs() {
     bhc: [],
     lineup: false,
     failure: null,
+    failed_targets: [],
     deliveries: [],
     attempts: [],
     calls: [],

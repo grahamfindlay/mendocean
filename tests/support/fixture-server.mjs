@@ -17,7 +17,9 @@ export function startFixtures(secret, port = 54328) {
         const target = channel === 'email' ? payload.to[0] : data.subscription.endpoint;
         state.attempts.push({channel, key, target});
         if (state.failure === 'expired' && channel === 'push') return reply(410, {});
-        if (state.failure === 'delivery') return reply(503, {});
+        if (state.failure === 'delivery' || state.failure === channel+'_failure' || (state.failed_targets || []).includes(target)) return reply(503, {});
+        // Enforce both key and payload, matching the provider's retry contract.
+        if (channel === 'email' && state.deliveries.some(d=>d.key===key && JSON.stringify(d.payload)!==JSON.stringify(payload))) return reply(409,{});
         // Simulate provider email idempotency, not a guarantee of push exactly-once delivery.
         if (channel !== 'email' || !state.deliveries.some(d => d.key === key)) state.deliveries.push({channel,key,target,payload});
         if (state.failure === 'after_accept') { state.failure = null; return reply(503, {}); }

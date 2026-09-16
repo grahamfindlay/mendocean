@@ -24,12 +24,14 @@ import Logger from "./Logger";
 import { Auth, Modal, SettingsForm, PlanForm } from "./Account";
 import { discard, flush, pending, type PendingReport } from "./outbox";
 export interface AccountData {
+  push_devices?: number;
   outings: Outing[];
   coaches: Coach[];
   profile: {
     display_name: string;
     role: string;
     reminder_channel: string;
+    reminder_channels?: string[];
     reminders_paused: boolean;
   };
   bhc: {
