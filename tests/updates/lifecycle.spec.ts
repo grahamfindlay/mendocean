@@ -297,11 +297,14 @@ test("corrupt asset and failed update check retain old shell; retry installs a c
     page.getByRole("region", { name: "App version and updates" }),
   ).toContainText("complete update could not be downloaded");
   await closeAccount(page);
+  // Set the next outage before navigation triggers a background update check.
+  // Otherwise an in-flight retry can receive B's script during the asset outage,
+  // then valid assets after the fixture switches to the worker-only outage.
+  await release("b", "worker");
   if (info.project.name === "chromium") await context.setOffline(true);
   await page.reload();
   await expect(build(page)).toHaveAttribute("content", a);
   await context.setOffline(false);
-  await release("b", "worker");
   await check(page);
   await expect(
     page
