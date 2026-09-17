@@ -18,6 +18,8 @@ Activation uses client messaging, then reloads only after the intended worker co
 
 ## Verification and rollout
 
+The implementation shipped in [PR #7](https://github.com/grahamfindlay/mendocean/pull/7), commit `867d321`, after both required CI lanes passed. Live checks confirmed matching release hashes, public endpoints and successful worker installation/control. A final header audit found the custom domain rewriting the worker's `no-cache` header to a four-hour browser TTL, while Pages itself preserved it. The follow-up uses `no-store` for `/sw.js` and requires it in production smoke checks. This changes HTTP caching of the worker script, not the installed worker or its complete offline app-shell cache.
+
 Production build/type checks, 61 focused tests, 8 Python tests and 14 preview browser cases pass locally. The complete disposable stack also passes 43 integration tests, 40 existing browser journeys and 14 real-worker upgrade cases. Each browser lane has two documented exclusions; Chromium covers offline upgrades, while online upgrades run in Chromium and WebKit. The real installed iPhone check is still required before claiming that the reported device symptom is resolved.
 
 The production smoke checks verify the exact deployment commit, HTML/worker identity and every precache file's hash, then confirm the worker actually installs and controls a browser. These checks also retain the existing public forecast, Auth configuration and unsigned-write rejection coverage.

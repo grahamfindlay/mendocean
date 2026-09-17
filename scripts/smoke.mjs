@@ -42,6 +42,8 @@ if (!asset || !(await get(site + asset)).ok)
   throw new Error("frontend: entry asset missing");
 const worker = await get(site + "/sw.js");
 if (!worker.ok) throw new Error("frontend: service worker unavailable");
+if (!worker.headers.get("cache-control")?.includes("no-store"))
+  throw new Error("frontend: service worker must not be HTTP-cached");
 const release = JSON.parse(
   (await worker.text()).match(/^const RELEASE = (.+);$/m)?.[1] || "null",
 );

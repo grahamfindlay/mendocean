@@ -4,7 +4,7 @@
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   X-Frame-Options: DENY
 /sw.js
-  Cache-Control: no-cache
+  Cache-Control: no-store
 
 /build.json
   Cache-Control: no-store
