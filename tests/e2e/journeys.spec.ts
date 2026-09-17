@@ -425,13 +425,13 @@ test("push setup explains dismissed permission and tests only the saved device",
   await page
     .getByRole("button", { name: "Enable push on this device", exact: true })
     .click();
-  await expect(page.getByRole("status")).toContainText(
+  await expect(page.locator(".notice[role=status]")).toContainText(
     "Permission was not granted",
   );
   await page
     .getByRole("button", { name: "Enable push on this device", exact: true })
     .click();
-  await expect(page.getByRole("status")).toContainText(
+  await expect(page.locator(".notice[role=status]")).toContainText(
     "This device is registered",
   );
   await page
@@ -440,7 +440,9 @@ test("push setup explains dismissed permission and tests only the saved device",
       exact: true,
     })
     .click();
-  await expect(page.getByRole("status")).toContainText("Test accepted");
+  await expect(page.locator(".notice[role=status]")).toContainText(
+    "Test accepted",
+  );
   const state = await fixtures();
   expect(state.deliveries.some((d: any) => d.target === endpoint)).toBe(true);
 });

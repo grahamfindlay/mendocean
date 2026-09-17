@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ArrowUpRight,
   Check,
@@ -24,6 +30,24 @@ import { canLog, outingPhase } from "../shared/presentation";
 import Logger from "./Logger";
 import { Auth, Modal, SettingsForm, PlanForm } from "./Account";
 import { discard, flush, pending, type PendingReport } from "./outbox";
+import { startAppUpdates } from "./appUpdates";
+import { UpdateBanner } from "./UpdateControls";
+import { setUpdateFormReason } from "./updateSafety";
+function readUpdatePosition() {
+  try {
+    const saved = JSON.parse(
+      sessionStorage.getItem("mendocean-update-position") || "null",
+    );
+    sessionStorage.removeItem("mendocean-update-position");
+    return saved &&
+      Date.now() - saved.at < 300000 &&
+      ["Now", "Hourly", "Forecast", "Log", "My outings"].includes(saved.tab)
+      ? saved
+      : null;
+  } catch {
+    return null;
+  }
+}
 export interface AccountData {
   push_devices?: number;
   outings: Outing[];
@@ -43,6 +67,7 @@ export interface AccountData {
 }
 export default function App() {
   const now = useClock();
+  const [resume] = useState(readUpdatePosition);
   const [outingView, setOutingView] = useState<"Upcoming" | "Past">("Upcoming");
   const [reportFilter, setReportFilter] = useState<ReportFilter>("All");
   const [forecastSelection, setForecastSelection] =
@@ -50,13 +75,14 @@ export default function App() {
   const weatherRequest = useRef<Promise<void> | null>(null);
   const weatherFetchedAt = useRef(0);
   const [tab, setTab] = useState(
-    new URLSearchParams(location.search).has("log")
-      ? "Log"
-      : ["Plan", "Forecast"].includes(
-            new URLSearchParams(location.search).get("tab") || "",
-          )
-        ? "Forecast"
-        : "Now",
+    resume?.tab ||
+      (new URLSearchParams(location.search).has("log")
+        ? "Log"
+        : ["Plan", "Forecast"].includes(
+              new URLSearchParams(location.search).get("tab") || "",
+            )
+          ? "Forecast"
+          : "Now"),
   );
   const [weather, setWeather] = useState<Forecast | null>(null);
   const [weatherError, setWeatherError] = useState("");
@@ -76,6 +102,40 @@ export default function App() {
   const [attendanceOuting, setAttendanceOuting] = useState<Outing>();
   const [selectedOuting, setSelectedOuting] = useState<string | undefined>(
     new URLSearchParams(location.search).get("log") || undefined,
+  );
+  const updatePosition = useRef({});
+  updatePosition.current = {
+    tab,
+    outingView,
+    reportFilter,
+    forecastSelection,
+    selectedOuting,
+    userId: user?.id,
+    at: now,
+  };
+  useLayoutEffect(() => {
+    setUpdateFormReason(
+      tab === "Log" ||
+        tab === "Forecast" ||
+        authOpen ||
+        settings ||
+        planned ||
+        !!attendanceOuting
+        ? "Finish or close the open form before updating."
+        : busy
+          ? "A request is still in progress."
+          : "",
+    );
+  }, [tab, authOpen, settings, planned, attendanceOuting, busy]);
+  useEffect(
+    () =>
+      startAppUpdates(() => {
+        sessionStorage.setItem(
+          "mendocean-update-position",
+          JSON.stringify(updatePosition.current),
+        );
+      }),
+    [],
   );
   const refreshWeather = useCallback(() => {
     if (weatherRequest.current) return weatherRequest.current;
@@ -146,6 +206,21 @@ export default function App() {
         setForecastSelection(undefined);
         setOutingView("Upcoming");
         setReportFilter("All");
+        if (
+          resume &&
+          next &&
+          !currentUser.current &&
+          resume.userId === next.id
+        ) {
+          setOutingView(resume.outingView === "Past" ? "Past" : "Upcoming");
+          setReportFilter(
+            ["All", "Unlogged", "Logged"].includes(resume.reportFilter)
+              ? resume.reportFilter
+              : "All",
+          );
+          setForecastSelection(resume.forecastSelection);
+          setSelectedOuting(resume.selectedOuting);
+        }
       }
       currentUser.current = next?.id ?? null;
       setUser(next);
@@ -186,10 +261,6 @@ export default function App() {
       })
       .catch((e) => setError(e.message));
   }, [user, refresh]);
-  useEffect(() => {
-    if ("serviceWorker" in navigator && !import.meta.env.DEV)
-      void navigator.serviceWorker.register("/sw.js");
-  }, []);
   const act = async (fn: () => Promise<void>) => {
     setBusy(true);
     setError("");
@@ -209,6 +280,7 @@ export default function App() {
   }
   return (
     <div className="app-shell">
+      <UpdateBanner />
       <header className="site-header">
         <a className="wordmark" href="/">
           mendocean<span>LAKE MENDOTA / MADISON, WI</span>
