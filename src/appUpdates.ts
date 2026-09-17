@@ -33,6 +33,7 @@ export const subscribeUpdates = (listener: () => void) => {
 export const updateSnapshot = () => state;
 let registration: ServiceWorkerRegistration | undefined;
 let checking: Promise<void> | undefined;
+let entryPending = false;
 let applying = false,
   reloading = false,
   started = false,
@@ -240,7 +241,12 @@ export function checkForUpdates(manual = false, entry = false): Promise<void> {
     });
     return Promise.resolve();
   }
-  if (checking) return checking;
+  if (checking) {
+    // A foreground boundary can arrive while an older check is settling.
+    // Preserve it instead of losing its activation intent to that older result.
+    entryPending ||= entry;
+    return checking;
+  }
   if (!manual && Date.now() - lastCheck < 60000) return Promise.resolve();
   lastCheck = Date.now();
   autoAtEntry = entry;
@@ -267,6 +273,10 @@ export function checkForUpdates(manual = false, entry = false): Promise<void> {
     .catch(failed)
     .finally(() => {
       checking = undefined;
+      if (entryPending) {
+        entryPending = false;
+        if (!reloading) void checkForUpdates(true, true);
+      }
     });
   return checking;
 }
