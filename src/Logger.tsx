@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, Save } from "lucide-react";
 import {
   BOAT_CLASSES,
@@ -142,28 +142,40 @@ export default function Logger({
       })
       .catch(() => setReady(true));
   }, [user, editing, initialOuting]);
+  const latestDraft = useRef<{ user: string; value: unknown } | null>(null);
+  const completedDraft = useRef(false);
+  useEffect(
+    () => () => {
+      const latest = latestDraft.current;
+      if (latest && !completedDraft.current)
+        void draft(latest.user, latest.value).catch(() => {});
+    },
+    [],
+  );
   useEffect(() => {
     if (!ready || editing) return;
+    const value = {
+      selected,
+      outcome,
+      rating,
+      route,
+      start,
+      end,
+      title,
+      boat,
+      reason,
+      coachState,
+      coachIds,
+      coachCount,
+      launched,
+      smallest,
+      largest,
+      notes,
+      segments,
+    };
+    latestDraft.current = { user, value };
     const timer = setTimeout(() => {
-      void draft(user, {
-        selected,
-        outcome,
-        rating,
-        route,
-        start,
-        end,
-        title,
-        boat,
-        reason,
-        coachState,
-        coachIds,
-        coachCount,
-        launched,
-        smallest,
-        largest,
-        notes,
-        segments,
-      });
+      if (!completedDraft.current) void draft(user, value).catch(() => {});
     }, 350);
     return () => clearTimeout(timer);
   }, [
@@ -261,6 +273,7 @@ export default function Logger({
         segments: outcome === "rowed" && route === "both" ? segments : [],
       });
       await stage(user, outing, report);
+      completedDraft.current = true;
       await clearDraft(user);
       const result = navigator.onLine ? await flush(user) : { remaining: [1] };
       onSaved(

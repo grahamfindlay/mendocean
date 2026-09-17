@@ -4,6 +4,7 @@ import {
   validateAuth,
 } from "../tests/smoke/checks.mjs";
 import publicConfig from "../tests/smoke/public-config.json" with { type: "json" };
+import { createHash } from "node:crypto";
 const site = "https://mendocean.fyi";
 const backend = "https://exhoyifhvultmjryisce.supabase.co";
 const expected = process.env.EXPECTED_SHA;
@@ -39,8 +40,31 @@ if (!html.includes("Mendocean"))
 const asset = html.match(/src="(\/assets\/[^\"]+\.js)"/)?.[1];
 if (!asset || !(await get(site + asset)).ok)
   throw new Error("frontend: entry asset missing");
-if (!(await get(site + "/sw.js")).ok)
-  throw new Error("frontend: service worker unavailable");
+const worker = await get(site + "/sw.js");
+if (!worker.ok) throw new Error("frontend: service worker unavailable");
+const release = JSON.parse(
+  (await worker.text()).match(/^const RELEASE = (.+);$/m)?.[1] || "null",
+);
+if (
+  !release?.id ||
+  !release.assets?.length ||
+  (expected && release.commit !== expected)
+)
+  throw new Error("frontend: service worker release identity mismatch");
+if (!html.includes(`content="${release.id}"`))
+  throw new Error("frontend: HTML and worker releases differ");
+for (const asset of release.assets) {
+  if (!asset.url.startsWith("/") || asset.url.startsWith("//"))
+    throw new Error("frontend: invalid precache URL");
+  const response = await get(site + asset.url);
+  const digest = createHash("sha256")
+    .update(Buffer.from(await response.arrayBuffer()))
+    .digest("hex");
+  if (!response.ok || digest !== asset.hash)
+    throw new Error(
+      "frontend: deployed precache integrity failed for " + asset.url,
+    );
+}
 const forecast = await get(backend + "/functions/v1/api/weather");
 if (!forecast.ok) throw new Error("weather-api: unavailable");
 validateForecast(await forecast.json());

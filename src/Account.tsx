@@ -9,6 +9,7 @@ import {
   formatTime,
 } from "../shared/domain";
 import Admin from "./Admin";
+import { UpdateSettings } from "./UpdateControls";
 import { reminderChannels } from "../shared/reminders";
 import { pushEnvironment } from "./pushSupport";
 import type { AccountData } from "./App";
@@ -370,6 +371,8 @@ export function SettingsForm({
         </button>
       </form>
       <hr />
+      <UpdateSettings />
+      <hr />
       <h3>Push on this device</h3>
       {reminderChannels(account.profile).includes("push") &&
         account.push_devices === 0 && (
@@ -462,7 +465,9 @@ export function SettingsForm({
                     : "Permission was not granted. Click Enable push again to retry.",
                 );
               setPushProgress("Registering this device…");
-              await navigator.serviceWorker.register("/sw.js");
+              await navigator.serviceWorker.register("/sw.js", {
+                updateViaCache: "none",
+              });
               let readyTimeout: ReturnType<typeof setTimeout> | undefined;
               const sw = await Promise.race([
                 navigator.serviceWorker.ready,

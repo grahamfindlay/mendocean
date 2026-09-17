@@ -11,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
+import { startReleaseServer } from "../tests/support/release-server.mjs";
 import { startFixtures } from "../tests/support/fixture-server.mjs";
 const root = resolve(".");
 const work = mkdtempSync(join(tmpdir(), "mendocean-test-"));
@@ -27,6 +28,7 @@ const safeEnv = Object.fromEntries(
 let env = { ...safeEnv };
 const children = [];
 let fixtures;
+let releaseServer;
 let cleanupStarted = false;
 const sensitive = [];
 const diagnostics = [];
@@ -46,6 +48,7 @@ function run(cmd, args, opts = {}) {
     child.stdout?.on("data", (b) => {
       output += b;
       stdout += b;
+      if (args.includes("test:updates")) process.stdout.write(redact(b));
     });
     child.stderr?.on("data", (b) => {
       output += b;
@@ -90,6 +93,7 @@ async function cleanup() {
   cleanupStarted = true;
   for (const c of children) c.kill("SIGTERM");
   fixtures?.close();
+  releaseServer?.close();
   try {
     execFileSync(cli, ["stop", "--workdir", work, "--no-backup"], {
       env,
@@ -263,20 +267,36 @@ import_map = "./functions/deno.json"
     VITE_BUILD_SHA: process.env.GITHUB_SHA || "local-test",
   };
   console.log("Building production frontend against isolated services.");
-  await run(join(root, "node_modules/.bin/vite"), ["build"], {
-    cwd: app,
-    env: buildEnv,
-  });
-  background(
-    join(root, "node_modules/.bin/vite"),
-    ["preview", "--host", "127.0.0.1", "--port", "4175", "--strictPort"],
-    { cwd: app, env: buildEnv },
+  for (const release of ["a", "b", "c"]) {
+    await run(
+      join(root, "node_modules/.bin/vite"),
+      ["build", "--outDir", "dist-" + release],
+      {
+        cwd: app,
+        env: { ...buildEnv, MENDOCEAN_BUILD_ID: id + "-" + release },
+      },
+    );
+  }
+  cpSync(join(app, "dist-a"), join(app, "dist-legacy"), { recursive: true });
+  cpSync(
+    join(root, "tests/support/legacy-sw.js"),
+    join(app, "dist-legacy/sw.js"),
   );
+  releaseServer = await startReleaseServer(app, secret);
   await ready(env.TEST_APP_URL);
-  console.log("Running real-backend integration tests.");
-  console.log(await run("npm", ["run", "test:integration"]));
-  console.log("Running production-build browser journeys.");
-  console.log(await run("npm", ["run", "test:e2e:full"]));
+  if (!process.argv.includes("--updates-only")) {
+    console.log("Running real-backend integration tests.");
+    console.log(await run("npm", ["run", "test:integration"]));
+    console.log("Running production-build browser journeys.");
+    console.log(await run("npm", ["run", "test:e2e:full"]));
+  }
+  console.log("Running real service-worker A → B → C upgrade journeys.");
+  const grepIndex = process.argv.indexOf("--grep");
+  await run("npm", [
+    "run",
+    "test:updates",
+    ...(grepIndex >= 0 ? ["--", "--grep", process.argv[grepIndex + 1]] : []),
+  ]);
 } catch (e) {
   console.error(e.message);
   for (const c of children) console.error(c.diagnostic());

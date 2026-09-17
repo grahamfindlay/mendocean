@@ -1,12 +1,13 @@
 import { createServer } from 'node:http';
 export function startFixtures(secret, port = 54328) {
+  let heldAttendance = [];
   let state = { bhc: [], lineup: false, failure: null, deliveries: [], attempts: [], calls: [] };
   const server = createServer(async (req, res) => {
     const reply = (status, value) => { res.writeHead(status, {'Content-Type':'application/json'}); res.end(JSON.stringify(value)); };
     if (req.headers['x-fixture-secret'] !== secret) return reply(401, {});
     let input = ''; for await (const b of req) input += b;
     const data = input ? JSON.parse(input) : {};
-    if (req.url === '/control') { state = {...state, ...data}; return reply(200, {}); }
+    if (req.url === '/control') { state = {...state, ...data}; if (data.hold_attendance === false) { heldAttendance.splice(0).forEach(release => release()); } return reply(200, {}); }
     if (req.url === '/state') return reply(200, state);
     if (req.url === '/push' || req.url === '/upstream') {
       const url = data.url ? new URL(data.url) : null;
@@ -28,6 +29,7 @@ export function startFixtures(secret, port = 54328) {
       state.calls.push({host:url.hostname,path:url.pathname,method:data.method}); // Never retain token-bearing URLs.
       if (url.hostname === 'api.boathouseconnect.com') {
         if (url.pathname === '/practices/setAttendance') {
+          if (state.hold_attendance) await new Promise(resolve => heldAttendance.push(resolve));
           const form = new URLSearchParams(data.body);
           if (data.method !== 'POST' || form.has('custid') || form.get('whitelabel_id') !== '1' || form.get('token') !== 'synthetic-bhc-token-for-tests-only') return reply(400,{});
           const p = state.bhc.find(p=>String(p.practice_id)===form.get('practice_id'));

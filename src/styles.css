@@ -1474,3 +1474,21 @@ button:hover:not(:disabled) {
   font-size: 0.85rem;
   margin: 0.5rem 0;
 }
+
+.app-update {
+  border: 1px solid var(--line, #ccc);
+  background: #fff9dd;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: 0.6rem;
+}
+.app-update p {
+  margin: 0 0 0.4rem;
+}
+.app-update small {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+.app-version {
+  overflow-wrap: anywhere;
+}

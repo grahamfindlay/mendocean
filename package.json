@@ -15,7 +15,8 @@
     "test:stack": "node scripts/test-stack.mjs",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e:full": "playwright test --config playwright.full.config.ts",
-    "test:smoke": "node scripts/smoke.mjs"
+    "test:smoke": "node scripts/smoke.mjs",
+    "test:updates": "playwright test --config playwright.updates.config.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
