@@ -296,3 +296,17 @@ test("gapped and out-of-horizon windows stay visibly incomplete", () => {
   expect(beyond.samples).toBe(0);
   expect(beyond.status).toBe("unavailable");
 });
+test("rain probability survives the quarter-hour horizon that masks it", () => {
+  // Quarter-hour samples override the hourly ones at :00 and carry no
+  // probability, so a merged-sample reading would report none at all.
+  const hours = [
+    sample(base, { probability: 20 }),
+    sample(base + 3600000, { probability: 55 }),
+  ];
+  const quarter = [
+    sample(base, { probability: null }, 15),
+    sample(base + 3600000, { probability: null }, 15),
+  ];
+  const s = summarizeWindow(windowOf(hours, quarter), base, base + 3600000);
+  expect(s.probability).toEqual({ min: 20, max: 55 });
+});

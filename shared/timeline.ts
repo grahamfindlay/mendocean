@@ -197,7 +197,13 @@ export function summarizeWindow(
     status: applicable.length
       ? applicable.reduce((worst, s) => (RANK[s] > RANK[worst] ? s : worst))
       : "unavailable",
-    probability: extremes(samples.map((h) => h.probability)),
+    probability: extremes(
+      // Quarter-hour samples carry no probability and mask the hourly value at
+      // :00, so read the hourly series directly. An hour covers (t - 1h, t].
+      weather.hours
+        .filter((h) => stamp(h) >= start && stamp(h) - 3600000 < end)
+        .map((h) => h.probability),
+    ),
     codes: [
       ...new Set(
         samples.map((h) => h.code).filter((c): c is number => c !== null),
