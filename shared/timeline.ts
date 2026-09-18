@@ -1,8 +1,11 @@
 import {
   chicagoToISO,
+  circularMean,
   localDateTime,
+  windStatus,
   type Forecast,
   type WeatherHour,
+  type WindStatus,
 } from "./domain.ts";
 const stamp = (h: WeatherHour) => Date.parse(h.time);
 export const sampleMinutes = (h: WeatherHour) => h.interval_minutes || 60;
@@ -121,4 +124,84 @@ export function precipitationRate(h: WeatherHour) {
   return h.precipitation === null
     ? null
     : (h.precipitation * 60) / sampleMinutes(h);
+}
+const RANK: Record<WindStatus, number> = {
+  unavailable: -1,
+  favorable: 0,
+  caution: 1,
+  unfavorable: 2,
+};
+/** Directions this scattered have no useful single bearing. R < 0.6 is roughly 55° of circular spread. */
+const CONCENTRATED = 0.6;
+function extremes(values: (number | null)[]) {
+  const present = values.filter(
+    (v): v is number => v !== null && Number.isFinite(v),
+  );
+  return present.length
+    ? { min: Math.min(...present), max: Math.max(...present) }
+    : null;
+}
+export interface WindowSummary {
+  /** False when the interval is gapped, unbracketed or outside the horizon. */
+  covered: boolean;
+  /** How many provider samples the summary rests on. Zero means nothing is known. */
+  samples: number;
+  wind: { min: number; max: number } | null;
+  gust: number | null;
+  temperature: { min: number; max: number } | null;
+  direction: { bearing: number | null; variable: boolean } | null;
+  /** Worst applicable classification in the interval, not an average of them. */
+  status: WindStatus;
+  /** Range across the hours that carry one, never a whole-interval event probability. */
+  probability: { min: number; max: number } | null;
+  codes: number[];
+}
+/**
+ * Summarize a requested interval from the samples that actually cover it.
+ *
+ * Extremes and ranges only. A window can mix 15- and 60-minute samples, so an
+ * unweighted mean would silently weight the near term four to one; a mean that
+ * is genuinely wanted later must be time-weighted by `sampleMinutes`. Every
+ * figure is a sampled extreme, not a continuous bound over the interval.
+ */
+export function summarizeWindow(
+  weather: Forecast,
+  start: number,
+  end: number,
+): WindowSummary {
+  const { samples, covered } = windowSamples(weather, start, end);
+  const bearings = samples
+    .map((h) => h.direction)
+    .filter((d): d is number => d !== null && Number.isFinite(d));
+  const resultant = bearings.length
+    ? Math.hypot(
+        bearings.reduce((sum, d) => sum + Math.cos((d * Math.PI) / 180), 0),
+        bearings.reduce((sum, d) => sum + Math.sin((d * Math.PI) / 180), 0),
+      ) / bearings.length
+    : 0;
+  const applicable = samples
+    .map((h) => windStatus(h.wind, h.direction))
+    .filter((s) => s !== "unavailable");
+  return {
+    covered,
+    samples: samples.length,
+    wind: extremes(samples.map((h) => h.wind)),
+    gust: extremes(samples.map((h) => h.gust))?.max ?? null,
+    temperature: extremes(samples.map((h) => h.temperature)),
+    direction: bearings.length
+      ? {
+          bearing: circularMean(bearings),
+          variable: resultant < CONCENTRATED,
+        }
+      : null,
+    status: applicable.length
+      ? applicable.reduce((worst, s) => (RANK[s] > RANK[worst] ? s : worst))
+      : "unavailable",
+    probability: extremes(samples.map((h) => h.probability)),
+    codes: [
+      ...new Set(
+        samples.map((h) => h.code).filter((c): c is number => c !== null),
+      ),
+    ],
+  };
 }

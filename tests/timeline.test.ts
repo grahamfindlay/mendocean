@@ -9,6 +9,7 @@ import {
   summarySamples,
   hourlyRainChance,
   dayBounds,
+  summarizeWindow,
 } from "../shared/timeline";
 import { forecastSamples } from "../shared/presentation";
 import {
@@ -191,4 +192,107 @@ test("five-day comparisons retain selected minutes and detect DST nonexistent lo
   expect(
     localDateTime(window.samples.at(-1)!.time).startsWith("2026-09-16"),
   ).toBe(true);
+});
+
+const sample = (
+  time: number,
+  over: Partial<WeatherHour> = {},
+  interval: 15 | 60 = 60,
+): WeatherHour => ({ ...row(time, interval), ...over });
+const windowOf = (
+  hours: WeatherHour[],
+  quarter: WeatherHour[] = [],
+): Forecast => ({
+  ...weather,
+  hours,
+  quarter_hours: quarter,
+});
+test("summaries report sampled extremes rather than averaging mixed intervals", () => {
+  // One brief 15-minute gust spike among calm hours must survive the summary.
+  const hours = Array.from({ length: 5 }, (_, i) =>
+    sample(base + i * 3600000, { wind: 4, gust: 6, temperature: 60 }),
+  );
+  const quarter = [
+    sample(base + 3600000, { wind: 22, gust: 31, temperature: 71 }, 15),
+  ];
+  const s = summarizeWindow(windowOf(hours, quarter), base, base + 4 * 3600000);
+  expect(s.wind).toEqual({ min: 4, max: 22 });
+  expect(s.gust).toBe(31);
+  expect(s.temperature).toEqual({ min: 60, max: 71 });
+  expect(s.covered).toBe(true);
+});
+test("summaries take the worst applicable classification, not a typical one", () => {
+  const hours = Array.from({ length: 5 }, (_, i) =>
+    sample(base + i * 3600000, { wind: 3, direction: 350 }),
+  );
+  // A single unfavorable quarter-hour inside an otherwise favorable window.
+  const quarter = [sample(base + 3600000, { wind: 19, direction: 350 }, 15)];
+  const s = summarizeWindow(windowOf(hours, quarter), base, base + 4 * 3600000);
+  expect(s.status).toBe("unfavorable");
+});
+test("summaries skip unavailable samples but report unavailable when none apply", () => {
+  const partial = [
+    sample(base, { wind: null, direction: null }),
+    sample(base + 3600000, { wind: 3, direction: 350 }),
+    sample(base + 2 * 3600000, { wind: 3, direction: 350 }),
+  ];
+  expect(summarizeWindow(windowOf(partial), base, base + 3600000).status).toBe(
+    "favorable",
+  );
+  const none = Array.from({ length: 3 }, (_, i) =>
+    sample(base + i * 3600000, { wind: null, direction: null }),
+  );
+  const s = summarizeWindow(windowOf(none), base, base + 3600000);
+  expect(s.status).toBe("unavailable");
+  expect(s.wind).toBe(null);
+  expect(s.direction).toBe(null);
+});
+test("summaries average bearings circularly and flag scattered wind as variable", () => {
+  // 350° and 10° are 20° apart: circularly they mean 0°, arithmetically 180°.
+  const across = [
+    sample(base, { direction: 350 }),
+    sample(base + 3600000, { direction: 10 }),
+  ];
+  const s = summarizeWindow(windowOf(across), base, base + 3600000);
+  expect(s.direction!.bearing).toBeCloseTo(0, 4);
+  expect(s.direction!.variable).toBe(false);
+  const scattered = [
+    sample(base, { direction: 0 }),
+    sample(base + 3600000, { direction: 120 }),
+    sample(base + 2 * 3600000, { direction: 240 }),
+  ];
+  expect(
+    summarizeWindow(windowOf(scattered), base, base + 2 * 3600000).direction!
+      .variable,
+  ).toBe(true);
+});
+test("summaries range rain probability and never invent a whole-window figure", () => {
+  const hours = [
+    sample(base, { probability: 10 }),
+    sample(base + 3600000, { probability: 40 }),
+    sample(base + 2 * 3600000, { probability: null }),
+    sample(base + 3 * 3600000, { probability: 0 }),
+  ];
+  const s = summarizeWindow(windowOf(hours), base, base + 3 * 3600000);
+  // 0% is a reading; null is absence. Neither is summed into an event chance.
+  expect(s.probability).toEqual({ min: 0, max: 40 });
+});
+test("gapped and out-of-horizon windows stay visibly incomplete", () => {
+  const gapped = [
+    sample(base),
+    sample(base + 3600000),
+    sample(base + 6 * 3600000),
+    sample(base + 7 * 3600000),
+  ];
+  const s = summarizeWindow(windowOf(gapped), base, base + 7 * 3600000);
+  expect(s.covered).toBe(false);
+  expect(s.samples).toBeGreaterThan(0);
+  const beyond = summarizeWindow(
+    windowOf([sample(base), sample(base + 3600000)]),
+    base + 48 * 3600000,
+    base + 52 * 3600000,
+  );
+  expect(beyond.covered).toBe(false);
+  expect(beyond.samples).toBe(0);
+  expect(beyond.status).toBe("unavailable");
 });
