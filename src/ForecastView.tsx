@@ -25,13 +25,33 @@ import {
   forecastDays,
   comparisonTimes,
   sampleMinutes,
+  summarySamples,
+  hourlyRainChance,
+  dayBounds,
 } from "../shared/timeline";
-import { Gust, WindCompass, WindSpeed } from "./WindReading";
+import { Gust, WindCompass, WindSpeed, WindVector } from "./WindReading";
+
+function RainChance({ hours, time }: { hours: WeatherHour[]; time: string }) {
+  const chance = hourlyRainChance(hours, time);
+  return chance ? (
+    <span className="rain-chance">
+      Hourly rain chance <b>{chance.probability}%</b>{" "}
+      <small>
+        {formatTime(new Date(chance.start).toISOString())}–
+        {formatTime(new Date(chance.end).toISOString())}
+      </small>
+    </span>
+  ) : (
+    <span>Rain chance unavailable</span>
+  );
+}
 
 export function HourRow({
   hour,
   expired = false,
+  hours = [],
 }: {
+  hours?: WeatherHour[];
   hour: WeatherHour;
   expired?: boolean;
 }) {
@@ -42,7 +62,8 @@ export function HourRow({
         <span className="wind-cell">
           <WindSpeed hour={hour} expired={expired} />
           <span className="wind-direction">
-            From {directionLabel(hour.direction)}
+            <WindVector hour={hour} expired={expired} /> From{" "}
+            {directionLabel(hour.direction)}
           </span>
         </span>
         <Gust value={hour.gust} />
@@ -55,16 +76,7 @@ export function HourRow({
         <span>
           Conditions <b>{weatherDescription(hour.code)}</b>
         </span>
-        <span>
-          Gusts <b>{hour.gust?.toFixed(1) ?? "—"} mph</b>
-        </span>
-        <span>
-          Rain chance <b>{hour.probability ?? "—"}%</b>
-        </span>
-        <span>
-          Preceding {sampleMinutes(hour)} min precipitation{" "}
-          <b>{hour.precipitation ?? "—"} in</b>
-        </span>
+        <RainChance hours={hours} time={hour.time} />
         <span>
           Visibility{" "}
           <b>
@@ -106,6 +118,7 @@ export default function ForecastView({
     localDateTime(new Date(Date.now() + 86400000).toISOString()).slice(0, 11) +
       "07:00",
   );
+  const [horizon, setHorizon] = useState("4");
   const [selectedDay, setSelectedDay] = useState("");
   const [duration, setDuration] = useState("90");
   const [basis, setBasis] = useState<"pooled" | "mine">("pooled");
@@ -215,6 +228,14 @@ export default function ForecastView({
   const daySamples = timelineSamples(weather).filter((h) =>
     localDateTime(h.time).startsWith(day),
   );
+  const today = localDateTime(new Date(now).toISOString()).slice(0, 10);
+  const todayDomain = dayBounds(today);
+  const todaySamples = windowSamples(weather, ...todayDomain).samples;
+  const rollingDomain: [number, number] = [
+    now,
+    now + Number(horizon) * 3600000,
+  ];
+  const rolling = windowSamples(weather, ...rollingDomain);
   const near = nearTerm(weather, now);
   const comparisons = comparisonTimes(weather, when, now);
   const dayView = (
@@ -232,15 +253,24 @@ export default function ForecastView({
       </div>
       <WeatherChart
         key={day}
-        samples={daySamples}
+        samples={
+          day ? windowSamples(weather, ...dayBounds(day)).samples : daySamples
+        }
+        domain={day ? dayBounds(day) : undefined}
+        initialTime={day === today ? now : undefined}
         expired={expired}
         title={day ? formatDate(day + "T12:00:00Z") : "Daily forecast"}
       />
       <details className="sample-details">
-        <summary>All samples for this day</summary>
+        <summary>Detailed forecast for this day</summary>
         <div className="hour-table">
-          {daySamples.map((h) => (
-            <HourRow key={h.time} hour={h} expired={expired} />
+          {summarySamples(daySamples).map((h) => (
+            <HourRow
+              key={h.time}
+              hour={h}
+              hours={weather.hours}
+              expired={expired}
+            />
           ))}
         </div>
       </details>
@@ -269,27 +299,11 @@ export default function ForecastView({
           {current ? (
             <section className="current-panel">
               <div className="current-weather">
-                <p className="eyebrow">JAMES MADISON PARK</p>
-                <p className="valid-time">
-                  {weather.current?.time === current.time
-                    ? "Current estimate"
-                    : sampleMinutes(current) === 15
-                      ? "15-minute estimate"
-                      : "Hourly estimate"}{" "}
-                  for{" "}
-                  <time dateTime={current.time}>
-                    {formatTime(current.time)}
-                  </time>
-                </p>
                 <div className="current-wind">
                   <WindCompass direction={current.direction} />
                   <div>
                     <WindSpeed hour={current} expired={expired} />
-                    <p>
-                      From {directionLabel(current.direction)}
-                      {current.direction !== null &&
-                        ` (${Math.round(current.direction)}°)`}
-                    </p>
+                    <p>From {directionLabel(current.direction)}</p>
                   </div>
                 </div>
                 <div className="weather-facts">
@@ -299,11 +313,17 @@ export default function ForecastView({
                   <span>
                     Air <b>{current.temperature?.toFixed(0) ?? "—"}°F</b>
                   </span>
-                  <span>
-                    {`Precipitation · ${weather.current?.time === current.time ? 15 : sampleMinutes(current)} min`}{" "}
-                    <b>{current.precipitation ?? "—"} in</b>
-                  </span>
+                  <RainChance hours={weather.hours} time={current.time} />
                 </div>
+                <details className="sample-time">
+                  <summary>Weather details</summary>
+                  <p>
+                    Sample:{" "}
+                    <time dateTime={current.time}>
+                      {formatDate(current.time)} · {formatTime(current.time)}
+                    </time>
+                  </p>
+                </details>
                 <p className="current-description">
                   {weatherDescription(current.code)}
                 </p>
@@ -317,24 +337,53 @@ export default function ForecastView({
           )}
           <div className="section-heading">
             <h2>The next few hours</h2>
-            <span>15-minute steps where available, then hourly</span>
           </div>
-          <WeatherChart
-            samples={[
-              ...(current ? [current] : []),
-              ...near.filter((h) => Date.parse(h.time) <= now + 2 * 3600000),
-            ]}
-            expired={expired}
-            title="Your next two hours"
-          />
           <section className="hour-table">
             {near.map((h) => (
-              <HourRow key={h.time} hour={h} expired={expired} />
+              <HourRow
+                key={h.time}
+                hour={h}
+                hours={weather.hours}
+                expired={expired}
+              />
             ))}
             {!upcoming.length && (
               <p className="empty">No upcoming forecast is available.</p>
             )}
           </section>
+          <WeatherChart
+            samples={todaySamples}
+            domain={todayDomain}
+            initialTime={now}
+            expired={expired}
+            title="Today"
+          />
+          <label className="horizon-picker">
+            Hours ahead
+            <select
+              value={horizon}
+              onChange={(e) => setHorizon(e.target.value)}
+            >
+              {Array.from({ length: 23 }, (_, i) => i + 2).map((n) => (
+                <option key={n} value={n}>
+                  {n} hours
+                </option>
+              ))}
+            </select>
+          </label>
+          <WeatherChart
+            key={horizon}
+            samples={rolling.samples}
+            domain={rollingDomain}
+            initialTime={now}
+            expired={expired}
+            title={`Next ${horizon} hours`}
+          />
+          {!rolling.covered && (
+            <p className="help">
+              Some forecast samples are unavailable in this window.
+            </p>
+          )}
           <div className="log-callout">
             <h2>How was the water?</h2>
             <button className="button" onClick={onLog}>
@@ -479,7 +528,12 @@ export default function ForecastView({
           <section className="hour-table">
             {selected.length ? (
               selected.map((h) => (
-                <HourRow key={h.time} hour={h} expired={expired} />
+                <HourRow
+                  key={h.time}
+                  hour={h}
+                  hours={weather.hours}
+                  expired={expired}
+                />
               ))
             ) : (
               <p className="empty">
@@ -593,10 +647,6 @@ export default function ForecastView({
           )}
         </>
       )}
-      <p className="help">
-        {weather.resolution_note ||
-          "Hourly model estimates; 15-minute data are not available in this cached forecast."}
-      </p>
       <aside className="method-note">
         <span>
           Weather: <a href="https://open-meteo.com/">{weather.provider}</a> ·
@@ -607,9 +657,9 @@ export default function ForecastView({
           <summary>Wind colors: Hannah’s heuristic</summary>
           <p>Version: {weather.model_version}</p>
           <p className="wind-key">
-            <span className="favorable">○ Below threshold</span>
-            <span className="caution">△ Intermediate range</span>
-            <span className="unfavorable">◇ Above threshold</span>
+            <span className="favorable">○ bussin’</span>
+            <span className="caution">△ sus</span>
+            <span className="unfavorable">◇ chopped</span>
           </p>
           <p>
             Thresholds depend on wind direction. Wind colors describe the

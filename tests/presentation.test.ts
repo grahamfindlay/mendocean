@@ -149,7 +149,9 @@ test("weather descriptions distinguish missing codes from clear skies", () => {
   expect(weatherDescription(null)).toBe("Conditions unavailable");
   expect(weatherDescription(0)).toBe("Clear");
   expect(weatherDescription(2)).toBe("Partly cloudy");
-  expect(weatherDescription(65)).toBe("Rain");
+  expect(weatherDescription(61)).toBe("Light rain");
+  expect(weatherDescription(63)).toBe("Moderate rain");
+  expect(weatherDescription(65)).toBe("Heavy rain");
   expect(weatherDescription(95)).toBe("Thunderstorms");
 });
 

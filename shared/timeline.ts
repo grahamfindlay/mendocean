@@ -17,14 +17,38 @@ export function timelineSamples(weather: Forecast): WeatherHour[] {
   return [...byTime.values()].sort((a, b) => stamp(a) - stamp(b));
 }
 export function nearTerm(weather: Forecast, now: number) {
-  return timelineSamples(weather).filter(
-    (h) =>
-      stamp(h) > now &&
-      stamp(h) <= now + 6 * 3600000 &&
-      (stamp(h) <= now + 2 * 3600000 ||
-        sampleMinutes(h) === 60 ||
-        new Date(h.time).getUTCMinutes() === 0),
+  return summarySamples(timelineSamples(weather)).filter(
+    (h) => stamp(h) > now && stamp(h) <= now + 6 * 3600000,
   );
+}
+/** Display selection only. Never thin the ingestion, archive or chart series. */
+export function summarySamples(samples: WeatherHour[]) {
+  return samples.filter(
+    (h) =>
+      sampleMinutes(h) === 60 || new Date(h.time).getUTCMinutes() % 30 === 0,
+  );
+}
+/** Open-Meteo hourly probability applies to (end - 1 hour, end], not the next hour. */
+export function hourlyRainChance(hours: WeatherHour[], time: string) {
+  const t = Date.parse(time);
+  const h = hours.find((h) => stamp(h) - 3600000 < t && t <= stamp(h));
+  if (!h || h.probability === null || !Number.isFinite(h.probability))
+    return null;
+  return {
+    probability: h.probability,
+    start: stamp(h) - 3600000,
+    end: stamp(h),
+  };
+}
+/** Madison calendar days can contain 23 or 25 hours at DST changes. */
+export function dayBounds(day: string): [number, number] {
+  const next = new Date(Date.parse(day + "T12:00:00Z") + 86400000)
+    .toISOString()
+    .slice(0, 10);
+  return [
+    Date.parse(chicagoToISO(day + "T00:00")),
+    Date.parse(chicagoToISO(next + "T00:00")),
+  ];
 }
 /** Include actual boundary samples, with explicit partial-coverage status. No extrapolation. */
 export function windowSamples(weather: Forecast, start: number, end: number) {

@@ -6,6 +6,9 @@ import {
   precipitationRate,
   timelineSamples,
   windowSamples,
+  summarySamples,
+  hourlyRainChance,
+  dayBounds,
 } from "../shared/timeline";
 import { forecastSamples } from "../shared/presentation";
 import {
@@ -61,14 +64,14 @@ test("requests bounded quarter-hour data without fabricating rain probability", 
   expect(f.hours[0].interval_minutes).toBe(60);
   expect(normalizeWeather({ hourly: raw.hourly }).quarter_hours).toEqual([]);
 });
-test("Now is latest actual quarter hour; next two hours step forward from 9:24 to 9:30", () => {
+test("Now retains quarter hours while summaries step from 9:24 to 9:30 in half hours", () => {
   expect(forecastSamples(weather, now).current?.time).toBe(
     "2026-09-15T14:15:00.000Z",
   );
   const samples = nearTerm(weather, now);
   expect(samples[0].time).toBe("2026-09-15T14:30:00.000Z");
   expect(samples.slice(0, 8).map((h) => Date.parse(h.time))).toEqual(
-    Array.from({ length: 8 }, (_, i) => base + (i + 2) * 900000),
+    Array.from({ length: 8 }, (_, i) => base + (i + 1) * 1800000),
   );
   expect(
     samples.slice(8).every((h) => new Date(h.time).getUTCMinutes() === 0),
@@ -76,6 +79,59 @@ test("Now is latest actual quarter hour; next two hours step forward from 9:24 t
   expect(new Set(timelineSamples(weather).map((h) => h.time)).size).toBe(
     timelineSamples(weather).length,
   );
+});
+test("summary density never thins chart data or creates points in an hourly cache", () => {
+  const raw = timelineSamples(weather);
+  expect(raw.some((h) => new Date(h.time).getUTCMinutes() === 15)).toBe(true);
+  expect(
+    summarySamples(raw).every(
+      (h) => new Date(h.time).getUTCMinutes() % 30 === 0,
+    ),
+  ).toBe(true);
+  expect(weather.quarter_hours).toHaveLength(17);
+  const hourly = timelineSamples({ ...weather, quarter_hours: [] });
+  expect(summarySamples(hourly)).toEqual(hourly);
+});
+test("rain probability retains its preceding-hour bounds, zero and missing values", () => {
+  const hours = [
+    row(base),
+    { ...row(base + 3600000), probability: 0 },
+    { ...row(base + 7200000), probability: null },
+  ];
+  expect(
+    hourlyRainChance(hours, new Date(base).toISOString())?.probability,
+  ).toBe(30);
+  for (const offset of [1, 15 * 60000, 30 * 60000, 3600000]) {
+    expect(
+      hourlyRainChance(hours, new Date(base + offset).toISOString()),
+    ).toEqual({ probability: 0, start: base, end: base + 3600000 });
+  }
+  expect(
+    hourlyRainChance(hours, new Date(base + 3600001).toISOString()),
+  ).toBeNull();
+  expect(
+    hourlyRainChance(
+      [hours[0], hours[2]],
+      new Date(base + 1800000).toISOString(),
+    ),
+  ).toBeNull();
+  expect(
+    hourlyRainChance(hours, new Date(base - 3600000).toISOString()),
+  ).toBeNull();
+});
+test("daily chart bounds follow Madison midnight across both DST transitions", () => {
+  for (const [day, hours] of [
+    ["2026-03-08", 23],
+    ["2026-11-01", 25],
+    ["2026-09-17", 24],
+  ] as const) {
+    const [start, end] = dayBounds(day);
+    expect((end - start) / 3600000).toBe(hours);
+    expect(localDateTime(new Date(start).toISOString())).toBe(day + "T00:00");
+    expect(localDateTime(new Date(end).toISOString()).endsWith("T00:00")).toBe(
+      true,
+    );
+  }
 });
 test("arbitrary minute and full window include both actual boundaries; no extrapolation", () => {
   const w = windowSamples(weather, now, now + 90 * 60000);

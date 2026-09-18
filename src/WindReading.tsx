@@ -37,11 +37,68 @@ export function WindCompass({ direction }: { direction: number | null }) {
       </g>
       {valid && (
         <g transform={`rotate(${direction} 40 40)`} className="compass-bearing">
-          <path d="M40 59V21" stroke="currentColor" strokeWidth="3" />
+          <path
+            d="M40 21V59 M34 51L40 59L46 51"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+          />
           <circle cx="40" cy="21" r="4" fill="currentColor" />
         </g>
       )}
       <circle cx="40" cy="40" r="2" fill="currentColor" />
+    </svg>
+  );
+}
+/** A north wind travels south: SVG's unrotated arrow points down. */
+export function WindVector({
+  hour,
+  expired = false,
+}: {
+  hour: WeatherHour;
+  expired?: boolean;
+}) {
+  const calm = hour.wind === 0;
+  const valid =
+    hour.wind !== null &&
+    hour.direction !== null &&
+    Number.isFinite(hour.wind) &&
+    Number.isFinite(hour.direction);
+  const status = expired
+    ? "unavailable"
+    : windStatus(hour.wind, hour.direction);
+  const length = 10 + (Math.min(30, Math.max(0, hour.wind ?? 0)) / 30) * 14;
+  return (
+    <svg
+      className={`wind-vector ${status}`}
+      width="32"
+      height="32"
+      viewBox="0 0 32 32"
+      role="img"
+      aria-label={
+        calm
+          ? "Calm wind"
+          : valid
+            ? `Wind from ${directionLabel(hour.direction)}, ${hour.wind!.toFixed(1)} mph. ${classification[status]}.`
+            : "Wind direction or speed unavailable"
+      }
+    >
+      {calm ? (
+        <circle cx="16" cy="16" r="3" fill="none" stroke="currentColor" />
+      ) : valid ? (
+        <g transform={`rotate(${hour.direction} 16 16)`}>
+          <path
+            d={`M16 ${16 - length / 2}V${16 + length / 2} M12 ${12 + length / 2}L16 ${16 + length / 2}L20 ${12 + length / 2}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          />
+        </g>
+      ) : (
+        <text x="16" y="21" textAnchor="middle">
+          —
+        </text>
+      )}
     </svg>
   );
 }

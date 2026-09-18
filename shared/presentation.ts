@@ -50,7 +50,9 @@ export function weatherDescription(code: number | null) {
   if ([45, 48].includes(code)) return "Fog";
   if ([51, 53, 55].includes(code)) return "Drizzle";
   if ([56, 57].includes(code)) return "Freezing drizzle";
-  if ([61, 63, 65].includes(code)) return "Rain";
+  if (code === 61) return "Light rain";
+  if (code === 63) return "Moderate rain";
+  if (code === 65) return "Heavy rain";
   if ([66, 67].includes(code)) return "Freezing rain";
   if ([71, 73, 75, 77].includes(code)) return "Snow";
   if ([80, 81, 82].includes(code)) return "Rain showers";
