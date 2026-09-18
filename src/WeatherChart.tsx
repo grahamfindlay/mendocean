@@ -150,28 +150,30 @@ export default function WeatherChart({
     });
     setSelected(data[nearest].time);
   };
-  // Keep at least one icon set per two hours, even on narrow screens.
-  const count = Math.max(
-    2,
-    Math.ceil((end - start) / (2 * 3600000)),
-    Math.floor(plotWidth / 68),
-  );
-  const vectorScale = Math.min(1, plotWidth / count / 36);
-  const annotations = [
-    ...new Set(
-      Array.from({ length: count }, (_, i) => {
-        const time = start + ((end - start) * (i + 0.5)) / count;
-        return data.reduce((nearest, point) =>
-          Math.abs(Date.parse(point.time) - time) <
-          Math.abs(Date.parse(nearest.time) - time)
-            ? point
-            : nearest,
-        );
-      }),
-    ),
-  ].filter(
-    (point) => Date.parse(point.time) >= start && Date.parse(point.time) <= end,
-  );
+  // Short windows expose finer changes; wind is twice as dense as conditions.
+  const hours = (end - start) / 3600000;
+  const windStep = hours <= 4 ? 0.25 : hours <= 12 ? 0.5 : 1;
+  const windCount = Math.max(2, Math.ceil(hours / windStep));
+  const weatherCount = Math.max(2, Math.ceil(hours / (windStep * 2)));
+  const vectorScale = Math.min(1, plotWidth / windCount / 26);
+  const weatherScale = Math.min(1, plotWidth / weatherCount / 21);
+  const annotations = (count: number) =>
+    [
+      ...new Set(
+        Array.from({ length: count }, (_, i) => {
+          const time = start + ((end - start) * (i + 0.5)) / count;
+          return data.reduce((nearest, point) =>
+            Math.abs(Date.parse(point.time) - time) <
+            Math.abs(Date.parse(nearest.time) - time)
+              ? point
+              : nearest,
+          );
+        }),
+      ),
+    ].filter(
+      (point) =>
+        Date.parse(point.time) >= start && Date.parse(point.time) <= end,
+    );
   const tickCount = W < 400 ? 3 : 5;
   const ticks = Array.from(
     { length: tickCount },
@@ -334,7 +336,7 @@ export default function WeatherChart({
         <text x="2" y="338">
           {rainMax.toFixed(2)}
         </text>
-        {annotations.map((point) => (
+        {annotations(windCount).map((point) => (
           <g
             key={point.time}
             className="chart-annotation"
@@ -345,9 +347,15 @@ export default function WeatherChart({
             >
               <WindVector hour={point} expired={expired} />
             </g>
-            <g transform="translate(-10,273)">
-              <WeatherIcon code={point.code} />
-            </g>
+          </g>
+        ))}
+        {annotations(weatherCount).map((point) => (
+          <g
+            key={point.time}
+            className="chart-annotation"
+            transform={`translate(${x(point.time) - 10 * weatherScale},${283 - 10 * weatherScale}) scale(${weatherScale})`}
+          >
+            <WeatherIcon code={point.code} />
           </g>
         ))}
         <line
