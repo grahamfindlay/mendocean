@@ -524,7 +524,7 @@ test("Forecast offers only supported model contexts and places fitted results af
       mine: [],
     });
     await loggedIn(page);
-    await page.getByRole("button", { name: "Forecast", exact: true }).click();
+    await page.getByRole("button", { name: "Rows", exact: true }).click();
     await page
       .getByRole("combobox", { name: "Route", exact: true })
       .selectOption("east");
