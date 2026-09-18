@@ -565,9 +565,9 @@ test("production timeline offers quarter-hour inspection and selectable daily fo
     "Precipitation",
   );
   await expect(
-    page.getByRole("region", { name: "Today", exact: true }),
+    page.getByRole("region", { name: "All day", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Hourly", exact: true }).click();
+  await page.getByRole("button", { name: "Week", exact: true }).click();
   await page.locator(".day-picker button").nth(1).click();
   await expect(page.locator(".day-picker button").nth(1)).toHaveAttribute(
     "aria-pressed",

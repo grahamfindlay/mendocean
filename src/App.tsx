@@ -33,15 +33,21 @@ import { discard, flush, pending, type PendingReport } from "./outbox";
 import { startAppUpdates } from "./appUpdates";
 import { UpdateBanner } from "./UpdateControls";
 import { setUpdateFormReason } from "./updateSafety";
+import {
+  DEFAULT_DESTINATION,
+  FORECASTS,
+  isDestination,
+  isForecast,
+  topLevel,
+  forecastDestinations,
+} from "./navigation";
 function readUpdatePosition() {
   try {
     const saved = JSON.parse(
       sessionStorage.getItem("mendocean-update-position") || "null",
     );
     sessionStorage.removeItem("mendocean-update-position");
-    return saved &&
-      Date.now() - saved.at < 300000 &&
-      ["Now", "Hourly", "Forecast", "Log", "My rows"].includes(saved.tab)
+    return saved && Date.now() - saved.at < 300000 && isDestination(saved.tab)
       ? saved
       : null;
   } catch {
@@ -78,11 +84,9 @@ export default function App() {
     resume?.tab ||
       (new URLSearchParams(location.search).has("log")
         ? "Log"
-        : ["Plan", "Forecast"].includes(
-              new URLSearchParams(location.search).get("tab") || "",
-            )
-          ? "Forecast"
-          : "Now"),
+        : isDestination(new URLSearchParams(location.search).get("tab"))
+          ? new URLSearchParams(location.search).get("tab")!
+          : DEFAULT_DESTINATION),
   );
   const [weather, setWeather] = useState<Forecast | null>(null);
   const [weatherError, setWeatherError] = useState("");
@@ -116,7 +120,7 @@ export default function App() {
   useLayoutEffect(() => {
     setUpdateFormReason(
       tab === "Log" ||
-        tab === "Forecast" ||
+        tab === "Rows" ||
         authOpen ||
         settings ||
         planned ||
@@ -297,16 +301,39 @@ export default function App() {
         )}
       </header>
       <nav className="main-nav" aria-label="Main navigation">
-        {["Now", "Hourly", "Forecast", "Log", "My rows"].map((name) => (
+        {topLevel.map(({ id, opens }) => (
           <button
-            key={name}
-            className={tab === name ? "selected" : ""}
-            onClick={() => navigate(name)}
+            key={id}
+            aria-current={
+              (id === FORECASTS ? isForecast(tab) : tab === id)
+                ? "page"
+                : undefined
+            }
+            className={
+              (id === FORECASTS ? isForecast(tab) : tab === id)
+                ? "selected"
+                : ""
+            }
+            onClick={() => navigate(opens)}
           >
-            {name === "Log" && <Plus size={16} />} {name}
+            {id === "Log" && <Plus size={16} />} {id}
           </button>
         ))}
       </nav>
+      {isForecast(tab) && (
+        <nav className="sub-nav" aria-label="Forecasts">
+          {forecastDestinations.map((name) => (
+            <button
+              key={name}
+              aria-current={tab === name ? "page" : undefined}
+              className={tab === name ? "selected" : ""}
+              onClick={() => navigate(name)}
+            >
+              {name}
+            </button>
+          ))}
+        </nav>
+      )}
       {!supabase && (
         <div className="setup-note">
           {previewMode
@@ -333,7 +360,7 @@ export default function App() {
         </div>
       )}
       <main>
-        {["Now", "Hourly", "Forecast"].includes(tab) ? (
+        {isForecast(tab) ? (
           weather ? (
             <ForecastView
               now={now}
@@ -522,7 +549,7 @@ export default function App() {
                     starts_at: o.starts_at,
                     ends_at: o.ends_at,
                   });
-                  setTab("Forecast");
+                  setTab("Rows");
                 }}
                 onDelete={(report) =>
                   void act(async () => {
@@ -607,7 +634,7 @@ export default function App() {
             onSignOut={() =>
               void act(async () => {
                 await supabase?.auth.signOut();
-                setTab("Now");
+                setTab(DEFAULT_DESTINATION);
               })
             }
           />
