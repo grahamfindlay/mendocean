@@ -156,6 +156,7 @@ export default function WeatherChart({
   const windCount = Math.max(2, Math.ceil(hours / windStep));
   const weatherCount = Math.max(2, Math.ceil(hours / (windStep * 2)));
   const vectorScale = Math.min(1, plotWidth / windCount / 26);
+  const weatherScale = Math.min(1, plotWidth / weatherCount / 21);
   const annotations = (count: number) =>
     [
       ...new Set(
@@ -352,7 +353,7 @@ export default function WeatherChart({
           <g
             key={point.time}
             className="chart-annotation"
-            transform={`translate(${x(point.time) - 10},273)`}
+            transform={`translate(${x(point.time) - 10 * weatherScale},${283 - 10 * weatherScale}) scale(${weatherScale})`}
           >
             <WeatherIcon code={point.code} />
           </g>

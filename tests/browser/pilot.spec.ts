@@ -356,6 +356,23 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
     await longChart.locator(".weather-icon").count(),
   ).toBeGreaterThanOrEqual(12);
   await expect(longChart.locator(".wind-vector")).toHaveCount(24);
+  // Narrow screens shrink annotations instead of letting them collide.
+  const viewport = page.viewportSize()!;
+  await page.setViewportSize({ width: 320, height: viewport.height });
+  await expect
+    .poll(() =>
+      longChart
+        .locator(".weather-icon")
+        .evaluateAll((icons) =>
+          icons
+            .map((icon) => icon.getBoundingClientRect())
+            .every(
+              (box, i, boxes) => i === 0 || box.left >= boxes[i - 1].right,
+            ),
+        ),
+    )
+    .toBe(true);
+  await page.setViewportSize(viewport);
   await longChart.scrollIntoViewIfNeeded();
   const bounds = (await longChart.locator(".chart-surface").boundingBox())!;
   await page.mouse.move(bounds.x + 60, bounds.y + 80);
