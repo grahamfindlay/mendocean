@@ -1310,7 +1310,7 @@ button:hover:not(:disabled) {
   border-radius: 14px;
   background: #fffdf7;
 }
-.weather-chart svg {
+.weather-chart > .chart-surface {
   display: block;
   width: 100%;
   touch-action: pan-y;
@@ -1392,7 +1392,7 @@ button:hover:not(:disabled) {
   background: #f2f3ea;
   border-radius: 8px;
   font-size: 0.85rem;
-  min-height: 125px;
+  min-height: 102px;
 }
 .chart-reading time {
   font-weight: 650;
@@ -1446,7 +1446,7 @@ button:hover:not(:disabled) {
   .weather-chart {
     padding: 0.8rem;
   }
-  .weather-chart svg {
+  .weather-chart > .chart-surface {
     min-width: 0;
   }
   .weather-chart .section-heading {
@@ -1491,4 +1491,66 @@ button:hover:not(:disabled) {
 }
 .app-version {
   overflow-wrap: anywhere;
+}
+
+/* Weather readings remain above the gesture surface on narrow screens. */
+.chart-legend {
+  margin: 1rem 0 0.4rem;
+  flex-wrap: wrap;
+}
+.weather-chart .chart-surface {
+  overflow: hidden;
+  user-select: none;
+}
+.wind-direction {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.wind-vector,
+.weather-chart .wind-vector {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  overflow: visible;
+}
+.weather-chart .weather-icon {
+  width: 20px;
+  height: 20px;
+  color: #596661;
+}
+.weather-chart .wind-vector path {
+  stroke: currentColor;
+}
+.weather-chart .chart-overflow {
+  fill: #235d51;
+  stroke: #235d51;
+  stroke-width: 1;
+}
+.chart-annotation {
+  pointer-events: none;
+}
+.rain-chance small {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: normal;
+  color: #596661;
+}
+.sample-time {
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: #596661;
+}
+.sample-time summary {
+  cursor: pointer;
+}
+.horizon-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.5rem 0 -0.7rem;
+  font-size: 0.85rem;
+}
+.horizon-picker select {
+  width: auto;
 }

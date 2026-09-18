@@ -87,7 +87,8 @@ test("future outing stays forecast-only, past rows sort and saved reports have n
   page,
 }) => {
   const now = Date.parse("2026-09-15T14:24:00Z");
-  await page.clock.install({ time: now });
+  await page.clock.install({ time: now - 1000 });
+  await page.clock.pauseAt(now);
   await page.addInitScript(() => {
     const base = {
       kind: "official",
@@ -234,17 +235,13 @@ test("wind bearing indicates source direction and a current sample keeps its val
     "transform",
     "rotate(90 40 40)",
   );
-  await expect(page.locator(".valid-time")).toHaveText(
-    "Current estimate for 9:15 AM",
-  );
+  await expect(page.locator(".sample-time time")).toContainText("9:15 AM");
   await expect(page.locator(".hour-row time")).toHaveText([
     "10:00 AM",
     "11:00 AM",
   ]);
   await page.clock.fastForward(37 * 60000);
-  await expect(page.locator(".valid-time")).toHaveText(
-    "Hourly estimate for 10:00 AM",
-  );
+  await expect(page.locator(".sample-time time")).toContainText("10:00 AM");
   await expect(page.locator(".hour-row time")).toHaveText(["11:00 AM"]);
 });
 
@@ -253,13 +250,14 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
 }) => {
   const now = Date.parse("2026-09-15T14:24:00Z"),
     base = Date.parse("2026-09-15T14:00:00Z");
-  await page.clock.install({ time: now });
+  await page.clock.install({ time: now - 1000 });
+  await page.clock.pauseAt(now);
   const row = (time: number, interval: number) => ({
     time: new Date(time).toISOString(),
     interval_minutes: interval,
     wind: 7,
     direction: 350,
-    gust: 12,
+    gust: time === base + 1800000 ? 38 : 12,
     temperature: 65,
     precipitation: 0.1,
     probability: interval === 60 ? 30 : null,
@@ -284,22 +282,90 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
     }),
   );
   await page.goto("/");
-  await expect(page.locator(".valid-time")).toHaveText(
-    "15-minute estimate for 9:15 AM",
-  );
+  await expect(page.locator(".sample-time time")).toContainText("9:15 AM");
   await expect(page.locator(".hour-row time").first()).toHaveText("9:30 AM");
   const chart = page.getByRole("region", {
-    name: "Your next two hours",
+    name: "Next 4 hours",
     exact: true,
   });
   await chart.getByRole("slider").press("ArrowRight");
   await expect(chart.locator(".chart-reading time")).toContainText("9:30 AM");
-  await expect(chart.locator(".chart-reading")).toContainText(
-    "0.1 in / preceding 15 min",
+  await expect(chart.locator(".chart-reading")).toContainText("G38");
+  await expect(chart.locator(".chart-overflow")).toHaveCount(1);
+  await expect(chart.locator(".chart-overflow title")).toContainText("38 mph");
+  const vector = chart.locator(".wind-vector").first();
+  await expect(vector).toHaveAttribute("width", "32");
+  await expect(vector.locator("g")).toHaveAttribute(
+    "transform",
+    "rotate(350 16 16)",
   );
-  await expect(chart.locator(".chart-reading")).toContainText("0.40 in/h");
   await expect(chart.locator(".chart-reading")).not.toContainText(
-    "rain chance",
+    "Precipitation",
+  );
+  await expect(page.locator(".current-panel .rain-chance")).toContainText(
+    "30%",
+  );
+  await expect(
+    page
+      .getByRole("region", { name: "Today", exact: true })
+      .locator(".chart-reading time"),
+  ).toContainText("9:15 AM");
+  expect(await page.locator(".hour-row time").allTextContents()).toEqual(
+    Array.from({ length: 12 }, (_, i) => {
+      const t = new Date(base + (i + 1) * 1800000);
+      return new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Chicago",
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(t);
+    }),
+  );
+  await expect(chart.locator(".chart-surface")).toHaveAttribute(
+    "data-domain-start",
+    String(now),
+  );
+  await expect(chart.locator(".chart-surface")).toHaveAttribute(
+    "data-domain-end",
+    String(now + 4 * 3600000),
+  );
+  const readingBox = await chart.locator(".chart-reading").boundingBox();
+  const surfaceBox = await chart.locator(".chart-surface").boundingBox();
+  expect(readingBox!.y + readingBox!.height).toBeLessThan(surfaceBox!.y);
+  await page.getByLabel("Hours ahead").selectOption("24");
+  const longChart = page.getByRole("region", {
+    name: "Next 24 hours",
+    exact: true,
+  });
+  await expect(longChart.locator(".chart-surface")).toHaveAttribute(
+    "data-domain-end",
+    String(now + 24 * 3600000),
+  );
+  expect(
+    Number(
+      await longChart
+        .locator(".chart-surface")
+        .getAttribute("data-sample-count"),
+    ),
+  ).toBeGreaterThan(90);
+  await longChart.scrollIntoViewIfNeeded();
+  const bounds = (await longChart.locator(".chart-surface").boundingBox())!;
+  await page.mouse.move(bounds.x + 60, bounds.y + 80);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + bounds.width - 30, bounds.y + 80, {
+    steps: 8,
+  });
+  expect(
+    Number(await longChart.getByRole("slider").inputValue()),
+  ).toBeGreaterThan(60);
+  await page.clock.fastForward(60000);
+  await expect(longChart.locator(".chart-surface")).toHaveAttribute(
+    "data-domain-start",
+    String(now),
+  );
+  await page.mouse.up();
+  await expect(longChart.locator(".chart-surface")).toHaveAttribute(
+    "data-domain-start",
+    String(now + 60000),
   );
   await page.getByRole("button", { name: "Forecast", exact: true }).click();
   await page.getByLabel("Start time · Madison").fill("2026-09-15T09:43");
@@ -328,10 +394,66 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
   await expect(
     page.locator(".day-picker button[aria-pressed=true]"),
   ).toContainText("Sep 16");
+  await page
+    .getByText("Detailed forecast for this day", { exact: true })
+    .click();
+  const dailyTimes = await page
+    .locator(".sample-details .hour-row time")
+    .allTextContents();
+  expect(dailyTimes.length).toBe(48);
+  expect(dailyTimes.every((time) => /:(00|30) [AP]M$/.test(time))).toBe(true);
   await expect(page.locator("body")).not.toHaveCSS("overflow-x", "scroll");
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+});
+
+test("touch scrubbing preserves vertical scrolling and releases a cancelled gesture", async ({
+  page,
+  context,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "phone",
+    "Touch input requires the phone project",
+  );
+  await page.goto("/");
+  const chart = page.getByRole("region", { name: "Next 4 hours", exact: true });
+  const surface = chart.locator(".chart-surface");
+  await surface.scrollIntoViewIfNeeded();
+  const bounds = (await surface.boundingBox())!;
+  const client = await context.newCDPSession(page);
+  const touch = async (
+    type: "touchStart" | "touchMove" | "touchEnd" | "touchCancel",
+    x = 0,
+    y = 0,
+  ) => {
+    await client.send("Input.dispatchTouchEvent", {
+      type,
+      touchPoints:
+        type === "touchEnd" || type === "touchCancel" ? [] : [{ x, y, id: 1 }],
+    });
+  };
+  const x = bounds.x + 65,
+    y = bounds.y + 100;
+  await touch("touchStart", x, y);
+  for (let i = 1; i <= 6; i++)
+    await touch("touchMove", x + ((bounds.width - 95) * i) / 6, y);
+  expect(Number(await chart.getByRole("slider").inputValue())).toBeGreaterThan(
+    2,
+  );
+  await touch("touchCancel");
+  // A fresh tap must work after cancellation instead of leaving the old pointer captured.
+  await touch("touchStart", x, y);
+  await touch("touchEnd");
+  expect(Number(await chart.getByRole("slider").inputValue())).toBeLessThan(2);
+  const before = await page.evaluate(() => window.scrollY);
+  await touch("touchStart", x, y + 80);
+  for (let i = 1; i <= 8; i++) await touch("touchMove", x, y + 80 - i * 15);
+  await touch("touchEnd");
+  await expect
+    .poll(() => page.evaluate(() => window.scrollY))
+    .toBeGreaterThan(before + 30);
+  await client.detach();
 });
