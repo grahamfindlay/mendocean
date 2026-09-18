@@ -247,6 +247,9 @@ test("manual upgrade waits for another tab's draft; session, BHC and registratio
   await log(other);
   await other.locator("details.form-card > summary").click();
   await other.getByLabel("Anything else?").fill("Keep this unfinished draft");
+  await other.evaluate(() => {
+    (window as unknown as { __probe?: number }).__probe = 1;
+  });
   const b = await release("b");
   await check(page);
   await expect(
@@ -257,6 +260,27 @@ test("manual upgrade waits for another tab's draft; session, BHC and registratio
   await expect(banner(page)).toContainText("other Mendocean windows");
   await expect(other.getByLabel("Anything else?")).toHaveValue(
     "Keep this unfinished draft",
+  );
+  console.log(
+    "PROBE " +
+      JSON.stringify(
+        await other.evaluate(() => ({
+          reloaded: !(window as unknown as { __probe?: number }).__probe,
+          detailsOpen:
+            document.querySelector("details.form-card")?.hasAttribute("open") ??
+            null,
+          selected: [
+            ...document.querySelectorAll(
+              ".main-nav button.selected, .sub-nav button.selected",
+            ),
+          ].map((b) => b.textContent?.trim()),
+          textareaOffsetParent: !!(
+            document.querySelector(
+              "details.form-card textarea",
+            ) as HTMLElement | null
+          )?.offsetParent,
+        })),
+      ),
   );
   // The last edit and navigation occur faster than the normal autosave delay.
   await other.getByLabel("Anything else?").fill("Latest draft keystroke");
