@@ -440,7 +440,7 @@ test("attendance submission finishes before activation, without a second BHC wri
   await api(actor, "bhc/connect", { token: syntheticToken });
   await tick();
   await signedIn(page);
-  await page.getByRole("button", { name: "My outings", exact: true }).click();
+  await page.getByRole("button", { name: "My rows", exact: true }).click();
   await page
     .getByRole("button", { name: "Change attendance", exact: true })
     .click();

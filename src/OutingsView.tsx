@@ -65,7 +65,7 @@ export default function OutingsView({
   return (
     <>
       <div className="outing-filters">
-        <div className="segmented" aria-label="Outing time">
+        <div className="segmented" aria-label="Row time">
           {(["Upcoming", "Past"] as const).map((v) => (
             <button key={v} aria-pressed={view === v} onClick={() => onView(v)}>
               {v}
@@ -89,10 +89,10 @@ export default function OutingsView({
       {!visible.length && (
         <p className="empty">
           {view === "Upcoming"
-            ? "No upcoming outings. Add an independent outing or connect Boathouse Connect in Account."
+            ? "No upcoming rows. Add an independent row or connect Boathouse Connect in Account."
             : filter === "All"
-              ? "No past outings yet."
-              : `No ${filter.toLowerCase()} past outings.`}
+              ? "No past rows yet."
+              : `No ${filter.toLowerCase()} past rows.`}
         </p>
       )}
       <div className="outing-grid">
@@ -206,7 +206,7 @@ export default function OutingsView({
                 ) : (
                   canLog(o, now) && (
                     <button className="text-button" onClick={() => onLog(o)}>
-                      Log this outing
+                      Log this row
                     </button>
                   )
                 )}

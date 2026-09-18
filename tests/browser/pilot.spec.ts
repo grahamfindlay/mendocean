@@ -129,13 +129,13 @@ test("future outing stays forecast-only, past rows sort and saved reports have n
     );
   });
   await page.goto("/?preview=1");
-  await page.getByRole("button", { name: "My outings", exact: true }).click();
+  await page.getByRole("button", { name: "My rows", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Tomorrow practice" }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Log this outing" }),
-  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Log this row" })).toHaveCount(
+    0,
+  );
   await page
     .getByRole("button", { name: "View forecast", exact: true })
     .click();
@@ -153,14 +153,14 @@ test("future outing stays forecast-only, past rows sort and saved reports have n
   ).toHaveCount(0);
   await page.getByRole("button", { name: "Log", exact: true }).click();
   const options = page
-    .getByRole("combobox", { name: "Which outing?" })
+    .getByRole("combobox", { name: "Which row?" })
     .locator("option");
   await expect(options).toHaveText([
-    "＋ Independent / unofficial outing",
+    "＋ Independent / unofficial row",
     /Recent practice/,
     /Older practice/,
   ]);
-  await page.getByRole("button", { name: "My outings", exact: true }).click();
+  await page.getByRole("button", { name: "My rows", exact: true }).click();
   await page.getByRole("button", { name: "Past", exact: true }).click();
   await expect(page.locator(".outing-card h3")).toHaveText([
     "Recent practice",

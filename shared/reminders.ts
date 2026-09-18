@@ -19,9 +19,9 @@ export function reminderScheduleError(
   action: "enable" | "snooze",
   now: number,
 ): string | null {
-  if (o.reports?.length) return "This outing already has a report.";
+  if (o.reports?.length) return "This row already has a report.";
   if (o.attendance !== "attending")
-    return "Logging reminders are available for outings you are attending.";
+    return "Logging reminders are available for rows you are attending.";
   if (profile.reminders_paused)
     return "Logging reminders are paused in Account.";
   if (!reminderChannels(profile).length)
@@ -29,9 +29,9 @@ export function reminderScheduleError(
   const end = Date.parse(o.ends_at);
   const due = action === "snooze" ? now + 3600000 : Math.max(now, end + 900000);
   if (action === "snooze" && now < end)
-    return "You can postpone a logging reminder after the outing ends.";
+    return "You can postpone a logging reminder after the row ends.";
   if (due > end + 86400000)
-    return "The logging reminder window has ended. You can still log this outing anytime.";
+    return "The logging reminder window has ended. You can still log this row anytime.";
   return null;
 }
 export function reminderPresentation(

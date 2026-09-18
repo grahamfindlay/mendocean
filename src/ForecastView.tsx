@@ -283,7 +283,7 @@ export default function ForecastView({
         <div>
           <h1>{tab}</h1>
           {tab === "Forecast" && (
-            <p>Choose a date and time, or an outing, to see its forecast.</p>
+            <p>Choose a date and time, or a row, to see its forecast.</p>
           )}
         </div>
       </div>
@@ -545,7 +545,7 @@ export default function ForecastView({
           </section>
           {estimate && estimate.source !== "heuristic" && !expired && (
             <section className="form-card assessment-result">
-              <h2>What logged outings suggest</h2>
+              <h2>What logged rows suggest</h2>
               {estimate.launch_probability !== null && (
                 <p>
                   {Math.round(estimate.launch_probability * 100)}% estimated
@@ -607,7 +607,7 @@ export default function ForecastView({
           {outings.some((o) => Date.parse(o.ends_at) > now) && (
             <>
               <div className="section-heading">
-                <h2>Your upcoming outings</h2>
+                <h2>Your upcoming rows</h2>
               </div>
               <div className="outing-grid">
                 {outings
