@@ -293,6 +293,8 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
   await expect(chart.locator(".chart-reading")).toContainText("G38");
   await expect(chart.locator(".chart-overflow")).toHaveCount(1);
   await expect(chart.locator(".chart-overflow title")).toContainText("38 mph");
+  await expect(chart.locator(".wind-vector")).toHaveCount(16);
+  await expect(chart.locator(".weather-icon")).toHaveCount(8);
   const vector = chart.locator(".wind-vector").first();
   await expect(vector).toHaveAttribute("width", "32");
   await expect(vector.locator("g")).toHaveAttribute(
@@ -353,9 +355,7 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
   expect(
     await longChart.locator(".weather-icon").count(),
   ).toBeGreaterThanOrEqual(12);
-  expect(
-    await longChart.locator(".wind-vector").count(),
-  ).toBeGreaterThanOrEqual(12);
+  await expect(longChart.locator(".wind-vector")).toHaveCount(24);
   await longChart.scrollIntoViewIfNeeded();
   const bounds = (await longChart.locator(".chart-surface").boundingBox())!;
   await page.mouse.move(bounds.x + 60, bounds.y + 80);
