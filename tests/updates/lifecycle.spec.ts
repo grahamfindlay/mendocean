@@ -247,9 +247,6 @@ test("manual upgrade waits for another tab's draft; session, BHC and registratio
   await log(other);
   await other.locator("details.form-card > summary").click();
   await other.getByLabel("Anything else?").fill("Keep this unfinished draft");
-  await other.evaluate(() => {
-    (window as unknown as { __probe?: number }).__probe = 1;
-  });
   const b = await release("b");
   await check(page);
   await expect(
@@ -271,7 +268,10 @@ test("manual upgrade waits for another tab's draft; session, BHC and registratio
       "PROBE " +
         JSON.stringify(
           await other.evaluate(() => ({
-            reloaded: !(window as unknown as { __probe?: number }).__probe,
+            navigationType: (
+              performance.getEntriesByType("navigation")[0] as
+                PerformanceNavigationTiming | undefined
+            )?.type,
             detailsOpen:
               document
                 .querySelector("details.form-card")
