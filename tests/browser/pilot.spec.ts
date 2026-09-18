@@ -347,6 +347,15 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
         .getAttribute("data-sample-count"),
     ),
   ).toBeGreaterThan(90);
+  expect(
+    await longChart.locator(".chart-annotation").count(),
+  ).toBeGreaterThanOrEqual(12);
+  expect(
+    await longChart.locator(".weather-icon").count(),
+  ).toBeGreaterThanOrEqual(12);
+  expect(
+    await longChart.locator(".wind-vector").count(),
+  ).toBeGreaterThanOrEqual(12);
   await longChart.scrollIntoViewIfNeeded();
   const bounds = (await longChart.locator(".chart-surface").boundingBox())!;
   await page.mouse.move(bounds.x + 60, bounds.y + 80);

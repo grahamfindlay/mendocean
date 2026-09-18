@@ -150,7 +150,13 @@ export default function WeatherChart({
     });
     setSelected(data[nearest].time);
   };
-  const count = Math.max(2, Math.floor(plotWidth / 68));
+  // Keep at least one icon set per two hours, even on narrow screens.
+  const count = Math.max(
+    2,
+    Math.ceil((end - start) / (2 * 3600000)),
+    Math.floor(plotWidth / 68),
+  );
+  const vectorScale = Math.min(1, plotWidth / count / 36);
   const annotations = [
     ...new Set(
       Array.from({ length: count }, (_, i) => {
@@ -334,7 +340,9 @@ export default function WeatherChart({
             className="chart-annotation"
             transform={`translate(${x(point.time)}, 0)`}
           >
-            <g transform="translate(-16,226)">
+            <g
+              transform={`translate(${-16 * vectorScale},${242 - 16 * vectorScale}) scale(${vectorScale})`}
+            >
               <WindVector hour={point} expired={expired} />
             </g>
             <g transform="translate(-10,273)">
