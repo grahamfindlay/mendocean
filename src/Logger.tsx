@@ -246,7 +246,7 @@ export default function Logger({
         });
       if (Date.parse(chicagoToISO(start)) > Date.now())
         throw new Error(
-          "This outing has not started yet. Use “Add independent outing” to schedule it.",
+          "This row has not started yet. Use “Add independent row” to schedule it.",
         );
       const extremes = launched.length
         ? boatExtremes(launched)
@@ -278,7 +278,7 @@ export default function Logger({
       const result = navigator.onLine ? await flush(user) : { remaining: [1] };
       onSaved(
         result.remaining.length
-          ? "Saved on this device. Waiting to upload; you can retry from My outings."
+          ? "Saved on this device. Waiting to upload; you can retry from My rows."
           : "Report saved.",
       );
     } catch (e) {
@@ -303,13 +303,13 @@ export default function Logger({
       <form onSubmit={save} className="logger">
         <section className="form-card">
           <label>
-            Which outing?
+            Which row?
             <select
               value={selected}
               disabled={!!editing}
               onChange={(e) => choose(e.target.value)}
             >
-              <option value="new">＋ Independent / unofficial outing</option>
+              <option value="new">＋ Independent / unofficial row</option>
               {outings
                 .filter(
                   (o) =>

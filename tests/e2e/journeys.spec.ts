@@ -140,7 +140,7 @@ test("independent row persists, reloads, edits; unwanted scope field absent", as
   await page.getByRole("button", { name: "Save report", exact: true }).click();
   await expect(page.getByText("2 · Good · east")).toBeVisible();
   await page.reload();
-  await page.getByRole("button", { name: "My outings", exact: true }).click();
+  await page.getByRole("button", { name: "My rows", exact: true }).click();
   await page.getByRole("button", { name: "Past", exact: true }).click();
   await expect(page.getByText("2 · Good · east")).toBeVisible();
   await page.getByRole("button", { name: "Edit report", exact: true }).click();
@@ -162,7 +162,7 @@ test("imported practice prefills boat and survives report submission", async ({
   await loggedIn(page);
   await startLog(page);
   await page
-    .getByRole("combobox", { name: "Which outing?", exact: true })
+    .getByRole("combobox", { name: "Which row?", exact: true })
     .selectOption(o.id);
   await chooseRow(page);
   await page.locator("details.form-card > summary").click();
@@ -467,11 +467,11 @@ test("upcoming, past and saved outing actions follow server reminder state", asy
     m.createOuting(actor, { title: "Finished independent", reminder: true }),
   );
   await loggedIn(page);
-  await page.getByRole("button", { name: "My outings", exact: true }).click();
+  await page.getByRole("button", { name: "My rows", exact: true }).click();
   await expect(page.getByRole("heading", { name: future.title })).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Log this outing" }),
-  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Log this row" })).toHaveCount(
+    0,
+  );
   await expect(page.getByText(/Logging reminder scheduled/)).toBeVisible();
   await page.getByRole("button", { name: "Past", exact: true }).click();
   await expect(page.getByRole("heading", { name: past.title })).toBeVisible();
@@ -481,7 +481,7 @@ test("upcoming, past and saved outing actions follow server reminder state", asy
   await expect(
     page.getByText("Logging reminder scheduled for one hour from now."),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Log this outing" }).click();
+  await page.getByRole("button", { name: "Log this row" }).click();
   await chooseRow(page);
   await page.getByRole("button", { name: "Save report", exact: true }).click();
   await expect(page.getByText("Report saved.", { exact: true })).toBeVisible();
@@ -542,7 +542,7 @@ test("Forecast offers only supported model contexts and places fitted results af
       .getByRole("heading", { name: "Your selected window" })
       .boundingBox();
     const fitted = await page
-      .getByRole("heading", { name: "What logged outings suggest" })
+      .getByRole("heading", { name: "What logged rows suggest" })
       .boundingBox();
     expect(fitted!.y).toBeGreaterThan(weather!.y);
   } finally {
@@ -596,7 +596,7 @@ test("partial reminder delivery is visible without implying device registration"
   });
   await tick();
   await loggedIn(page);
-  await page.getByRole("button", { name: "My outings", exact: true }).click();
+  await page.getByRole("button", { name: "My rows", exact: true }).click();
   await page.getByRole("button", { name: "Past", exact: true }).click();
   await expect(
     page.getByText("Logging reminder partially sent", { exact: false }),
@@ -641,7 +641,7 @@ test("attendance changes persist in BHC, closed windows and uncertain sends stay
   await api(actor, "bhc/connect", { token: syntheticToken });
   await tick();
   await loggedIn(page);
-  await page.getByRole("button", { name: "My outings", exact: true }).click();
+  await page.getByRole("button", { name: "My rows", exact: true }).click();
   const card = page.locator(".outing-card").filter({ hasText: p.name });
   await card
     .getByRole("button", { name: "Change attendance", exact: true })
@@ -654,7 +654,7 @@ test("attendance changes persist in BHC, closed windows and uncertain sends stay
   await dialog.getByRole("button", { name: "Close", exact: true }).click();
   await expect(card.locator(".attendance-badge")).toHaveText("Attending");
   await page.reload();
-  await page.getByRole("button", { name: "My outings", exact: true }).click();
+  await page.getByRole("button", { name: "My rows", exact: true }).click();
   await expect(card.locator(".attendance-badge")).toHaveText("Attending");
   await card
     .getByRole("button", { name: "Change attendance", exact: true })

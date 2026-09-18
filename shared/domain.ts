@@ -210,7 +210,7 @@ export const reportSchema = z
       v.coach_state === "uncoached" &&
       (v.coach_ids.length || v.coach_count !== 0)
     )
-      issue("An uncoached outing must have zero coaches.");
+      issue("An uncoached row must have zero coaches.");
     if (new Set(v.coach_ids).size !== v.coach_ids.length)
       issue("Each coach may only appear once.");
     if (v.coach_ids.length && v.coach_count !== v.coach_ids.length)

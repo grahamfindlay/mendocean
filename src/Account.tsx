@@ -172,7 +172,7 @@ export function PlanForm({
       }}
     >
       <p className="help">
-        Add a personal outing. This does not sign you up for a BHC practice.
+        Add a personal row. This does not sign you up for a BHC practice.
       </p>
       <label>
         Name
@@ -216,12 +216,12 @@ export function PlanForm({
       </label>
       <label className="checkbox">
         <input type="checkbox" name="reminder" />
-        Remind me to log, 15 minutes after the outing ends
+        Remind me to log, 15 minutes after the row ends
       </label>
       <p className="help">Choose email, push, or both in Account.</p>
       {error && <p className="alert">{error}</p>}
       <button className="button full" disabled={busy}>
-        Save outing
+        Save row
       </button>
     </form>
   );
@@ -355,7 +355,7 @@ export function SettingsForm({
           <p>
             New choices apply to upcoming and unfinished reminders. Only
             selected channels are used. To repeat a reminder already sent,
-            request another from My outings.
+            request another from My rows.
           </p>
         </details>
         <label className="checkbox">

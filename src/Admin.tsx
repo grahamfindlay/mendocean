@@ -86,7 +86,7 @@ export default function Admin() {
           </p>
         </>
       )}
-      <h3>Reconcile duplicate outings</h3>
+      <h3>Reconcile duplicate rows</h3>
       <p className="help">
         Use only when these records describe the same event. An official
         practice must be the destination. Conflicting reports by the same person
@@ -96,21 +96,20 @@ export default function Admin() {
         onSubmit={(e) => {
           e.preventDefault();
           const f = new FormData(e.currentTarget);
-          if (!confirm("Merge these two records into one shared outing?"))
-            return;
+          if (!confirm("Merge these two records into one shared row?")) return;
           void run(async () => {
             await api("outings/reconcile", {
               source: f.get("source"),
               target: f.get("target"),
             });
-            setMessage("Outings reconciled.");
+            setMessage("Rows reconciled.");
           });
         }}
       >
         <label>
           Duplicate to merge
           <select name="source" required>
-            <option value="">Choose an independent outing</option>
+            <option value="">Choose an independent row</option>
             {outings
               .filter((o) => o.kind === "independent")
               .map((o) => (
@@ -121,7 +120,7 @@ export default function Admin() {
           </select>
         </label>
         <label>
-          Keep this outing
+          Keep this row
           <select name="target" required>
             <option value="">Choose the shared event</option>
             {outings.map((o) => (
@@ -155,9 +154,9 @@ export default function Admin() {
         }}
       >
         <label>
-          Outing
+          Row
           <select name="outing" required>
-            <option value="">Choose an outing</option>
+            <option value="">Choose a row</option>
             {outings.map((o) => (
               <option key={o.id} value={o.id}>
                 {label(o)}

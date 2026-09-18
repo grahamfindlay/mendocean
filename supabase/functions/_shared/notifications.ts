@@ -92,7 +92,7 @@ export async function sendReminder(
               subject: title,
               text:
                 body +
-                "\n\nLog your outing: " +
+                "\n\nLog your row: " +
                 url +
                 "\n\nManage or pause reminders: " +
                 env("APP_URL") +

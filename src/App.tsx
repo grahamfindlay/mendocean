@@ -41,7 +41,7 @@ function readUpdatePosition() {
     sessionStorage.removeItem("mendocean-update-position");
     return saved &&
       Date.now() - saved.at < 300000 &&
-      ["Now", "Hourly", "Forecast", "Log", "My outings"].includes(saved.tab)
+      ["Now", "Hourly", "Forecast", "Log", "My rows"].includes(saved.tab)
       ? saved
       : null;
   } catch {
@@ -255,8 +255,8 @@ export default function App() {
     void api("join", { token: share })
       .then(() => {
         history.replaceState({}, "", location.pathname);
-        setMessage("You joined the shared outing.");
-        setTab("My outings");
+        setMessage("You joined the shared row.");
+        setTab("My rows");
         void refresh();
       })
       .catch((e) => setError(e.message));
@@ -297,7 +297,7 @@ export default function App() {
         )}
       </header>
       <nav className="main-nav" aria-label="Main navigation">
-        {["Now", "Hourly", "Forecast", "Log", "My outings"].map((name) => (
+        {["Now", "Hourly", "Forecast", "Log", "My rows"].map((name) => (
           <button
             key={name}
             className={tab === name ? "selected" : ""}
@@ -366,7 +366,7 @@ export default function App() {
         ) : !user ? (
           <section className="empty-state">
             <p className="eyebrow">A SMALL EFFORT. A BETTER FORECAST.</p>
-            <h1>Log an outing</h1>
+            <h1>Log a row</h1>
             <p>Sign in to log practices and independent rows.</p>
             <button className="button" onClick={() => setAuthOpen(true)}>
               Sign in to log <ArrowUpRight size={16} />
@@ -407,7 +407,7 @@ export default function App() {
               }
               setEditing(undefined);
               setSelectedOuting(undefined);
-              setTab("My outings");
+              setTab("My rows");
               void refresh();
             }}
           />
@@ -415,14 +415,14 @@ export default function App() {
           <>
             <div className="page-heading">
               <div>
-                <h1>My outings</h1>
+                <h1>My rows</h1>
               </div>
               <button
                 className="button subtle"
                 onClick={() => setPlanned(true)}
               >
                 <Plus size={16} />
-                Add independent outing
+                Add independent row
               </button>
             </div>
             {!!queue.length && (
@@ -565,7 +565,7 @@ export default function App() {
                 }
               />
             ) : (
-              <p role="status">Loading your outings…</p>
+              <p role="status">Loading your rows…</p>
             )}
           </>
         )}
@@ -614,13 +614,13 @@ export default function App() {
         </Modal>
       )}
       {planned && (
-        <Modal title="Add independent outing" onClose={() => setPlanned(false)}>
+        <Modal title="Add independent row" onClose={() => setPlanned(false)}>
           <PlanForm
             onSave={async (body) => {
               await api("outing", body);
               setPlanned(false);
               setOutingView("Upcoming");
-              setMessage("Independent outing added.");
+              setMessage("Independent row added.");
               await refresh();
             }}
           />
