@@ -164,3 +164,180 @@ Bootstrap matters: the already-installed old JavaScript has none of the new upda
 Then verify the next release through the new update flow in the same installed iPhone app: foreground it, receive/apply the update, retain login and push registration, restore an unfinished draft, and open offline. The owner can perform this short real-device check if the device is not accessible to automation. A normal logged-in push test can verify continuity if the owner chooses it.
 
 M5 is complete when the installed-app two-release transition works without reinstall/re-authentication/re-registration, interrupted work survives, and the automated regression is in CI. Browser-only success is not enough to claim the iOS symptom resolved.
+
+## Milestone 7 implementation plan
+
+Scope: R06, R16, R17, R19–R24, plus the entry-point half of R25 pulled forward
+from M8. M7 changes navigation, adds seven-day and scheduled-row forecasts, and
+renames outings to rows in user-facing text. It introduces no database
+migration, no new service and no change to weather collection cadence. R23 is
+the final optional increment and must not gate the rest.
+
+Operating conditions differ from M5. The app has one test user, the owner, and
+no external pilot participants. Brief downtime is acceptable. That removes the
+compatibility burden that shaped earlier milestones: no reminder emails are in
+the wild whose links must keep resolving, and no other installation is mid-
+session during an update. Prefer the simpler implementation over the
+backward-compatible one wherever the two conflict, and delete dead
+compatibility paths rather than preserving them.
+
+Three facts from the code govern the sequence. Navigation is not routed:
+`App.tsx` holds a `tab` string in `useState`, and deep links arrive as query
+parameters, not paths; `react-router-dom` is declared in `package.json` but
+unused in `src/`. `forecastDays` already returns seven days and `weatherURL`
+already requests `forecast_days=7`, so the seven-day view is presentation work
+rather than new collection. And scheduling a future independent row already
+works end to end — `outingPhase` returns `future`, `canLog` withholds logging
+until the start time, and the browser case "future outing stays forecast-only"
+covers it.
+
+### 1. Rename outings to rows first
+
+R06 touches 205 user-facing occurrences across 14 files. With no live users
+there is no reason to defer it, and doing it first means every later step is
+built and reviewed under the final vocabulary instead of being relabeled
+afterwards. Land it as its own PR before any structural work.
+
+Only user-facing text changes: navigation, forms, feedback, reminders,
+notifications and accessibility text. Internal API and database names stay
+compatible — `outingSchema`, the `outing` table and its columns, the `?log=`
+parameter and the Edge Function payloads are unchanged, as are the internal
+exports `outingPhase`, `canLog` and `sortedOutings` in
+`shared/presentation.ts`. The 17 class-name occurrences in `src/styles.css` are
+churn without user benefit; skip them.
+
+### 2. Establish the shared duration summary
+
+R21 is the dependency for Week cards, scheduled-row forecasts and M8's compact
+cards, so build and test it before any view consumes it. Add one exported
+helper to `shared/timeline.ts` that takes a sample window and returns sampled
+wind min–max, maximum gust, temperature range, a direction summary, the worst
+applicable heuristic classification in the interval, an hourly-probability
+range, and explicit coverage.
+
+Honor the contract above literally. `forecast_minutely_15` is 192, so only the
+first 48 hours carry quarter-hour samples and days three through seven are
+hourly: any unweighted mean over a seven-day card silently weights the near
+term 4:1. Return ranges and extremes rather than means; if a mean is later
+needed, time-weight it by `sampleMinutes`. Use `circularMean` or a
+range/variable indication for bearings, never an arithmetic average. Take the
+worst classification in the window rather than averaging away a brief difficult
+period, and keep the detail reachable.
+
+`windowSamples` already returns `{ samples, covered }` with boundary bracketing
+and no extrapolation. Build coverage reporting on that flag rather than
+re-deriving it, so a gapped or out-of-horizon window stays visibly incomplete
+and no distant sample is quietly recruited to fake a complete row.
+
+Files: `shared/timeline.ts`, `tests/timeline.test.ts`. Pure addition with unit
+tests and no UI change; land it on its own.
+
+### 3. Restructure navigation
+
+The nav is the list `["Now", "Hourly", "Forecast", "Log", "My outings"]`, which
+appears three times in `App.tsx` (lines 44, 300, 336) and must not drift.
+Extract one destination table — internal id, visible label, grouping — and
+derive the nav, the `ForecastView` predicate and the resume whitelist from it.
+Group Today, Week and Rows beneath Forecasts; Log and My rows stay top level.
+
+Name the third forecast destination **Rows**, not Practices: it lists scheduled
+independent rows alongside BHC practices, so the narrower label would be wrong,
+and Rows matches the R06 vocabulary.
+
+Keep `/?log=<id>` and `/?account=1` working. They are generated server-side by
+`supabase/functions/_shared/notifications.ts` (lines 50 and 235), so changing
+them means a coordinated Edge Function deploy for no user-visible gain. Drop
+the `?tab=Plan` legacy alias and the legacy-name handling in the resume
+whitelist at `App.tsx:44` instead of extending them — with one user and no
+external links, they are dead weight, and carrying them forward would preserve
+vocabulary R06 just removed.
+
+Files: `src/App.tsx`, `src/ForecastView.tsx`.
+
+### 4. Split ForecastView before adding to it
+
+`ForecastView.tsx` is 672 lines and already branches across three tabs, with
+`dayView` rendered from two of them. Adding Week controls, scheduled-row cards
+and highlighting in place will not stay reviewable. Split it into Today, Week
+and Rows components over shared helpers as part of this milestone, not as a
+follow-up. Today keeps the current card, near-term list, Today chart and
+rolling horizon and should come out of the split behaviorally unchanged, which
+makes it the check that the split was clean.
+
+### 5. Week: seven days, disclosure, day affordances
+
+The seven-day cap is not in `forecastDays`, which already slices to seven. It
+is in `comparisonTimes`, which slices to five and filters
+`Date.parse(d.time) >= now`. R19 wants today included even when its chosen time
+has passed, so both the slice and that filter change together; a day whose time
+has passed shows as past rather than disappearing. Verify the seventh day
+degrades honestly when the provider is short, rather than rendering an empty
+card.
+
+R20 moves start time and Window behind a small labeled Change time disclosure,
+preserving selected values and DST-valid Madison conversion via `chicagoToISO`.
+R17 makes further days obvious through arrow controls or a partially visible
+next day, with a keyboard-accessible selected state — the existing
+`.day-picker` already carries `aria-pressed`, so extend it rather than
+replacing it.
+
+Cards consume the step 2 summary. Remove the redundant section heading.
+
+### 6. Rows: scheduled-row forecasts replace arbitrary-time planning
+
+There is no arbitrary-time forecasting destination. To ask about a specific
+future time, schedule an independent row for it; the row then appears as a card
+under Forecasts → Rows, ordered soonest first, and selecting it inspects its
+whole scheduled duration through the step 2 summary rather than a single start
+sample. The signed-out state explains account access; public Today and Week
+remain available without an account.
+
+A precursor exists: the Forecast tab already renders "Your upcoming outings"
+with an `onForecast(outing)` callback over the same dataset as `OutingsView`.
+Share that selection so the two lists cannot drift, while allowing the forecast
+view its own active filter selection.
+
+Because this removes the only other way to ask about a future time, pull R25's
+entry-point labeling forward from M8 into this step. The underlying capability
+already works; what is missing is that the sole entry is labeled **Log**, which
+reads as recording something that already happened, leaving scheduling
+discoverable only by accident. Make the two actions explicit — **Schedule
+independent row** for a future plan, **Log independent row** for one already
+started — both reaching the existing workflow without signing up for BHC. This
+is labeling and routing, not new capability. R26–R31 stay in M8.
+
+Do not lose the learned-assessment path when the planner goes. The estimate
+block, `capabilities`, `contexts` and the basis selector are gated
+model-learning surfaces that must be preserved behind their existing gates with
+unchanged weather features. Removing the generic Forecast screen must not
+remove the model-learning path.
+
+### 7. Window highlighting
+
+R22 adds a Show on chart toggle that highlights the selected
+date/time/duration without replacing the inspection cursor — the highlight and
+the cursor are separate concerns, and the numeric controls stay authoritative
+and accessible. `WeatherChart` already freezes its domain during a gesture and
+clips to fixed axes, so the highlight must respect the frozen domain rather
+than reading live clock state mid-gesture.
+
+R23 adds dragging of highlight boundaries with discrete snapping, a minimum
+duration, midnight/DST handling and touch targets distinct from the existing
+scrub gesture. It is explicitly the last optional increment. Land R22 and
+confirm it before starting R23, and drop R23 rather than delaying the
+milestone.
+
+### 8. Verification
+
+Extend the preview browser suite with the new destinations and with scheduling
+an independent row and finding its card under Rows. Unit-test the step 2
+summary directly against mixed 15/60-minute windows, gapped windows and
+out-of-horizon windows, since its honesty guarantees are not observable from a
+rendered card.
+
+Both `fast` and `full-stack` are required on the protected branch. Ignore the
+`Workers Builds: mendocean` check: no Cloudflare Worker exists in this repo,
+and it fails on every commit. After deployment, run exact-commit public smoke
+and production browser smoke, and verify seven-day cards and scheduled-row
+forecasts at phone width against real provider data, where days three through
+seven are hourly.
