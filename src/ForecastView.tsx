@@ -18,6 +18,8 @@ import type {
 import { forecastSamples, weatherDescription } from "../shared/presentation";
 import { api, supabase } from "./client";
 import WeatherChart from "./WeatherChart";
+import { HourRow, RainChance } from "./HourRow";
+import ForecastDayView from "./ForecastDayView";
 import {
   timelineSamples,
   nearTerm,
@@ -31,65 +33,7 @@ import {
 } from "../shared/timeline";
 import { Gust, WindCompass, WindSpeed, WindVector } from "./WindReading";
 
-function RainChance({ hours, time }: { hours: WeatherHour[]; time: string }) {
-  const chance = hourlyRainChance(hours, time);
-  return chance ? (
-    <span className="rain-chance">
-      Hourly rain chance <b>{chance.probability}%</b>{" "}
-      <small>
-        {formatTime(new Date(chance.start).toISOString())}–
-        {formatTime(new Date(chance.end).toISOString())}
-      </small>
-    </span>
-  ) : (
-    <span>Rain chance unavailable</span>
-  );
-}
-
-export function HourRow({
-  hour,
-  expired = false,
-  hours = [],
-}: {
-  hours?: WeatherHour[];
-  hour: WeatherHour;
-  expired?: boolean;
-}) {
-  return (
-    <details className="hour-detail">
-      <summary className="hour-row">
-        <time dateTime={hour.time}>{formatTime(hour.time)}</time>
-        <span className="wind-cell">
-          <WindSpeed hour={hour} expired={expired} />
-          <span className="wind-direction">
-            <WindVector hour={hour} expired={expired} /> From{" "}
-            {directionLabel(hour.direction)}
-          </span>
-        </span>
-        <Gust value={hour.gust} />
-        <span>{hour.temperature?.toFixed(0) ?? "—"}°F</span>
-        <span className="weather-description">
-          {weatherDescription(hour.code)}
-        </span>
-      </summary>
-      <div className="hour-more">
-        <span>
-          Conditions <b>{weatherDescription(hour.code)}</b>
-        </span>
-        <RainChance hours={hours} time={hour.time} />
-        <span>
-          Visibility{" "}
-          <b>
-            {hour.visibility == null
-              ? "—"
-              : (hour.visibility / 1609.344).toFixed(1)}{" "}
-            mi
-          </b>
-        </span>
-      </div>
-    </details>
-  );
-}
+export { HourRow } from "./HourRow";
 export interface ForecastSelection {
   starts_at: string;
   ends_at: string;
@@ -239,42 +183,16 @@ export default function ForecastView({
   const near = nearTerm(weather, now);
   const comparisons = comparisonTimes(weather, when, now);
   const dayView = (
-    <>
-      <div className="day-picker" role="group" aria-label="Forecast day">
-        {days.map((d) => (
-          <button
-            key={d}
-            aria-pressed={day === d}
-            onClick={() => setSelectedDay(d)}
-          >
-            {formatDate(d + "T12:00:00Z")}
-          </button>
-        ))}
-      </div>
-      <WeatherChart
-        key={day}
-        samples={
-          day ? windowSamples(weather, ...dayBounds(day)).samples : daySamples
-        }
-        domain={day ? dayBounds(day) : undefined}
-        initialTime={day === today ? now : undefined}
-        expired={expired}
-        title={day ? formatDate(day + "T12:00:00Z") : "Daily forecast"}
-      />
-      <details className="sample-details">
-        <summary>Detailed forecast for this day</summary>
-        <div className="hour-table">
-          {summarySamples(daySamples).map((h) => (
-            <HourRow
-              key={h.time}
-              hour={h}
-              hours={weather.hours}
-              expired={expired}
-            />
-          ))}
-        </div>
-      </details>
-    </>
+    <ForecastDayView
+      weather={weather}
+      days={days}
+      day={day}
+      today={today}
+      daySamples={daySamples}
+      expired={expired}
+      now={now}
+      onSelectDay={setSelectedDay}
+    />
   );
   const windowOptions = ["1", "60", "90", "120"];
   return (
