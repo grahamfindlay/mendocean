@@ -1,4 +1,3 @@
-import { protectLocalSave } from "./updateSafety";
 import { openDB } from "idb";
 import { api, previewMode } from "./client";
 import type { OutingInput, ReportInput } from "../shared/domain";
@@ -28,26 +27,26 @@ export async function stage(
   outing: OutingInput,
   report: ReportInput,
 ) {
-  await protectLocalSave(async () =>
-    (await db).put("outbox", {
-      key: `${user}:${report.submission_id}`,
-      user,
-      outing,
-      report,
-      savedAt: new Date().toISOString(),
-    }),
-  );
+  await (
+    await db
+  ).put("outbox", {
+    key: `${user}:${report.submission_id}`,
+    user,
+    outing,
+    report,
+    savedAt: new Date().toISOString(),
+  });
 }
 export async function discard(key: string) {
-  await protectLocalSave(async () => (await db).delete("outbox", key));
+  await (await db).delete("outbox", key);
 }
 export async function draft(user: string, value?: unknown) {
   return value === undefined
     ? (await db).get("drafts", user)
-    : protectLocalSave(async () => (await db).put("drafts", value, user));
+    : (await db).put("drafts", value, user);
 }
 export async function clearDraft(user: string) {
-  await protectLocalSave(async () => (await db).delete("drafts", user));
+  await (await db).delete("drafts", user);
 }
 export async function flush(user: string) {
   let sent = 0;
@@ -59,7 +58,7 @@ export async function flush(user: string) {
       sent++;
     } catch (error) {
       item.error = error instanceof Error ? error.message : "Upload failed";
-      await protectLocalSave(async () => (await db).put("outbox", item));
+      await (await db).put("outbox", item);
       break;
     }
   }

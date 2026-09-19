@@ -6,58 +6,90 @@ afterEach(() => {
   vi.resetModules();
 });
 
-it("retains a foreground request arriving while an older check settles", async () => {
+function harness() {
+  const posted: string[] = [];
+  const build = (id: string) => ({
+    postMessage(data: { type: string }, ports?: MessagePort[]) {
+      posted.push(data.type);
+      if (data.type === "GET_VERSION") ports?.[0].postMessage({ build: id });
+    },
+  });
+  const listeners: Record<string, (() => void)[]> = {};
+  const reload = vi.fn();
   vi.stubEnv("DEV", false);
-  vi.stubGlobal("document", { getElementById: () => null });
+  vi.stubGlobal("document", {
+    visibilityState: "visible",
+    addEventListener() {},
+    removeEventListener() {},
+  });
+  vi.stubGlobal("location", { reload });
+  vi.stubGlobal("window", { addEventListener() {}, removeEventListener() {} });
+  vi.stubGlobal("setInterval", () => 0);
+  return { posted, build, listeners, reload };
+}
+
+it("applies a waiting release at a launch boundary, reloading only once it takes control", async () => {
+  const { posted, build, listeners, reload } = harness();
   const updates = await import("../src/appUpdates");
-  const applied = vi.fn();
-  function worker(build: string) {
-    return {
-      postMessage(data: { type: string }, ports: MessagePort[]) {
-        if (data.type === "GET_VERSION") ports[0].postMessage({ build });
-        if (data.type === "APPLY_UPDATE") {
-          applied(build);
-          // Another tab refuses activation; this page must remain usable.
-          ports[0].postMessage({ ok: false });
-        }
-      },
-    };
-  }
-  let finish!: () => void;
-  const active = worker(updates.APP_BUILD);
+  const active = build(updates.APP_BUILD);
   const registration = {
     active,
-    waiting: null as ReturnType<typeof worker> | null,
+    waiting: build("next-release"),
     installing: null,
     addEventListener() {},
-    update: vi
-      .fn()
-      .mockImplementationOnce(
-        () =>
-          new Promise<void>((resolve) => {
-            finish = resolve;
-          }),
-      )
-      .mockImplementation(async () => {
-        registration.waiting = worker("next-release");
-      }),
+    update: vi.fn(async () => {}),
   };
   vi.stubGlobal("navigator", {
     onLine: true,
-    serviceWorker: { register: async () => registration, controller: active },
+    serviceWorker: {
+      register: async () => registration,
+      controller: active,
+      addEventListener(type: string, fn: () => void) {
+        (listeners[type] ||= []).push(fn);
+      },
+      removeEventListener() {},
+    },
   });
-  const initial = updates.checkForUpdates(true);
-  await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
-  void updates.checkForUpdates(false, true);
-  finish();
-  await initial;
-  await vi.waitFor(() => expect(applied).toHaveBeenCalledWith("next-release"));
-  await vi.waitFor(() =>
-    expect(updates.updateSnapshot()).toMatchObject({
-      status: "ready",
-      available: "next-release",
-      message:
-        "Finish or close forms in other Mendocean windows, then try again.",
-    }),
-  );
+  const stop = updates.startAppUpdates(() => {});
+  // No window is polled first: the release is applied on its own.
+  await vi.waitFor(() => expect(posted).toContain("SKIP_WAITING"));
+  expect(posted).not.toContain("APPLY_UPDATE");
+  expect(updates.updateSnapshot()).toMatchObject({ status: "applying" });
+  expect(reload).not.toHaveBeenCalled();
+  listeners.controllerchange.forEach((fn) => fn());
+  expect(reload).toHaveBeenCalledTimes(1);
+  listeners.controllerchange.forEach((fn) => fn());
+  expect(reload).toHaveBeenCalledTimes(1);
+  stop();
+});
+
+it("a manual check offers a release without applying it", async () => {
+  const { posted, build, listeners } = harness();
+  const updates = await import("../src/appUpdates");
+  const active = build(updates.APP_BUILD);
+  const registration = {
+    active,
+    waiting: build("next-release"),
+    installing: null,
+    addEventListener() {},
+    update: vi.fn(async () => {}),
+  };
+  vi.stubGlobal("navigator", {
+    onLine: true,
+    serviceWorker: {
+      register: async () => registration,
+      controller: active,
+      addEventListener(type: string, fn: () => void) {
+        (listeners[type] ||= []).push(fn);
+      },
+      removeEventListener() {},
+    },
+  });
+  await updates.checkForUpdates(true);
+  expect(updates.updateSnapshot()).toMatchObject({
+    status: "ready",
+    available: "next-release",
+    message: "Update available.",
+  });
+  expect(posted).not.toContain("SKIP_WAITING");
 });

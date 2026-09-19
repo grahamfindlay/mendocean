@@ -2,6 +2,29 @@
 
 This is the first milestone of `PILOT_DESIGN_ROUND2_PLAN.md`. Later weather, chart and navigation changes are not part of this release. In particular, quarter-hour weather collection and chart points are unchanged.
 
+## Withdrawn, 2026-09-19
+
+The work-in-progress coordination described under **Behavior** was removed; see
+`UPDATE_SIMPLIFICATION_PROPOSAL.md`. Open forms no longer defer activation,
+another tab's unfinished work no longer blocks it, requests and local saves no
+longer hold it back, and **Update now** is never disabled. Roughly 900 lines
+went with it, including `src/updateSafety.ts`, the worker's
+`PREPARE_UPDATE`/`CANCEL_UPDATE`/`COMMIT_UPDATE` handshake, the reload
+orchestration and the legacy-worker bootstrap path.
+
+What that protected is now carried by autosave: new-report drafts persist to
+IndexedDB on a 350ms debounce and are restored on the next load, so an update
+landing at the worst moment costs at most the last fraction of a second of
+typing. Queued reports still upload exactly once after reconnecting.
+
+Everything under **Release integrity** stands and is unchanged. So does
+automatic application at a launch or foreground boundary; only its safety gate
+was removed.
+
+Given up deliberately: an in-flight request can be interrupted by the reload
+(the outbox re-sends it), a second window's open form no longer holds an update
+back, and a page on a pre-M5 worker no longer has a dedicated upgrade path.
+
 ## Behavior
 
 The app checks for releases on launch, returning to the foreground, reconnecting, and every five minutes while visible. Ordinary checks are deduplicated and throttled to once a minute. Account offers **Check for updates** and a collapsed **App version**. A complete new release produces an **Update available** notice for signed-in and public forecast users.
