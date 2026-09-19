@@ -1422,12 +1422,37 @@ button:hover:not(:disabled) {
 .chart-reading .wind-speed {
   font-size: 1rem;
 }
+.day-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 1rem 0;
+}
+.day-step {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border: 1px solid #d4d9cd;
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+}
+.day-step:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
 .day-picker {
   display: flex;
+  flex: 1;
   overflow-x: auto;
   gap: 0.4rem;
-  margin: 1rem 0;
   padding-bottom: 0.3rem;
+  /* A day left half-cut at the edge reads as "there is more"; the arrows say
+     it is reachable. Both, because neither alone is obvious on a phone. */
+  scroll-padding-inline: 1.5rem;
 }
 .day-picker button {
   white-space: nowrap;
@@ -1445,24 +1470,47 @@ button:hover:not(:disabled) {
   padding: 1rem 0;
   font-weight: 600;
 }
-.comparison-grid {
+.week-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(145px, 1fr));
+  /* Wrapping, not a horizontal scroller: seven 160px cards in one row force a
+     1120px layout viewport, and a phone answers that by zooming the whole page
+     out to about a third. Two columns on a phone, seven on a wide screen. */
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 0.75rem;
-  overflow-x: auto;
-  padding-bottom: 0.6rem;
 }
-.comparison-grid article {
+.week-grid article {
   border: 1px solid #deddd3;
   border-radius: 10px;
   padding: 0.8rem;
   font-size: 0.8rem;
 }
-.comparison-grid article p {
-  margin: 0.4rem 0;
+.week-grid article[aria-current="true"] {
+  border-color: #235d51;
+  box-shadow: inset 0 0 0 1px #235d51;
 }
-.comparison-grid .wind-speed {
+.week-grid .practice-window {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid #ecebe3;
+}
+.week-grid .practice-window:first-of-type {
+  border-top: 0;
+}
+.week-grid .practice-window p {
+  margin: 0.2rem 0;
+}
+.week-grid .wind-speed {
   font-size: 1rem;
+}
+.window-facts,
+.window-empty,
+.window-partial {
+  display: block;
+  color: #5c6157;
+}
+.window-partial {
+  margin-top: 0.3rem;
+  font-style: italic;
 }
 @media (max-width: 600px) {
   .weather-chart {

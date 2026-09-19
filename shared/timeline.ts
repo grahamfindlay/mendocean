@@ -3,6 +3,7 @@ import {
   circularMean,
   localDateTime,
   windStatus,
+  PRACTICE_WINDOWS,
   type Forecast,
   type WeatherHour,
   type WindStatus,
@@ -97,27 +98,31 @@ export function forecastDays(weather: Forecast, now: number) {
     .filter((d) => d >= today)
     .slice(0, 7);
 }
-export function comparisonTimes(weather: Forecast, when: string, now: number) {
-  return forecastDays(weather, now)
-    .map((day) => {
-      try {
-        const time = chicagoToISO(day + "T" + when.slice(11));
-        return {
-          day,
-          time,
-          ...windowSamples(weather, Date.parse(time), Date.parse(time)),
-        };
-      } catch {
-        return {
-          day,
-          time: null,
-          samples: [] as WeatherHour[],
-          covered: false,
-        };
-      }
-    })
-    .filter((d) => !d.time || Date.parse(d.time) >= now)
-    .slice(0, 5);
+/**
+ * Each fixed practice window on a Madison calendar day, summarized.
+ *
+ * `end` is exclusive of nothing -- `summarizeWindow` brackets the interval --
+ * but a window whose bounds fall outside the forecast horizon returns an
+ * uncovered summary rather than being dropped, so a short provider response
+ * shows as unknown instead of silently shortening the week.
+ */
+export function practiceWindows(weather: Forecast, day: string) {
+  return PRACTICE_WINDOWS.map((window) => {
+    let startsAt = NaN;
+    let endsAt = NaN;
+    try {
+      startsAt = Date.parse(chicagoToISO(day + "T" + window.start));
+      endsAt = Date.parse(chicagoToISO(day + "T" + window.end));
+    } catch {
+      /* Both bounds dodge the DST-changed hour; an unparsable day is unknown. */
+    }
+    return {
+      ...window,
+      startsAt,
+      endsAt,
+      summary: summarizeWindow(weather, startsAt, endsAt),
+    };
+  });
 }
 /** A common axis for totals over different intervals: mean rate in inches/hour. */
 export function precipitationRate(h: WeatherHour) {

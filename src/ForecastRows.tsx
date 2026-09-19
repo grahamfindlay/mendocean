@@ -12,16 +12,10 @@ import type {
   AssessmentCapabilities,
   AssessmentContext,
 } from "../shared/model";
-import { weatherDescription } from "../shared/presentation";
 import { api, supabase } from "./client";
 import WeatherChart from "./WeatherChart";
 import { HourRow } from "./HourRow";
-import {
-  windowSamples,
-  comparisonTimes,
-  sampleMinutes,
-} from "../shared/timeline";
-import { Gust, WindSpeed } from "./WindReading";
+import { windowSamples } from "../shared/timeline";
 
 const defaultContext = { route: "either", boat: "any", coach: "none" };
 const emptyCapabilities: AssessmentCapabilities = { pooled: [], mine: [] };
@@ -36,7 +30,6 @@ export default function ForecastRows({
   onSelectWhen,
   duration,
   onSelectDuration,
-  onSelectDay,
   dayView,
   userId,
 }: {
@@ -48,7 +41,6 @@ export default function ForecastRows({
   onSelectWhen: (when: string) => void;
   duration: string;
   onSelectDuration: (duration: string) => void;
-  onSelectDay: (day: string) => void;
   dayView: ReactNode;
   userId?: string;
 }) {
@@ -134,7 +126,6 @@ export default function ForecastRows({
     start + (Number(duration) === 1 ? 0 : Number(duration) * 60000),
   );
   const selected = window.samples;
-  const comparisons = comparisonTimes(weather, when, now);
   return (
     <>
       <section className="form-card">
@@ -300,37 +291,6 @@ export default function ForecastRows({
         </section>
       )}
       {estimateError && <p className="help">{estimateError}</p>}
-      <div className="section-heading">
-        <h2>Five days at {when.slice(11)}</h2>
-        <span>Select a day for its timeline</span>
-      </div>
-      <div className="comparison-grid">
-        {comparisons.map((c) => (
-          <article key={c.day}>
-            <button className="text-button" onClick={() => onSelectDay(c.day)}>
-              {formatDate(c.day + "T12:00:00Z")}
-            </button>
-            {c.covered ? (
-              c.samples.map((h) => (
-                <div key={h.time}>
-                  <small>
-                    {formatTime(h.time)} · {sampleMinutes(h)} min
-                  </small>
-                  <p>
-                    <WindSpeed hour={h} expired={expired} />{" "}
-                    <Gust value={h.gust} />
-                  </p>
-                  <span>
-                    {h.temperature ?? "—"}°F · {weatherDescription(h.code)}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <p>Forecast not available.</p>
-            )}
-          </article>
-        ))}
-      </div>
       {dayView}
       {outings.some((o) => Date.parse(o.ends_at) > now) && (
         <>

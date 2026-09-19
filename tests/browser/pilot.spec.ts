@@ -409,17 +409,26 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
   await expect(selectedChart.locator(".chart-reading time")).toContainText(
     "9:45 AM",
   );
+  await page.getByRole("button", { name: "Week", exact: true }).click();
+  const cards = page.locator(".week-grid article");
+  await expect(cards).toHaveCount(7);
+  await expect(cards.first().locator(".practice-window")).toHaveCount(2);
+  await expect(cards.first()).toContainText("Morning · 5:30 AM–7:30 AM");
+  await expect(cards.first()).toContainText("Evening · 6:00 PM–8:00 PM");
+  await cards.nth(1).getByRole("button").click();
   await expect(
-    page.getByRole("heading", { name: "Five days at 09:43" }),
-  ).toBeVisible();
-  await page.locator(".comparison-grid button").nth(1).click();
+    page.locator(".day-picker button[aria-pressed=true]"),
+  ).toContainText("Sep 16");
+  await page.getByRole("button", { name: "Later day" }).click();
+  await expect(
+    page.locator(".day-picker button[aria-pressed=true]"),
+  ).toContainText("Sep 17");
+  await page.getByRole("button", { name: "Earlier day" }).click();
+  await page.getByRole("button", { name: "Rows", exact: true }).click();
   await expect(
     page.locator(".day-picker button[aria-pressed=true]"),
   ).toContainText("Sep 16");
   await page.getByRole("button", { name: "Week", exact: true }).click();
-  await expect(
-    page.locator(".day-picker button[aria-pressed=true]"),
-  ).toContainText("Sep 16");
   await page
     .getByText("Detailed forecast for this day", { exact: true })
     .click();
@@ -429,11 +438,15 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
   expect(dailyTimes.length).toBe(48);
   expect(dailyTimes.every((time) => /:(00|30) [AP]M$/.test(time))).toBe(true);
   await expect(page.locator("body")).not.toHaveCSS("overflow-x", "scroll");
+  // innerWidth is asserted too: content wider than the screen makes the phone
+  // widen the layout viewport and zoom the page out, which would satisfy
+  // scrollWidth <= innerWidth while rendering everything at a third size.
   expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-  ).toBe(true);
+    await page.evaluate(() => ({
+      docWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth,
+    })),
+  ).toEqual({ docWidth: viewport.width, innerWidth: viewport.width });
 });
 
 test("touch scrubbing preserves vertical scrolling and releases a cancelled gesture", async ({
