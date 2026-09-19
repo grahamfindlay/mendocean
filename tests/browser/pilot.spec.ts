@@ -186,6 +186,7 @@ test("future outing stays forecast-only, past rows sort and saved reports have n
   await expect(
     page.getByText("1 past practice you did not attend is hidden."),
   ).toBeVisible();
+  await page.locator(".row-filters > summary").click();
   expect(
     (await page.locator(".filter-toggle").boundingBox())!.height,
   ).toBeLessThan(32);
@@ -197,11 +198,110 @@ test("future outing stays forecast-only, past rows sort and saved reports have n
   ]);
   await expect(page.getByText("you did not attend")).toHaveCount(0);
   // The report filter composes with the default set rather than replacing it.
-  await page.getByRole("button", { name: "Unlogged", exact: true }).click();
+  await page.selectOption('label:has-text("Reports") select', "Unlogged");
+  await expect(page.locator(".row-filters > summary")).toContainText(
+    "Filters · 2",
+  );
   await expect(page.locator(".outing-card h3")).toHaveText([
     "Recent practice",
     "Older practice",
   ]);
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await expect(page.locator(".row-filters > summary")).toHaveText("Filters");
+  await expect(page.locator(".outing-card h3")).toHaveText([
+    "Recent practice",
+    "Logged practice",
+  ]);
+});
+
+test("upcoming filters narrow by type and attendance without hiding independent rows", async ({
+  page,
+}, testInfo) => {
+  const viewport = testInfo.project.use.viewport!;
+  const now = Date.parse("2026-09-15T14:24:00Z");
+  await page.clock.install({ time: now - 1000 });
+  await page.clock.pauseAt(now);
+  await page.addInitScript(() => {
+    const base = {
+      kind: "official",
+      version: 1,
+      owner_id: null,
+      bhc_practice_id: 100,
+      reminder: true,
+      attendance: "attending",
+      reports: [],
+      planned_boat: null,
+    };
+    localStorage.setItem(
+      "mendocean-explicit-preview-v1",
+      JSON.stringify([
+        {
+          ...base,
+          id: "going",
+          title: "Attending practice",
+          starts_at: "2026-09-16T14:00:00Z",
+          ends_at: "2026-09-16T15:30:00Z",
+        },
+        {
+          ...base,
+          id: "skipping",
+          title: "Declined practice",
+          attendance: "declined",
+          starts_at: "2026-09-17T14:00:00Z",
+          ends_at: "2026-09-17T15:30:00Z",
+        },
+        {
+          ...base,
+          id: "single",
+          kind: "independent",
+          bhc_practice_id: null,
+          attendance: undefined,
+          owner_id: "10000000-0000-4000-8000-000000000001",
+          title: "Sunrise single",
+          starts_at: "2026-09-18T11:00:00Z",
+          ends_at: "2026-09-18T12:00:00Z",
+        },
+      ]),
+    );
+  });
+  await page.goto("/?preview=1");
+  await page.getByRole("button", { name: "My rows", exact: true }).click();
+  const titles = page.locator(".outing-card h3");
+  await expect(titles).toHaveText([
+    "Attending practice",
+    "Declined practice",
+    "Sunrise single",
+  ]);
+  await page.locator(".row-filters > summary").click();
+  // R29's trap, from the owner's seat: asking for rows they are attending must
+  // not drop the row they scheduled themselves, which carries no BHC value.
+  await page.selectOption('label:has-text("Attendance") select', "Attending");
+  await expect(titles).toHaveText(["Attending practice", "Sunrise single"]);
+  await page.selectOption(
+    'label:has-text("Attendance") select',
+    "Not attending",
+  );
+  await expect(titles).toHaveText(["Declined practice", "Sunrise single"]);
+  // Attendance describes practices, so it is not offered once they are gone.
+  await page.selectOption('label:has-text("Type") select', "Independent");
+  await expect(titles).toHaveText(["Sunrise single"]);
+  await expect(page.getByLabel("Attendance")).toHaveCount(0);
+  await page.selectOption('label:has-text("Type") select', "Practices");
+  await expect(titles).toHaveText(["Declined practice"]);
+  await page.selectOption('label:has-text("Attendance") select', "Unknown");
+  await expect(titles).toHaveCount(0);
+  await expect(
+    page.getByText("No upcoming rows match these filters."),
+  ).toBeVisible();
+  // The panel is open with every control showing: still no page-widening.
+  expect(
+    await page.evaluate(() => ({
+      docWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth,
+    })),
+  ).toEqual({ docWidth: viewport.width, innerWidth: viewport.width });
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await expect(titles).toHaveCount(3);
 });
 
 test("uninstalled iOS explains Home Screen setup before requesting permission", async ({

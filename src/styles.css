@@ -1516,6 +1516,47 @@ button:hover:not(:disabled) {
   /* The inspection cursor stays the only thing the surface reacts to. */
   pointer-events: none;
 }
+/* A sibling of the view control rather than a third item inside its flex row:
+   sharing that line leaves roughly 120px on a phone, which the selects inside
+   cannot use. */
+.row-filters {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--paper);
+}
+.row-filters > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 14px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+.row-filters > summary::-webkit-details-marker {
+  display: none;
+}
+.row-filters > summary .chevron {
+  margin-left: auto;
+}
+.row-filters[open] > summary .chevron {
+  transform: rotate(180deg);
+}
+.row-filter-fields {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border-top: 1px solid var(--line);
+}
+.row-filter-fields label {
+  margin: 0;
+}
+.row-filter-fields .text-button {
+  justify-self: start;
+}
 /* Both reset the global label rule, which stacks a form label above its input
    and centers it. A checkbox belongs beside its text, not above it. */
 .chart-toggle,
