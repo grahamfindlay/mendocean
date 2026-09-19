@@ -18,6 +18,7 @@ import { HourRow } from "./HourRow";
 import { WindowReading } from "./WindowReading";
 import ForecastDayView from "./ForecastDayView";
 import { summarizeWindow, windowSamples } from "../shared/timeline";
+import { visibleOutings } from "../shared/presentation";
 
 const defaultContext = { route: "either", boat: "any", coach: "none" };
 const emptyCapabilities: AssessmentCapabilities = { pooled: [], mine: [] };
@@ -63,9 +64,9 @@ export default function ForecastRows({
   } | null>(null);
   const [estimateError, setEstimateError] = useState("");
   const [onChart, setOnChart] = useState(true);
-  const upcoming = outings
-    .filter((o) => Date.parse(o.ends_at) > now)
-    .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
+  // The same list helper My rows uses, so the two cannot answer "upcoming"
+  // differently. This view holds no filter selection of its own.
+  const upcoming = visibleOutings(outings, "Upcoming", now);
   const row = upcoming.find((o) => o.id === selectedRow) || upcoming[0];
   const start = row ? Date.parse(row.starts_at) : NaN;
   const end = row ? Date.parse(row.ends_at) : NaN;

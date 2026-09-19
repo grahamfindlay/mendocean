@@ -2,9 +2,10 @@ import { expect, test } from "vitest";
 import {
   canLog,
   outingPhase,
-  sortedOutings,
+  visibleOutings,
   forecastSamples,
   weatherDescription,
+  type RowFilters,
 } from "../shared/presentation";
 import {
   reminderPresentation,
@@ -35,13 +36,55 @@ test("logging begins exactly at start, while Past begins exactly at end", () => 
   expect(outingPhase(current, now)).toBe("in_progress");
   expect(outingPhase(current, Date.parse(current.ends_at))).toBe("past");
   expect(canLog(future, now)).toBe(false);
-  expect(sortedOutings([future, past, current], "Upcoming", now)).toEqual([
+  expect(visibleOutings([future, past, current], "Upcoming", now)).toEqual([
     current,
     future,
   ]);
   expect(
-    sortedOutings([past, current, future], "Past", Date.parse(future.ends_at)),
+    visibleOutings([past, current, future], "Past", Date.parse(future.ends_at)),
   ).toEqual([future, current, past]);
+});
+test("the attendance filter describes practices only and never hides independent rows", () => {
+  const at = (hour: number, over: Partial<Outing>): Outing => ({
+    ...outing(`2026-09-16T1${hour}:00:00Z`, `2026-09-16T1${hour}:30:00Z`),
+    ...over,
+  });
+  const rows = [
+    at(4, {
+      id: "mine",
+      kind: "independent",
+      attendance: undefined,
+      owner_id: "me",
+      bhc_practice_id: null,
+    }),
+    at(3, { id: "blank", attendance: "" }),
+    at(2, { id: "unknown", attendance: undefined }),
+    at(1, { id: "declined", attendance: "declined" }),
+    at(0, { id: "attending" }),
+  ];
+  const ids = (filters?: RowFilters) =>
+    visibleOutings(rows, "Upcoming", now, filters).map((o) => o.id);
+  expect(ids()).toEqual(["attending", "declined", "unknown", "blank", "mine"]);
+  // The trap this helper exists to prevent: intersecting the two filters
+  // returns ["attending"] here and drops a row the owner scheduled themselves.
+  expect(ids({ attendance: "Attending" })).toEqual(["attending", "mine"]);
+  expect(ids({ attendance: "Not attending" })).toEqual(["declined", "mine"]);
+  // Absent and empty both read as unknown, matching the importer's mapping.
+  expect(ids({ attendance: "Unknown" })).toEqual(["unknown", "blank", "mine"]);
+  // Type alone governs independent rows, in either direction.
+  expect(ids({ type: "Independent" })).toEqual(["mine"]);
+  expect(ids({ type: "Independent", attendance: "Not attending" })).toEqual([
+    "mine",
+  ]);
+  expect(ids({ type: "Practices" })).toEqual([
+    "attending",
+    "declined",
+    "unknown",
+    "blank",
+  ]);
+  expect(ids({ type: "Practices", attendance: "Attending" })).toEqual([
+    "attending",
+  ]);
 });
 test("Now uses the latest actual timestamp and upcoming rows never look backward", () => {
   const hour = (time: string) => ({
