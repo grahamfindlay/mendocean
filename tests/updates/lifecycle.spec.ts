@@ -260,7 +260,7 @@ test("manual upgrade waits for another tab's draft; session, BHC and registratio
   );
   // The last edit and navigation occur faster than the normal autosave delay.
   await other.getByLabel("Anything else?").fill("Latest draft keystroke");
-  await other.getByRole("button", { name: "Hourly", exact: true }).click();
+  await other.getByRole("button", { name: "Forecasts", exact: true }).click();
   await banner(page).getByRole("button", { name: "Update now" }).click();
   await expect(build(page)).toHaveAttribute("content", b);
   await expect(build(other)).toHaveAttribute("content", b);

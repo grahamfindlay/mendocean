@@ -118,6 +118,28 @@ button:disabled {
   border-color: var(--ink);
   font-weight: 700;
 }
+.sub-nav[hidden] {
+  display: none;
+}
+.sub-nav {
+  display: flex;
+  gap: 20px;
+  padding-top: 10px;
+}
+.sub-nav button {
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.sub-nav button.selected {
+  color: var(--ink);
+  border-color: var(--ink);
+  font-weight: 700;
+}
 .page-heading {
   display: flex;
   justify-content: space-between;

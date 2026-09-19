@@ -524,7 +524,7 @@ test("Forecast offers only supported model contexts and places fitted results af
       mine: [],
     });
     await loggedIn(page);
-    await page.getByRole("button", { name: "Forecast", exact: true }).click();
+    await page.getByRole("button", { name: "Rows", exact: true }).click();
     await page
       .getByRole("combobox", { name: "Route", exact: true })
       .selectOption("east");
@@ -565,9 +565,9 @@ test("production timeline offers quarter-hour inspection and selectable daily fo
     "Precipitation",
   );
   await expect(
-    page.getByRole("region", { name: "Today", exact: true }),
+    page.getByRole("region", { name: "All day", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Hourly", exact: true }).click();
+  await page.getByRole("button", { name: "Week", exact: true }).click();
   await page.locator(".day-picker button").nth(1).click();
   await expect(page.locator(".day-picker button").nth(1)).toHaveAttribute(
     "aria-pressed",

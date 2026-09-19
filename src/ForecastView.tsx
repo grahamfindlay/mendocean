@@ -181,7 +181,7 @@ export default function ForecastView({
     let active = true;
     setEstimate(null);
     setEstimateError("");
-    if (tab !== "Forecast" || !supabase || !contexts.length) return;
+    if (tab !== "Rows" || !supabase || !contexts.length) return;
     const timer = setTimeout(() => {
       let time: string;
       try {
@@ -282,7 +282,7 @@ export default function ForecastView({
       <div className="page-heading concise-heading">
         <div>
           <h1>{tab}</h1>
-          {tab === "Forecast" && (
+          {tab === "Rows" && (
             <p>Choose a date and time, or a row, to see its forecast.</p>
           )}
         </div>
@@ -294,7 +294,7 @@ export default function ForecastView({
             : "This forecast is more than two hours old. Conditions may have changed."}
         </div>
       )}
-      {tab === "Now" && (
+      {tab === "Today" && (
         <>
           {current ? (
             <section className="current-panel">
@@ -356,7 +356,7 @@ export default function ForecastView({
             domain={todayDomain}
             initialTime={now}
             expired={expired}
-            title="Today"
+            title="All day"
           />
           <label className="horizon-picker">
             Hours ahead
@@ -392,8 +392,8 @@ export default function ForecastView({
           </div>
         </>
       )}
-      {tab === "Hourly" && dayView}
-      {tab === "Forecast" && (
+      {tab === "Week" && dayView}
+      {tab === "Rows" && (
         <>
           <section className="form-card">
             <div className="field-grid">

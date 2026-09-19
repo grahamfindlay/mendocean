@@ -28,9 +28,9 @@ test.beforeEach(async ({ page }) => {
 test("public forecast, planner, and invitation boundary", async ({ page }) => {
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Now", exact: true }),
+    page.getByRole("heading", { name: "Today", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Forecast", exact: true }).click();
+  await page.getByRole("button", { name: "Rows", exact: true }).click();
   await page
     .getByRole("combobox", { name: "Window", exact: true })
     .selectOption("1");
@@ -309,7 +309,7 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
   );
   await expect(
     page
-      .getByRole("region", { name: "Today", exact: true })
+      .getByRole("region", { name: "All day", exact: true })
       .locator(".chart-reading time"),
   ).toContainText("9:15 AM");
   expect(await page.locator(".hour-row time").allTextContents()).toEqual(
@@ -393,7 +393,7 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
     "data-domain-start",
     String(now + 60000),
   );
-  await page.getByRole("button", { name: "Forecast", exact: true }).click();
+  await page.getByRole("button", { name: "Rows", exact: true }).click();
   await page.getByLabel("Start time · Madison").fill("2026-09-15T09:43");
   await page
     .getByRole("combobox", { name: "Window", exact: true })
@@ -416,7 +416,7 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
   await expect(
     page.locator(".day-picker button[aria-pressed=true]"),
   ).toContainText("Sep 16");
-  await page.getByRole("button", { name: "Hourly", exact: true }).click();
+  await page.getByRole("button", { name: "Week", exact: true }).click();
   await expect(
     page.locator(".day-picker button[aria-pressed=true]"),
   ).toContainText("Sep 16");
