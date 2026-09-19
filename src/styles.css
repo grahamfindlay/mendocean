@@ -1502,6 +1502,11 @@ button:hover:not(:disabled) {
 .week-grid .wind-speed {
   font-size: 1rem;
 }
+.window-time {
+  display: block;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+}
 .chart-highlight {
   fill: #235d51;
   fill-opacity: 0.1;

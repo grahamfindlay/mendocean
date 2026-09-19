@@ -38,10 +38,14 @@ export default function ForecastWeek({
             {practiceWindows(weather, d).map((w) => (
               <div className="practice-window" key={w.id}>
                 <span className="eyebrow">
-                  {w.label} ·{" "}
-                  {Number.isFinite(w.startsAt)
-                    ? `${formatTime(new Date(w.startsAt).toISOString())}–${formatTime(new Date(w.endsAt).toISOString())}`
-                    : `${w.start}–${w.end}`}
+                  {w.label}{" "}
+                  {/* Its own line, unbreakable: the monospaced, letter-spaced
+                      eyebrow otherwise wraps between "5:30" and "AM". */}
+                  <span className="window-time">
+                    {Number.isFinite(w.startsAt)
+                      ? `${formatTime(new Date(w.startsAt).toISOString())}–${formatTime(new Date(w.endsAt).toISOString())}`
+                      : `${w.start}–${w.end}`}
+                  </span>
                 </span>
                 <WindowReading summary={w.summary} expired={expired} />
               </div>

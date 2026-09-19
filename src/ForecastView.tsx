@@ -60,7 +60,7 @@ export default function ForecastView({
         <div>
           <h1>{tab}</h1>
           {tab === "Rows" && (
-            <p>Choose a date and time, or a row, to see its forecast.</p>
+            <p>Select a scheduled row to forecast its window.</p>
           )}
         </div>
       </div>
