@@ -7,7 +7,7 @@ import {
   type Outing,
   type Report,
 } from "../shared/domain";
-import { canLog, outingPhase, sortedOutings } from "../shared/presentation";
+import { canLog, outingPhase, visibleOutings } from "../shared/presentation";
 import {
   reminderPresentation,
   type ReminderProfile,
@@ -56,7 +56,7 @@ export default function OutingsView({
   bhcConnected: boolean;
   busy: boolean;
 }) {
-  const visible = sortedOutings(outings, view, now).filter(
+  const visible = visibleOutings(outings, view, now).filter(
     (o) =>
       view !== "Past" ||
       filter === "All" ||

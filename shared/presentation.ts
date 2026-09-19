@@ -1,3 +1,4 @@
+import { bhcAttendance } from "./bhc.ts";
 import { timelineSamples } from "./timeline.ts";
 import type { Forecast, Outing } from "./domain.ts";
 
@@ -14,13 +15,38 @@ export function outingPhase(
 export function canLog(o: Pick<Outing, "starts_at">, now: number) {
   return Date.parse(o.starts_at) <= now;
 }
-export function sortedOutings(
+export type RowTypeFilter = "All" | "Practices" | "Independent";
+export type AttendanceFilter =
+  "All" | "Attending" | "Unknown" | "Not attending";
+export interface RowFilters {
+  type?: RowTypeFilter;
+  attendance?: AttendanceFilter;
+}
+const ATTENDANCE = {
+  Attending: "attending",
+  Unknown: "unknown",
+  "Not attending": "declined",
+} as const;
+export function visibleOutings(
   outings: Outing[],
   view: "Upcoming" | "Past",
   now: number,
+  { type = "All", attendance = "All" }: RowFilters = {},
 ) {
   return outings
     .filter((o) => (outingPhase(o, now) === "past") === (view === "Past"))
+    .filter((o) => {
+      const practice = o.kind === "official";
+      if (type !== "All" && practice !== (type === "Practices")) return false;
+      // Attendance describes practices only. An independent row carries no BHC
+      // attendance, so an intersection here would hide every row the owner
+      // scheduled themselves the moment they asked for the ones they are
+      // attending. The type filter alone governs those.
+      if (!practice || attendance === "All") return true;
+      // Normalized rather than compared raw: the same function the importer
+      // used, so a stored value it mapped to unknown filters as unknown.
+      return bhcAttendance(o.attendance) === ATTENDANCE[attendance];
+    })
     .sort(
       (a, b) =>
         (Date.parse(a.starts_at) - Date.parse(b.starts_at)) *
