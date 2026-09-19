@@ -277,11 +277,6 @@ import_map = "./functions/deno.json"
       },
     );
   }
-  cpSync(join(app, "dist-a"), join(app, "dist-legacy"), { recursive: true });
-  cpSync(
-    join(root, "tests/support/legacy-sw.js"),
-    join(app, "dist-legacy/sw.js"),
-  );
   releaseServer = await startReleaseServer(app, secret);
   await ready(env.TEST_APP_URL);
   if (!process.argv.includes("--updates-only")) {

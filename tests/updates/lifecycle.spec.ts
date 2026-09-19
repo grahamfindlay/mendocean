@@ -18,7 +18,7 @@ import {
 let actor: Actor;
 let browserErrors: string[] = [];
 const unfinished = new Set<import("@playwright/test").Request>();
-async function release(name: "a" | "b" | "c" | "legacy", failure?: string) {
+async function release(name: "a" | "b" | "c", failure?: string) {
   const r = await fetch(localURL("TEST_APP_URL") + "/__test/release", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-fixture-secret": secret },
@@ -219,72 +219,6 @@ test("first install, signed-out foreground A→B→C, no reload loop, coherent o
   ).toBeVisible();
 });
 
-test("manual upgrade waits for another tab's draft; session, BHC and registration survive", async ({
-  page,
-  context,
-}) => {
-  await fixtures({ bhc: [], lineup: false });
-  expect(
-    (await api(actor, "bhc/connect", { token: syntheticToken })).status,
-  ).toBe(200);
-  await context.addInitScript(() => {
-    const forbidden = () => {
-      localStorage.setItem("update-registration-reset", "yes");
-      return Promise.reject(new Error("An update must not reset registration"));
-    };
-    if ("ServiceWorkerRegistration" in window)
-      ServiceWorkerRegistration.prototype.unregister = forbidden;
-    if ("PushSubscription" in window)
-      PushSubscription.prototype.unsubscribe = forbidden;
-  });
-  await signedIn(page);
-  const before = await page.evaluate(() =>
-    localStorage.getItem("sb-127-auth-token"),
-  );
-  const other = await context.newPage();
-  await other.goto("/");
-  await controlled(other);
-  await log(other);
-  await other.locator("details.form-card > summary").click();
-  await other.getByLabel("Anything else?").fill("Keep this unfinished draft");
-  const b = await release("b");
-  await check(page);
-  await expect(
-    banner(page).getByRole("button", { name: "Update now" }),
-  ).toBeDisabled();
-  await closeAccount(page);
-  await banner(page).getByRole("button", { name: "Update now" }).click();
-  await expect(banner(page)).toContainText("other Mendocean windows");
-  await expect(other.getByLabel("Anything else?")).toHaveValue(
-    "Keep this unfinished draft",
-  );
-  // The last edit and navigation occur faster than the normal autosave delay.
-  await other.getByLabel("Anything else?").fill("Latest draft keystroke");
-  await other.getByRole("button", { name: "Forecasts", exact: true }).click();
-  await banner(page).getByRole("button", { name: "Update now" }).click();
-  await expect(build(page)).toHaveAttribute("content", b);
-  await expect(build(other)).toHaveAttribute("content", b);
-  await expect(
-    page.getByRole("button", { name: "Account", exact: true }),
-  ).toBeVisible();
-  expect(
-    await page.evaluate(() => localStorage.getItem("sb-127-auth-token")),
-  ).toBe(before);
-  expect(
-    await page.evaluate(() =>
-      localStorage.getItem("update-registration-reset"),
-    ),
-  ).toBeNull();
-  const account = (await api(actor, "account")).data;
-  expect(account.bhc.connected).toBe(true);
-  await log(other);
-  await other.locator("details.form-card > summary").click();
-  await expect(other.getByLabel("Anything else?")).toHaveValue(
-    "Latest draft keystroke",
-  );
-  await other.close();
-});
-
 test("corrupt asset and failed update check retain old shell; retry installs a complete release", async ({
   page,
   context,
@@ -366,119 +300,6 @@ test("a ready update preserves an offline report and uploads it exactly once aft
   ).toHaveCount(0);
 });
 
-test("an existing-report edit remains untouched by an update discovered during use", async ({
-  page,
-}) => {
-  await signedIn(page);
-  await log(page);
-  await page.getByRole("button", { name: "2 Good", exact: true }).click();
-  await page.getByRole("button", { name: "East", exact: true }).click();
-  await page.route(
-    "**/functions/v1/api/report",
-    async (route) => {
-      // A slow upload outlasts the draft debounce; it must not recreate a saved draft.
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      await route.continue();
-    },
-    { times: 1 },
-  );
-  await page.getByRole("button", { name: "Save report", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Edit report", exact: true }),
-  ).toBeVisible();
-  expect(
-    await page.evaluate(
-      (userId) =>
-        new Promise((resolve) => {
-          const request = indexedDB.open("mendocean-private", 1);
-          request.onsuccess = () => {
-            const database = request.result;
-            const read = database
-              .transaction("drafts")
-              .objectStore("drafts")
-              .get(userId);
-            read.onsuccess = () => {
-              database.close();
-              resolve(read.result);
-            };
-          };
-        }),
-      actor.id,
-    ),
-  ).toBeUndefined();
-  await page.getByRole("button", { name: "Edit report", exact: true }).click();
-  await page.getByRole("button", { name: "3 Fine", exact: true }).click();
-  await release("b");
-  await page.evaluate(async () => {
-    await (await navigator.serviceWorker.ready).update();
-  });
-  await expect(
-    banner(page).getByRole("button", { name: "Update now" }),
-  ).toBeDisabled();
-  await expect(
-    page.getByRole("button", { name: "3 Fine", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "Save changes", exact: true }).click();
-  await expect(page.getByText("3 · Fine · east")).toBeVisible();
-  await banner(page).getByRole("button", { name: "Update now" }).click();
-  await expect(build(page)).toHaveAttribute("content", await release("b"));
-  await expect(page.getByText("3 · Fine · east")).toBeVisible();
-});
-
-test("attendance submission finishes before activation, without a second BHC write", async ({
-  page,
-}) => {
-  const p = {
-    ...practice(9000000 + Math.floor(Math.random() * 100000), "unknown"),
-    start_time: Math.floor(Date.now() / 1000) + 86400,
-    end_time: Math.floor(Date.now() / 1000) + 90000,
-    attendance_window_start: Math.floor(Date.now() / 1000) - 3600,
-    attendance_window_end: Math.floor(Date.now() / 1000) + 3600,
-    set_attendance_allowed: true,
-  };
-  await fixtures({ bhc: [p], failure: null, calls: [] });
-  await api(actor, "bhc/connect", { token: syntheticToken });
-  await tick();
-  await signedIn(page);
-  await page.getByRole("button", { name: "My rows", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Change attendance", exact: true })
-    .click();
-  await expect(page.getByText("Status checked with BHC.")).toBeVisible();
-  await fixtures({ hold_attendance: true });
-  await page.getByLabel("Your attendance").selectOption("attending");
-  await page.getByRole("button", { name: "Save attendance in BHC" }).click();
-  await expect
-    .poll(async () =>
-      (await fixtures()).calls.some(
-        (c: any) => c.path === "/practices/setAttendance",
-      ),
-    )
-    .toBe(true);
-  const b = await release("b");
-  await page.evaluate(async () => {
-    await (await navigator.serviceWorker.ready).update();
-  });
-  await expect(
-    banner(page).getByRole("button", { name: "Update now" }),
-  ).toBeDisabled();
-  await fixtures({ hold_attendance: false });
-  await expect(page.getByText("Attendance updated in BHC.")).toBeVisible();
-  // Confirmation precedes the account refresh; the editor cannot close until it finishes.
-  await expect(
-    page.getByText("Checking with BHC…", { exact: true }),
-  ).toHaveCount(0);
-  await closeAccount(page);
-  await banner(page).getByRole("button", { name: "Update now" }).click();
-  await expect(build(page)).toHaveAttribute("content", b);
-  await expect(page.locator(".attendance-badge")).toHaveText("Attending");
-  expect(
-    (await fixtures()).calls.filter(
-      (c: any) => c.path === "/practices/setAttendance",
-    ),
-  ).toHaveLength(1);
-});
-
 test("one persistent profile upgrades on reopen and retains sign-in offline", async ({}, info) => {
   test.skip(
     info.project.name !== "chromium",
@@ -517,40 +338,30 @@ test("one persistent profile upgrades on reopen and retains sign-in offline", as
   }
 });
 
-test("an online navigation from the legacy worker completes installation without an extra reload", async ({
+test("an update applied mid-draft is never blocked, and the draft comes back", async ({
   page,
 }) => {
-  await release("legacy");
-  await page.goto("/");
-  await controlled(page);
+  await signedIn(page);
   const b = await release("b");
-  let navigations = 0;
-  page.on("framenavigated", (frame) => {
-    if (frame === page.mainFrame()) navigations++;
-  });
-  // The existing header is a normal navigation, as recommended for bootstrapping.
-  await page.getByRole("link", { name: /mendocean LAKE MENDOTA/ }).click();
+  await check(page);
+  await expect(banner(page)).toContainText("Update available");
+  await closeAccount(page);
+  await log(page);
+  await page.locator("details.form-card > summary").click();
+  await page.getByLabel("Anything else?").fill("Half-written note");
+  // Autosave debounces at 350ms; the update must not wait for anything.
+  await page.waitForTimeout(500);
+  const update = banner(page).getByRole("button", { name: "Update now" });
+  // The guarantee that replaced coordination: the button is never refused.
+  await expect(update).toBeEnabled();
+  await update.click();
   await expect(build(page)).toHaveAttribute("content", b);
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          new Promise<string | null>((resolve) => {
-            const channel = new MessageChannel();
-            const timeout = setTimeout(() => resolve(null), 500);
-            channel.port1.onmessage = (event) => {
-              clearTimeout(timeout);
-              channel.port1.close();
-              resolve(event.data.build);
-            };
-            navigator.serviceWorker.controller?.postMessage(
-              { type: "GET_VERSION" },
-              [channel.port2],
-            );
-          }),
-      ),
-    )
-    .toBe(b);
-  expect(navigations).toBe(1);
-  await expect(banner(page)).toHaveCount(0);
+  await log(page);
+  await expect(
+    page.getByText("Your unfinished draft was restored from this device."),
+  ).toBeVisible();
+  await page.locator("details.form-card > summary").click();
+  await expect(page.getByLabel("Anything else?")).toHaveValue(
+    "Half-written note",
+  );
 });

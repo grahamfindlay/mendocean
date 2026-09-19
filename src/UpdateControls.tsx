@@ -6,25 +6,16 @@ import {
   subscribeUpdates,
   updateSnapshot,
 } from "./appUpdates";
-import { updateBlockReason, subscribeSafety } from "./updateSafety";
 export function UpdateBanner() {
   const state = useSyncExternalStore(subscribeUpdates, updateSnapshot);
-  const blocked = useSyncExternalStore(subscribeSafety, updateBlockReason);
   if (!["ready", "applying"].includes(state.status)) return null;
   return (
     <aside className="app-update" aria-label="App update">
       <p role="status">{state.message}</p>
       {state.status === "ready" && (
-        <>
-          {blocked && <small>{blocked}</small>}
-          <button
-            className="button subtle"
-            disabled={!!blocked}
-            onClick={() => void applyUpdate()}
-          >
-            Update now
-          </button>
-        </>
+        <button className="button subtle" onClick={() => applyUpdate()}>
+          Update now
+        </button>
       )}
     </aside>
   );
@@ -47,7 +38,7 @@ export function UpdateSettings() {
       <p role="status">{state.message}</p>
       {state.status === "ready" && (
         <p className="help">
-          Close Account and finish any open forms, then choose Update now.
+          Choose Update now. Unsent work on this device is kept.
         </p>
       )}
       <details className="help">

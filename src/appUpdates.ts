@@ -1,9 +1,3 @@
-import {
-  lockUpdate,
-  unlockUpdate,
-  updateBlockReason,
-  prepareUpdate,
-} from "./updateSafety";
 export const APP_BUILD: string =
   import.meta.env.VITE_APP_BUILD || "development";
 export type UpdateState = {
@@ -33,14 +27,12 @@ export const subscribeUpdates = (listener: () => void) => {
 export const updateSnapshot = () => state;
 let registration: ServiceWorkerRegistration | undefined;
 let checking: Promise<void> | undefined;
-let entryPending = false;
 let applying = false,
   reloading = false,
   started = false,
-  autoAtEntry = false;
-let lastCheck = 0,
-  intended = "";
-let intendedWorker: ServiceWorker | null = null;
+  autoAtEntry = false,
+  entryPending = false;
+let lastCheck = 0;
 let beforeReload = () => {};
 const seen = new WeakSet<ServiceWorker>();
 function message<T>(
@@ -69,7 +61,6 @@ async function workerBuild(worker: ServiceWorker) {
 async function offer(worker: ServiceWorker) {
   const build = await workerBuild(worker);
   if (build === APP_BUILD && worker !== registration?.waiting) {
-    autoAtEntry = false;
     if (!navigator.serviceWorker.controller)
       worker.postMessage({ type: "CLAIM", build: APP_BUILD });
     worker.postMessage({ type: "CLEANUP" });
@@ -80,11 +71,11 @@ async function offer(worker: ServiceWorker) {
   publish({ status: "ready", available: build, message: "Update available." });
   if (autoAtEntry) {
     autoAtEntry = false;
-    // Initial weather/account reads can still be settling at a foreground boundary.
-    if (await prepareUpdate()) {
-      await applyUpdate();
-      if (!reloading && state.status !== "applying") unlockUpdate();
-    }
+    // Launch and foreground boundaries still apply a waiting release on their
+    // own -- that is what keeps an installed app current without anyone
+    // tapping anything. What is gone is the gate that used to poll every open
+    // window first and cancel when any of them had a form open.
+    applyUpdate();
   }
 }
 function observe(worker: ServiceWorker | null) {
@@ -117,121 +108,31 @@ function failed(error: unknown) {
       : "Unable to check while offline. Your current app is still available.",
   });
 }
-async function reloadFor(build: string) {
-  if (reloading || intended !== build) return;
-  // Never reload before the intended worker actually controls the page.
-  const controller = navigator.serviceWorker.controller;
-  // Do not wake the outgoing worker while the browser is retiring it.
-  if (!controller || controller !== intendedWorker) return;
-  if (controller.state !== "activated") {
-    controller.addEventListener(
-      "statechange",
-      () => {
-        if (controller.state === "activated")
-          void reloadFor(build).catch(failed);
-      },
-      { once: true },
-    );
-    return;
-  }
-  if (
-    (await workerBuild(controller)) !== build ||
-    reloading ||
-    intended !== build
-  )
-    return;
-  if (build === APP_BUILD) {
-    intended = "";
-    unlockUpdate();
-    publish({ status: "current", message: "Up to date." });
-    controller.postMessage({ type: "CLEANUP" });
-    return;
-  }
-  // Recheck after asynchronous worker messaging, including a timed-out lock.
-  if (!lockUpdate()) {
-    publish({
-      status: "ready",
-      available: build,
-      message: "Update available. Finish your current work before updating.",
-    });
-    return;
-  }
-  try {
-    if (sessionStorage.getItem("mendocean-update-attempt") === build) {
-      unlockUpdate();
-      failed(
-        new Error(
-          "The update did not finish. Check for updates again when connected.",
-        ),
-      );
-      return;
-    }
-    beforeReload();
-    sessionStorage.setItem("mendocean-update-attempt", build);
-  } catch {
-    unlockUpdate();
-    failed(
-      new Error(
-        "Unable to preserve your place. Close and reopen the app to finish updating.",
-      ),
-    );
-    return;
-  }
-  reloading = true;
-  location.reload();
-}
-export async function applyUpdate() {
+/**
+ * Apply a waiting release.
+ *
+ * Nothing is asked of other windows first: they keep running their own
+ * release from its retained cache generation and pick this one up on their
+ * next load. Only the window that asked reloads, on `controllerchange`.
+ */
+export function applyUpdate() {
   if (applying || !state.available) return;
-  const blocked = updateBlockReason();
-  if (blocked) {
-    publish({ ...state, status: "ready", message: blocked });
-    return;
-  }
-  const worker = registration?.waiting || registration?.active;
-  if (!worker) return;
+  const worker = registration?.waiting;
   applying = true;
-  const build = state.available;
   publish({ ...state, status: "applying", message: "Updating app…" });
-  try {
-    const result = await message<{ ok: boolean }>(worker, {
-      type: "APPLY_UPDATE",
-      build,
-    });
-    if (!result.ok) {
-      unlockUpdate();
-      intended = "";
-      publish({
-        status: "ready",
-        available: build,
-        message:
-          "Finish or close forms in other Mendocean windows, then try again.",
-      });
-    } else {
-      intended = build;
-      intendedWorker = worker;
-      await reloadFor(build);
-      setTimeout(() => {
-        if (!reloading && intended === build) {
-          unlockUpdate();
-          publish({
-            status: "ready",
-            available: build,
-            message: "Update is ready. Try applying it again.",
-          });
-        }
-      }, 8000);
-    }
-  } catch {
-    unlockUpdate();
-    intended = "";
-    publish({
-      status: "ready",
-      available: build,
-      message: "Unable to apply the update. Please try again.",
-    });
-  } finally {
-    applying = false;
-  }
+  if (!worker) return reload();
+  worker.postMessage({ type: "SKIP_WAITING" });
+  // controllerchange does the reload; this is the backstop for a worker that
+  // never takes control.
+  setTimeout(() => {
+    if (!reloading) reload();
+  }, 4000);
+}
+function reload() {
+  if (reloading) return;
+  reloading = true;
+  beforeReload();
+  location.reload();
 }
 export function checkForUpdates(manual = false, entry = false): Promise<void> {
   if (import.meta.env.DEV || !("serviceWorker" in navigator)) {
@@ -242,8 +143,8 @@ export function checkForUpdates(manual = false, entry = false): Promise<void> {
     return Promise.resolve();
   }
   if (checking) {
-    // A foreground boundary can arrive while an older check is settling.
-    // Preserve it instead of losing its activation intent to that older result.
+    // A foreground boundary can arrive while an older check is settling;
+    // keep its intent to apply rather than losing it to that older result.
     entryPending ||= entry;
     return checking;
   }
@@ -283,36 +184,13 @@ export function checkForUpdates(manual = false, entry = false): Promise<void> {
 export function startAppUpdates(savePosition: () => void) {
   beforeReload = savePosition;
   if (import.meta.env.DEV || !("serviceWorker" in navigator)) return () => {};
-  try {
-    if (sessionStorage.getItem("mendocean-update-attempt") === APP_BUILD)
-      sessionStorage.removeItem("mendocean-update-attempt");
-  } catch {
-    /* A blocked session store must not prevent update checks. */
-  }
   const onMessage = (event: MessageEvent) => {
-    const data = event.data;
-    if (data?.type === "APP_VERSION")
+    // Cache cleanup asks live windows which release they are still using.
+    if (event.data?.type === "APP_VERSION")
       event.ports[0]?.postMessage({ build: APP_BUILD });
-    if (data?.type === "PREPARE_UPDATE") {
-      void prepareUpdate().then((safe) => {
-        if (safe) {
-          intended = data.build;
-          intendedWorker = event.source as ServiceWorker;
-        }
-        event.ports[0]?.postMessage({ safe, build: APP_BUILD });
-      });
-    }
-    if (data?.type === "CANCEL_UPDATE") {
-      intended = "";
-      unlockUpdate();
-    }
-    if (data?.type === "COMMIT_UPDATE")
-      void reloadFor(data.build).catch(failed);
   };
   const changed = () => {
-    if (intended) void reloadFor(intended).catch(failed);
-    else if (registration?.active)
-      void offer(registration.active).catch(failed);
+    if (applying) reload();
   };
   const onReturn = () => {
     if (document.visibilityState === "visible")

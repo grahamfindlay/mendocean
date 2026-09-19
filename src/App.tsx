@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
   Check,
@@ -33,7 +27,6 @@ import { Auth, Modal, SettingsForm, PlanForm } from "./Account";
 import { discard, flush, pending, type PendingReport } from "./outbox";
 import { startAppUpdates } from "./appUpdates";
 import { UpdateBanner } from "./UpdateControls";
-import { setUpdateFormReason } from "./updateSafety";
 import {
   DEFAULT_DESTINATION,
   FORECASTS,
@@ -118,20 +111,6 @@ export default function App() {
     userId: user?.id,
     at: now,
   };
-  useLayoutEffect(() => {
-    setUpdateFormReason(
-      tab === "Log" ||
-        tab === "Rows" ||
-        authOpen ||
-        settings ||
-        planned ||
-        !!attendanceOuting
-        ? "Finish or close the open form before updating."
-        : busy
-          ? "A request is still in progress."
-          : "",
-    );
-  }, [tab, authOpen, settings, planned, attendanceOuting, busy]);
   useEffect(
     () =>
       startAppUpdates(() => {

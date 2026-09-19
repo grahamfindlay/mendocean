@@ -33,7 +33,6 @@ self.addEventListener("install", (event) =>
           await cache.put(asset.url, response);
         }
         await cache.put(META, new Response(JSON.stringify(RELEASE)));
-        // Existing installations wait for a coordinated safe activation.
       } catch (error) {
         await caches.delete(SHELL);
         throw error;
@@ -55,10 +54,6 @@ function ask(client, type) {
     channel.port1.onmessage = (e) => finish(e.data);
     client.postMessage({ type, build: RELEASE.id }, [channel.port2]);
   });
-}
-async function broadcast(type) {
-  for (const client of await windows())
-    client.postMessage({ type, build: RELEASE.id });
 }
 async function cleanup() {
   const clients = await windows();
@@ -84,7 +79,6 @@ async function cleanup() {
       .map((r) => caches.delete(r.name)),
   );
 }
-let applying = false;
 self.addEventListener("message", (event) => {
   const reply = (value) => event.ports[0]?.postMessage(value);
   if (event.data?.type === "GET_VERSION") {
@@ -99,45 +93,14 @@ self.addEventListener("message", (event) => {
     event.waitUntil(cleanup());
     return;
   }
-  if (event.data?.type !== "APPLY_UPDATE" || event.data.build !== RELEASE.id)
-    return;
-  event.waitUntil(
-    (async () => {
-      if (applying) {
-        reply({ ok: false });
-        return;
-      }
-      applying = true;
-      try {
-        const clients = await windows();
-        const states = await Promise.all(
-          clients.map((c) => ask(c, "PREPARE_UPDATE")),
-        );
-        if (states.some((s) => !s?.safe)) {
-          await broadcast("CANCEL_UPDATE");
-          reply({ ok: false });
-          return;
-        }
-        reply({ ok: true });
-        const wasWaiting = !!self.registration.waiting;
-        void self.skipWaiting();
-        if (!wasWaiting) {
-          // Also handles a page whose controller is already newer than its JS.
-          await broadcast("COMMIT_UPDATE");
-        }
-      } finally {
-        applying = false;
-      }
-    })(),
-  );
+  // Activation is unconditional: the page decides when to ask, and nothing
+  // is polled about other windows first.
+  if (event.data?.type === "SKIP_WAITING") void self.skipWaiting();
 });
 self.addEventListener("activate", (event) =>
-  event.waitUntil(
-    (async () => {
-      await self.clients.claim();
-      await broadcast("COMMIT_UPDATE");
-    })(),
-  ),
+  // Claiming fires controllerchange; only the window that asked for the
+  // update reloads on it.
+  event.waitUntil(self.clients.claim()),
 );
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
