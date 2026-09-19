@@ -214,6 +214,76 @@ test("future outing stays forecast-only, past rows sort and saved reports have n
   ]);
 });
 
+test("past rows mark logged, needs log and a report still on this device", async ({
+  page,
+  context,
+}) => {
+  const now = Date.parse("2026-09-15T14:24:00Z");
+  await page.clock.install({ time: now - 1000 });
+  await page.clock.pauseAt(now);
+  await page.addInitScript(() => {
+    const base = {
+      kind: "official",
+      version: 1,
+      owner_id: null,
+      bhc_practice_id: 100,
+      reminder: true,
+      attendance: "attending",
+      reports: [],
+      planned_boat: null,
+    };
+    localStorage.setItem(
+      "mendocean-explicit-preview-v1",
+      JSON.stringify([
+        {
+          ...base,
+          id: "done",
+          title: "Logged practice",
+          reports: [{ outcome: "rowed", rating: 2, route: "east" }],
+          starts_at: "2026-09-14T14:00:00Z",
+          ends_at: "2026-09-14T15:30:00Z",
+        },
+        {
+          ...base,
+          id: "todo",
+          title: "Unlogged practice",
+          starts_at: "2026-09-13T14:00:00Z",
+          ends_at: "2026-09-13T15:30:00Z",
+        },
+      ]),
+    );
+  });
+  await page.goto("/?preview=1");
+  await page.getByRole("button", { name: "My rows", exact: true }).click();
+  await page.getByRole("button", { name: "Past", exact: true }).click();
+  const marks = page.locator(".log-status .log-mark");
+  await expect(marks).toHaveText(["Logged", "Needs log"]);
+  // Every mark names its state in words. Color alone would leave the three
+  // indistinguishable to anyone who cannot separate them.
+  await expect(page.locator(".log-logged svg")).toBeVisible();
+  await page.getByRole("button", { name: "Log this row" }).click();
+  await page
+    .getByRole("button", { name: "Stayed ashore", exact: true })
+    .click();
+  await page.getByLabel("What kept you ashore?").selectOption("wind_waves");
+  await context.setOffline(true);
+  await page.getByRole("button", { name: "Save report", exact: true }).click();
+  await expect(page.getByText("On this device · 1 pending")).toBeVisible();
+  await page.getByRole("button", { name: "Past", exact: true }).click();
+  // A report sitting in the outbox is neither logged nor waiting to be
+  // written, and the row it belongs to says so rather than "Needs log".
+  await expect(marks).toHaveText(["Logged", "Saved on this device"]);
+  // Offering it again would stage a second report for the same row.
+  await expect(page.getByRole("button", { name: "Log this row" })).toHaveCount(
+    0,
+  );
+  // Reconnecting flushes the outbox on its own; the mark follows the upload.
+  await context.setOffline(false);
+  await expect(page.getByText("On this device · 1 pending")).toHaveCount(0);
+  await page.getByRole("button", { name: "Past", exact: true }).click();
+  await expect(marks).toHaveText(["Logged", "Logged"]);
+});
+
 test("upcoming filters narrow by type and attendance without hiding independent rows", async ({
   page,
 }, testInfo) => {

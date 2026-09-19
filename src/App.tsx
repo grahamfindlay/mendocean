@@ -540,6 +540,7 @@ export default function App() {
             {account ? (
               <OutingsView
                 outings={account.outings}
+                queued={queue.map((q) => q.outing.id)}
                 profile={account.profile}
                 bhcConnected={account.bhc.connected}
                 onAttendance={setAttendanceOuting}

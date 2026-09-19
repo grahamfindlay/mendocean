@@ -672,6 +672,32 @@ input[type="checkbox"] {
   border-top: 1px solid var(--line);
   font-size: 14px;
 }
+.log-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+/* The icon and the word carry the state; color only reinforces them, so the
+   mark still reads without it. */
+.log-status .log-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+}
+.log-status .log-mark svg {
+  flex: none;
+}
+.log-logged .log-mark {
+  color: #1f6b3a;
+}
+.log-pending .log-mark {
+  color: #8a5a00;
+}
+.log-needed .log-mark {
+  color: var(--muted);
+}
 .muted {
   color: var(--muted);
 }
