@@ -14,6 +14,7 @@ export default function ForecastDayView({
   expired,
   now,
   onSelectDay,
+  highlight,
 }: {
   weather: Forecast;
   days: string[];
@@ -23,6 +24,7 @@ export default function ForecastDayView({
   expired: boolean;
   now: number;
   onSelectDay: (day: string) => void;
+  highlight?: [number, number];
 }) {
   const index = days.indexOf(day);
   const selected = useRef<HTMLButtonElement>(null);
@@ -74,6 +76,7 @@ export default function ForecastDayView({
         initialTime={day === today ? now : undefined}
         expired={expired}
         title={day ? formatDate(day + "T12:00:00Z") : "Daily forecast"}
+        highlight={highlight}
       />
       <details className="sample-details">
         <summary>Detailed forecast for this day</summary>

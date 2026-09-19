@@ -43,12 +43,15 @@ export default function WeatherChart({
   initialTime,
   expired = false,
   title = "Weather over time",
+  highlight,
 }: {
   samples: WeatherHour[];
   domain?: [number, number];
   initialTime?: number;
   expired?: boolean;
   title?: string;
+  /** A period to mark, in epoch ms. Drawn behind the series, never inspected. */
+  highlight?: [number, number];
 }) {
   const id = useId();
   const surface = useRef<SVGSVGElement>(null);
@@ -278,6 +281,29 @@ export default function WeatherChart({
             <rect x={left} y="145" width={plotWidth} height="210" />
           </clipPath>
         </defs>
+        {highlight &&
+          (() => {
+            /* Clamped to the plotted domain -- which is the frozen one during a
+             gesture -- so the band cannot drift against the axes mid-scrub or
+             spill past them when the period runs off either edge. */
+            const from = Math.max(start, Math.min(end, highlight[0]));
+            const to = Math.max(start, Math.min(end, highlight[1]));
+            return to <= from ? null : (
+              <rect
+                className="chart-highlight"
+                x={x(from)}
+                y="12"
+                width={Math.max(1, x(to) - x(from))}
+                height="343"
+              >
+                <title>
+                  Selected period:{" "}
+                  {formatTime(new Date(highlight[0]).toISOString())}–
+                  {formatTime(new Date(highlight[1]).toISOString())}
+                </title>
+              </rect>
+            );
+          })()}
         {[120, 215, 355].map((y) => (
           <line
             key={y}

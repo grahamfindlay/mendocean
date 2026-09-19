@@ -7,7 +7,6 @@ import {
   type Forecast,
   type Outing,
 } from "../shared/domain";
-import ForecastDayView from "./ForecastDayView";
 import ForecastToday from "./ForecastToday";
 import ForecastRows from "./ForecastRows";
 import ForecastWeek from "./ForecastWeek";
@@ -55,19 +54,6 @@ export default function ForecastView({
     localDateTime(h.time).startsWith(day),
   );
   const today = localDateTime(new Date(now).toISOString()).slice(0, 10);
-  /* Week renders its own copy beneath the cards; Rows takes this one. */
-  const dayView = (
-    <ForecastDayView
-      weather={weather}
-      days={days}
-      day={day}
-      today={today}
-      daySamples={daySamples}
-      expired={expired}
-      now={now}
-      onSelectDay={setSelectedDay}
-    />
-  );
   return (
     <>
       <div className="page-heading concise-heading">
@@ -116,7 +102,11 @@ export default function ForecastView({
           selectedRow={selectedRow}
           onSelectRow={setSelectedRow}
           onSchedule={onSchedule}
-          dayView={dayView}
+          days={days}
+          day={day}
+          today={today}
+          daySamples={daySamples}
+          onSelectDay={setSelectedDay}
           userId={userId}
         />
       )}
