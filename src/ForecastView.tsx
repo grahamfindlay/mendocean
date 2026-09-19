@@ -12,7 +12,6 @@ import ForecastToday from "./ForecastToday";
 import ForecastRows from "./ForecastRows";
 import { timelineSamples, forecastDays } from "../shared/timeline";
 
-export { HourRow } from "./HourRow";
 export interface ForecastSelection {
   starts_at: string;
   ends_at: string;
