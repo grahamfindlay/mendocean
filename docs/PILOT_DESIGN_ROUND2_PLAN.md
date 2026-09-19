@@ -281,7 +281,20 @@ next day, with a keyboard-accessible selected state — the existing
 `.day-picker` already carries `aria-pressed`, so extend it rather than
 replacing it.
 
-Cards consume the step 2 summary. Remove the redundant section heading.
+Cards summarize the two practice windows, not the calendar day. A
+whole-day summary answers a question nobody asks: checked against live
+data, today reads unfavorable across the calendar day because of
+afternoon wind, while 5:30-7:30 reads favorable. Six of eight days
+summarized identically as unfavorable for that reason, which is the
+wrong interval rather than a defect in the summary. Define the windows
+as fixed constants in `shared/domain.ts` alongside `ROUTES` and
+`BOAT_CLASSES` - morning 05:30-07:30 and evening 18:00-20:00, the same
+every day - and derive each day's bounds through `chicagoToISO` so DST
+is handled. Real BHC practice times are a later refinement, not a
+prerequisite.
+
+Each day therefore carries two summaries from step 2. Remove the
+redundant section heading.
 
 ### 6. Rows: scheduled-row forecasts replace arbitrary-time planning
 
