@@ -21,7 +21,7 @@ import ForecastView, { type ForecastSelection } from "./ForecastView";
 import OutingsView from "./OutingsView";
 import AttendanceEditor from "./AttendanceEditor";
 import { useClock } from "./useClock";
-import { canLog, outingPhase, type ReportFilter } from "../shared/presentation";
+import { canLog, outingPhase, type RowFilters } from "../shared/presentation";
 import Logger from "./Logger";
 import { Auth, Modal, SettingsForm, PlanForm } from "./Account";
 import { discard, flush, pending, type PendingReport } from "./outbox";
@@ -35,6 +35,30 @@ import {
   topLevel,
   forecastDestinations,
 } from "./navigation";
+const NO_FILTERS: RowFilters = {
+  type: "All",
+  attendance: "All",
+  reports: "All",
+  allPractices: false,
+};
+const FILTER_OPTIONS = {
+  type: ["All", "Practices", "Independent"],
+  attendance: ["All", "Attending", "Unknown", "Not attending"],
+  reports: ["All", "Unlogged", "Logged"],
+} as const;
+/** Anything unrecognized in a restored position falls back to unfiltered. */
+function savedFilters(value: any): RowFilters {
+  const pick = (key: keyof typeof FILTER_OPTIONS) =>
+    (FILTER_OPTIONS[key] as readonly string[]).includes(value?.[key])
+      ? value[key]
+      : "All";
+  return {
+    type: pick("type"),
+    attendance: pick("attendance"),
+    reports: pick("reports"),
+    allPractices: value?.allPractices === true,
+  };
+}
 function readUpdatePosition() {
   try {
     const saved = JSON.parse(
@@ -69,10 +93,7 @@ export default function App() {
   const now = useClock();
   const [resume] = useState(readUpdatePosition);
   const [outingView, setOutingView] = useState<"Upcoming" | "Past">("Upcoming");
-  const [reportFilter, setReportFilter] = useState<ReportFilter>("All");
-  // Deliberately not in the resume payload: R30 calls this a filter rather
-  // than a mode, so it starts off on every visit.
-  const [allPractices, setAllPractices] = useState(false);
+  const [rowFilters, setRowFilters] = useState<RowFilters>(NO_FILTERS);
   const [forecastSelection, setForecastSelection] =
     useState<ForecastSelection>();
   const weatherRequest = useRef<Promise<void> | null>(null);
@@ -108,7 +129,7 @@ export default function App() {
   updatePosition.current = {
     tab,
     outingView,
-    reportFilter,
+    rowFilters,
     forecastSelection,
     selectedOuting,
     userId: user?.id,
@@ -192,7 +213,7 @@ export default function App() {
         setPlanned(false);
         setForecastSelection(undefined);
         setOutingView("Upcoming");
-        setReportFilter("All");
+        setRowFilters(NO_FILTERS);
         if (
           resume &&
           next &&
@@ -200,11 +221,7 @@ export default function App() {
           resume.userId === next.id
         ) {
           setOutingView(resume.outingView === "Past" ? "Past" : "Upcoming");
-          setReportFilter(
-            ["All", "Unlogged", "Logged"].includes(resume.reportFilter)
-              ? resume.reportFilter
-              : "All",
-          );
+          setRowFilters(savedFilters(resume.rowFilters));
           setForecastSelection(resume.forecastSelection);
           setSelectedOuting(resume.selectedOuting);
         }
@@ -414,7 +431,7 @@ export default function App() {
                     ? "Upcoming"
                     : "Past",
                 );
-                setReportFilter("All");
+                setRowFilters(NO_FILTERS);
               }
               setEditing(undefined);
               setSelectedOuting(undefined);
@@ -530,11 +547,9 @@ export default function App() {
                 user={user.id}
                 weather={weather}
                 view={outingView}
-                filter={reportFilter}
-                allPractices={allPractices}
+                filters={rowFilters}
                 onView={setOutingView}
-                onFilter={setReportFilter}
-                onAllPractices={setAllPractices}
+                onFilters={setRowFilters}
                 busy={busy}
                 onSettings={() => setSettings(true)}
                 onLog={(o) => {

@@ -7,11 +7,12 @@ import {
   type Outing,
   type Report,
 } from "../shared/domain";
+import { ChevronDown, SlidersHorizontal } from "lucide-react";
 import {
   canLog,
   outingPhase,
   visibleOutings,
-  type ReportFilter,
+  type RowFilters,
 } from "../shared/presentation";
 import {
   reminderPresentation,
@@ -26,11 +27,9 @@ export default function OutingsView({
   user,
   weather,
   view,
-  filter,
-  allPractices,
+  filters,
   onView,
-  onFilter,
-  onAllPractices,
+  onFilters,
   onLog,
   onEdit,
   onForecast,
@@ -48,11 +47,9 @@ export default function OutingsView({
   user: string;
   weather: Forecast | null;
   view: "Upcoming" | "Past";
-  filter: ReportFilter;
-  allPractices: boolean;
+  filters: RowFilters;
   onView: (view: "Upcoming" | "Past") => void;
-  onFilter: (filter: ReportFilter) => void;
-  onAllPractices: (allPractices: boolean) => void;
+  onFilters: (filters: RowFilters) => void;
   onLog: (outing: Outing) => void;
   onEdit: (outing: Outing, report: Report) => void;
   onForecast: (outing: Outing) => void;
@@ -64,18 +61,28 @@ export default function OutingsView({
   bhcConnected: boolean;
   busy: boolean;
 }) {
-  // The report filter is a Past affordance, so Upcoming is asked for "All"
-  // rather than inheriting whatever Past was left on.
-  const filters = {
-    reports: view === "Past" ? filter : ("All" as ReportFilter),
-    allPractices,
+  // A filter applies only where it is offered, so leaving Past on Unlogged and
+  // switching to Upcoming cannot silently thin a list with no control for it.
+  // One place decides that, rather than each caller remembering.
+  const inView: RowFilters = {
+    type: filters.type,
+    attendance: view === "Upcoming" ? filters.attendance : "All",
+    reports: view === "Past" ? filters.reports : "All",
+    allPractices: filters.allPractices,
   };
-  const visible = visibleOutings(outings, view, now, filters);
+  const active = [
+    inView.type !== "All",
+    inView.attendance !== "All",
+    inView.reports !== "All",
+    view === "Past" && inView.allPractices,
+  ].filter(Boolean).length;
+  const set = (patch: RowFilters) => onFilters({ ...filters, ...patch });
+  const visible = visibleOutings(outings, view, now, inView);
   // A second pass rather than a flag on the first: the count is only wanted
   // when the list looks emptier than the owner expects.
   const hidden =
-    view === "Past" && !allPractices
-      ? visibleOutings(outings, view, now, { ...filters, allPractices: true })
+    view === "Past" && !inView.allPractices
+      ? visibleOutings(outings, view, now, { ...inView, allPractices: true })
           .length - visible.length
       : 0;
   return (
@@ -88,37 +95,99 @@ export default function OutingsView({
             </button>
           ))}
         </div>
-        {view === "Past" && (
-          <>
-            <div className="segmented small" aria-label="Report filter">
-              {(["All", "Unlogged", "Logged"] as const).map((v) => (
-                <button
-                  key={v}
-                  aria-pressed={filter === v}
-                  onClick={() => onFilter(v)}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
-            <label className="filter-toggle">
-              <input
-                type="checkbox"
-                checked={allPractices}
-                onChange={(e) => onAllPractices(e.target.checked)}
-              />
-              Show all practices
-            </label>
-          </>
-        )}
       </div>
+      {/* One disclosure rather than a row of controls per filter: four
+            segmented groups stack into four rows on a phone, and "Not
+            attending" does not fit a segment at that width anyway. */}
+      <details className="row-filters">
+        <summary>
+          <SlidersHorizontal size={15} />
+          Filters{active ? ` · ${active}` : ""}
+          <ChevronDown className="chevron" size={16} />
+        </summary>
+        <div className="row-filter-fields">
+          <label>
+            Type
+            <select
+              value={inView.type}
+              onChange={(e) =>
+                set({ type: e.target.value as RowFilters["type"] })
+              }
+            >
+              {["All", "Practices", "Independent"].map((v) => (
+                <option key={v}>{v}</option>
+              ))}
+            </select>
+          </label>
+          {/* Hidden rather than disabled when only independent rows are
+                shown: attendance describes practices, and a control that
+                cannot change the list is worse than no control. */}
+          {view === "Upcoming" && inView.type !== "Independent" && (
+            <label>
+              Attendance
+              <select
+                value={inView.attendance}
+                onChange={(e) =>
+                  set({
+                    attendance: e.target.value as RowFilters["attendance"],
+                  })
+                }
+              >
+                {["All", "Attending", "Unknown", "Not attending"].map((v) => (
+                  <option key={v}>{v}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          {view === "Past" && (
+            <>
+              <label>
+                Reports
+                <select
+                  value={inView.reports}
+                  onChange={(e) =>
+                    set({ reports: e.target.value as RowFilters["reports"] })
+                  }
+                >
+                  {["All", "Unlogged", "Logged"].map((v) => (
+                    <option key={v}>{v}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="filter-toggle">
+                <input
+                  type="checkbox"
+                  checked={!!inView.allPractices}
+                  onChange={(e) => set({ allPractices: e.target.checked })}
+                />
+                Show all practices
+              </label>
+            </>
+          )}
+          {!!active && (
+            <button
+              className="text-button"
+              onClick={() =>
+                onFilters({
+                  type: "All",
+                  attendance: "All",
+                  reports: "All",
+                  allPractices: false,
+                })
+              }
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+      </details>
       {!visible.length && (
         <p className="empty">
-          {view === "Upcoming"
-            ? "No upcoming rows. Add an independent row or connect Boathouse Connect in Account."
-            : filter === "All"
-              ? "No past rows yet."
-              : `No ${filter.toLowerCase()} past rows.`}
+          {active
+            ? `No ${view.toLowerCase()} rows match these filters.`
+            : view === "Upcoming"
+              ? "No upcoming rows. Add an independent row or connect Boathouse Connect in Account."
+              : "No past rows yet."}
         </p>
       )}
       {!!hidden && (

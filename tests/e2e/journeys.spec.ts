@@ -486,9 +486,10 @@ test("upcoming, past and saved outing actions follow server reminder state", asy
   await page.getByRole("button", { name: "Save report", exact: true }).click();
   await expect(page.getByText("Report saved.", { exact: true })).toBeVisible();
   await expect(page.locator(".outing-reminder")).toHaveCount(0);
-  await page.getByRole("button", { name: "Unlogged", exact: true }).click();
+  await page.locator(".row-filters > summary").click();
+  await page.selectOption('label:has-text("Reports") select', "Unlogged");
   await expect(page.getByRole("heading", { name: past.title })).toHaveCount(0);
-  await page.getByRole("button", { name: "Logged", exact: true }).click();
+  await page.selectOption('label:has-text("Reports") select', "Logged");
   await expect(page.getByRole("heading", { name: past.title })).toBeVisible();
 });
 
