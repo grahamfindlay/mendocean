@@ -96,15 +96,6 @@ self.addEventListener("message", (event) => {
   // Activation is unconditional: the page decides when to ask, and nothing
   // is polled about other windows first.
   if (event.data?.type === "SKIP_WAITING") void self.skipWaiting();
-  // Transition shim. A page still running the pre-coordination-removal
-  // release asks with APPLY_UPDATE and waits for a reply; without one it
-  // times out and reports that the update failed, and its Update now button
-  // can never succeed. Answering it lets that page reload itself normally.
-  // Removable once no installation is still on that release.
-  if (event.data?.type === "APPLY_UPDATE") {
-    reply({ ok: true });
-    void self.skipWaiting();
-  }
 });
 self.addEventListener("activate", (event) =>
   // Claiming fires controllerchange; only the window that asked for the
