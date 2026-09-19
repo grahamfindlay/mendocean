@@ -7,14 +7,18 @@ import {
   type Outing,
   type Report,
 } from "../shared/domain";
-import { canLog, outingPhase, visibleOutings } from "../shared/presentation";
+import {
+  canLog,
+  outingPhase,
+  visibleOutings,
+  type ReportFilter,
+} from "../shared/presentation";
 import {
   reminderPresentation,
   type ReminderProfile,
 } from "../shared/reminders";
 import { windowSamples, sampleMinutes } from "../shared/timeline";
 import { WindSpeed, Gust } from "./WindReading";
-export type ReportFilter = "All" | "Unlogged" | "Logged";
 export default function OutingsView({
   outings,
   profile,
@@ -23,8 +27,10 @@ export default function OutingsView({
   weather,
   view,
   filter,
+  allPractices,
   onView,
   onFilter,
+  onAllPractices,
   onLog,
   onEdit,
   onForecast,
@@ -43,8 +49,10 @@ export default function OutingsView({
   weather: Forecast | null;
   view: "Upcoming" | "Past";
   filter: ReportFilter;
+  allPractices: boolean;
   onView: (view: "Upcoming" | "Past") => void;
   onFilter: (filter: ReportFilter) => void;
+  onAllPractices: (allPractices: boolean) => void;
   onLog: (outing: Outing) => void;
   onEdit: (outing: Outing, report: Report) => void;
   onForecast: (outing: Outing) => void;
@@ -56,12 +64,20 @@ export default function OutingsView({
   bhcConnected: boolean;
   busy: boolean;
 }) {
-  const visible = visibleOutings(outings, view, now).filter(
-    (o) =>
-      view !== "Past" ||
-      filter === "All" ||
-      (filter === "Logged") === !!o.reports?.length,
-  );
+  // The report filter is a Past affordance, so Upcoming is asked for "All"
+  // rather than inheriting whatever Past was left on.
+  const filters = {
+    reports: view === "Past" ? filter : ("All" as ReportFilter),
+    allPractices,
+  };
+  const visible = visibleOutings(outings, view, now, filters);
+  // A second pass rather than a flag on the first: the count is only wanted
+  // when the list looks emptier than the owner expects.
+  const hidden =
+    view === "Past" && !allPractices
+      ? visibleOutings(outings, view, now, { ...filters, allPractices: true })
+          .length - visible.length
+      : 0;
   return (
     <>
       <div className="outing-filters">
@@ -73,17 +89,27 @@ export default function OutingsView({
           ))}
         </div>
         {view === "Past" && (
-          <div className="segmented small" aria-label="Report filter">
-            {(["All", "Unlogged", "Logged"] as const).map((v) => (
-              <button
-                key={v}
-                aria-pressed={filter === v}
-                onClick={() => onFilter(v)}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
+          <>
+            <div className="segmented small" aria-label="Report filter">
+              {(["All", "Unlogged", "Logged"] as const).map((v) => (
+                <button
+                  key={v}
+                  aria-pressed={filter === v}
+                  onClick={() => onFilter(v)}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+            <label className="filter-toggle">
+              <input
+                type="checkbox"
+                checked={allPractices}
+                onChange={(e) => onAllPractices(e.target.checked)}
+              />
+              Show all practices
+            </label>
+          </>
         )}
       </div>
       {!visible.length && (
@@ -93,6 +119,13 @@ export default function OutingsView({
             : filter === "All"
               ? "No past rows yet."
               : `No ${filter.toLowerCase()} past rows.`}
+        </p>
+      )}
+      {!!hidden && (
+        <p className="help">
+          {hidden === 1
+            ? "1 past practice you did not attend is hidden."
+            : `${hidden} past practices you did not attend are hidden.`}
         </p>
       )}
       <div className="outing-grid">

@@ -1516,14 +1516,22 @@ button:hover:not(:disabled) {
   /* The inspection cursor stays the only thing the surface reacts to. */
   pointer-events: none;
 }
-.chart-toggle {
+/* Both reset the global label rule, which stacks a form label above its input
+   and centers it. A checkbox belongs beside its text, not above it. */
+.chart-toggle,
+.filter-toggle {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 0.45rem;
-  margin: 1rem 0 0;
+  margin: 0;
   font-size: 0.85rem;
 }
-.chart-toggle input {
+.chart-toggle {
+  margin-top: 1rem;
+}
+.chart-toggle input,
+.filter-toggle input {
   width: auto;
 }
 .heading-actions {
