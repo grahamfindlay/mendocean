@@ -21,7 +21,8 @@ import { bhcGet, list } from "../_shared/bhc.ts";
 import { manageAttendance } from "../_shared/attendance.ts";
 import { assess, assessmentCapabilities } from "../../../shared/model.ts";
 import {
-  reminderScheduleError,
+  reminderBlock,
+  reminderBlockMessage,
   reminderChannels,
 } from "../../../shared/reminders.ts";
 import { weatherFeatures } from "../_shared/weather.ts";
@@ -400,7 +401,7 @@ export function createApiHandler(providers: Providers = liveProviders) {
               .eq("outing_id", outing.id)
               .eq("user_id", uid),
           );
-          const reason = reminderScheduleError(
+          const reason = reminderBlock(
             {
               ...outing,
               attendance: membership.attendance,
@@ -410,7 +411,7 @@ export function createApiHandler(providers: Providers = liveProviders) {
             parsed.action,
             providers.now(),
           );
-          if (reason) throw new HttpError(409, reason);
+          if (reason) throw new HttpError(409, reminderBlockMessage(reason));
           const states = check(await db.rpc("reminder_states", { uid }));
           if (
             parsed.action === "enable" &&

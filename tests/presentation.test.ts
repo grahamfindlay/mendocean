@@ -8,8 +8,10 @@ import {
   type RowFilters,
 } from "../shared/presentation";
 import {
+  accountReminderBlock,
+  reminderBlock,
+  reminderBlockMessage,
   reminderPresentation,
-  reminderScheduleError,
 } from "../shared/reminders";
 import type { Forecast, Outing } from "../shared/domain";
 const now = Date.parse("2026-09-15T14:24:00Z");
@@ -205,38 +207,58 @@ test("reminder preference, scheduled and sent are distinct; saved reports hide c
 });
 test("reminder scheduling honors attendance, account state, expiry and one-hour boundary", () => {
   for (const attendance of ["declined", "unknown"])
-    expect(
-      reminderScheduleError({ ...past, attendance }, profile, "enable", now),
-    ).toMatch(/attending/);
+    expect(reminderBlock({ ...past, attendance }, profile, "enable", now)).toBe(
+      "not_attending",
+    );
   expect(
-    reminderScheduleError(
+    reminderBlock(
       past,
       { ...profile, reminder_channel: "none" },
       "enable",
       now,
     ),
-  ).toMatch(/channel/);
+  ).toBe("no_channel");
   expect(
-    reminderScheduleError(
-      past,
-      { ...profile, reminders_paused: true },
-      "enable",
-      now,
-    ),
-  ).toMatch(/paused/);
-  expect(reminderScheduleError(current, profile, "snooze", now)).toMatch(
-    /ends/,
-  );
-  expect(reminderScheduleError(past, profile, "snooze", now)).toBeNull();
+    reminderBlock(past, { ...profile, reminders_paused: true }, "enable", now),
+  ).toBe("paused");
+  expect(reminderBlock(current, profile, "snooze", now)).toBe("not_ended");
+  expect(reminderBlock(past, profile, "snooze", now)).toBeNull();
   const expiry = Date.parse(past.ends_at) + 86400000;
-  expect(
-    reminderScheduleError(past, profile, "snooze", expiry - 3600000),
-  ).toBeNull();
-  expect(
-    reminderScheduleError(past, profile, "snooze", expiry - 3600000 + 1),
-  ).toMatch(/window/);
+  expect(reminderBlock(past, profile, "snooze", expiry - 3600000)).toBeNull();
+  expect(reminderBlock(past, profile, "snooze", expiry - 3600000 + 1)).toBe(
+    "window_closed",
+  );
   expect(reminderPresentation(past, profile, expiry + 1)).toBeNull();
   expect(canLog(past, expiry + 1)).toBe(true);
+  // The API still answers in words; only the card stopped repeating them.
+  expect(reminderBlockMessage("not_attending")).toMatch(/attending/);
+});
+test("an ineligible row says nothing, and an account-level reason is said once", () => {
+  // The situation itself, which the card already shows through its attendance
+  // badge. Repeating it in a sentence on every practice is what R28 removes.
+  expect(
+    reminderPresentation({ ...future, attendance: "declined" }, profile, now),
+  ).toBeNull();
+  const paused = { ...profile, reminders_paused: true };
+  expect(reminderPresentation(future, paused, now)).toBeNull();
+  expect(accountReminderBlock([future], paused, now)).toBe("paused");
+  expect(
+    accountReminderBlock([future], { ...profile, reminder_channel: "" }, now),
+  ).toBe("no_channel");
+  // Not raised by rows that could not carry a reminder anyway: a declined
+  // practice, one already logged, and one past its window.
+  expect(
+    accountReminderBlock(
+      [
+        { ...future, attendance: "declined" },
+        { ...future, reports: [{} as never] },
+        past,
+      ],
+      paused,
+      Date.parse(past.ends_at) + 86400001,
+    ),
+  ).toBeNull();
+  expect(accountReminderBlock([future], profile, now)).toBeNull();
 });
 test("weather descriptions distinguish missing codes from clear skies", () => {
   expect(weatherDescription(null)).toBe("Conditions unavailable");
@@ -254,15 +276,10 @@ test("multiple reminder channels treat an explicit empty selection as off and su
     reminder_channels: ["email", "push"],
     reminders_paused: false,
   };
-  expect(reminderScheduleError(past, both, "enable", now)).toBeNull();
+  expect(reminderBlock(past, both, "enable", now)).toBeNull();
   expect(
-    reminderScheduleError(
-      past,
-      { ...both, reminder_channels: [] },
-      "enable",
-      now,
-    ),
-  ).toContain("Choose");
+    reminderBlock(past, { ...both, reminder_channels: [] }, "enable", now),
+  ).toBe("no_channel");
   const state = reminderPresentation(
     {
       ...past,
