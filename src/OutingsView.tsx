@@ -7,7 +7,13 @@ import {
   type Outing,
   type Report,
 } from "../shared/domain";
-import { ChevronDown, SlidersHorizontal } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  CloudUpload,
+  PenLine,
+  SlidersHorizontal,
+} from "lucide-react";
 import {
   canLog,
   outingPhase,
@@ -22,6 +28,7 @@ import { windowSamples, sampleMinutes } from "../shared/timeline";
 import { WindSpeed, Gust } from "./WindReading";
 export default function OutingsView({
   outings,
+  queued,
   profile,
   now,
   user,
@@ -42,6 +49,8 @@ export default function OutingsView({
   busy,
 }: {
   outings: Outing[];
+  /** Row ids whose report is saved on this device and not yet uploaded. */
+  queued: string[];
   profile: ReminderProfile;
   now: number;
   user: string;
@@ -201,6 +210,17 @@ export default function OutingsView({
         {visible.map((o) => {
           const report = o.reports?.[0];
           const phase = outingPhase(o, now);
+          // Three states, never distinguished by color alone. A report held in
+          // the outbox is neither logged nor waiting to be written, and saying
+          // "No report yet" over work the owner already did is the worst of
+          // the three mistakes.
+          const status = report
+            ? ("logged" as const)
+            : queued.includes(o.id)
+              ? ("pending" as const)
+              : phase === "past"
+                ? ("needed" as const)
+                : null;
           const reminder = reminderPresentation(o, profile, now);
           const preview = weather
             ? windowSamples(
@@ -236,18 +256,33 @@ export default function OutingsView({
               {phase === "in_progress" && (
                 <p className="phase-label">In progress</p>
               )}
-              {report ? (
-                <div className="report-summary">
-                  {report.outcome === "rowed"
-                    ? `${report.rating} · ${RATINGS[(report.rating || 1) - 1]} · ${report.route}`
-                    : report.outcome === "stayed_ashore"
-                      ? "Stayed ashore"
-                      : "Didn’t attend"}
+              {status && (
+                <div className={`report-summary log-status log-${status}`}>
+                  <span className="log-mark">
+                    {status === "logged" ? (
+                      <Check size={14} />
+                    ) : status === "pending" ? (
+                      <CloudUpload size={14} />
+                    ) : (
+                      <PenLine size={14} />
+                    )}
+                    {status === "logged"
+                      ? "Logged"
+                      : status === "pending"
+                        ? "Saved on this device"
+                        : "Needs log"}
+                  </span>
+                  {report && (
+                    <span>
+                      {report.outcome === "rowed"
+                        ? `${report.rating} · ${RATINGS[(report.rating || 1) - 1]} · ${report.route}`
+                        : report.outcome === "stayed_ashore"
+                          ? "Stayed ashore"
+                          : "Didn’t attend"}
+                    </span>
+                  )}
+                  {status === "pending" && <span>Waiting to upload.</span>}
                 </div>
-              ) : (
-                phase === "past" && (
-                  <div className="report-summary muted">No report yet</div>
-                )
               )}
               {phase !== "past" && (
                 <div className="outing-forecast">
@@ -306,7 +341,12 @@ export default function OutingsView({
                     </button>
                   </>
                 ) : (
-                  canLog(o, now) && (
+                  // Withheld while a report for this row sits in the outbox:
+                  // tapping it would stage a second one under a new submission
+                  // id, and both would upload. The queue owns that report until
+                  // it lands, including discarding it.
+                  canLog(o, now) &&
+                  status !== "pending" && (
                     <button className="text-button" onClick={() => onLog(o)}>
                       Log this row
                     </button>
