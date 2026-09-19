@@ -38,6 +38,20 @@ export const BOAT_CLASSES = [
 ] as const;
 export const ROUTES = ["east", "west", "both", "unknown"] as const;
 export const RATINGS = ["Glass", "Good", "Fine", "Poor", "Forced off"] as const;
+/**
+ * The intervals people actually row, summarized on each Week card.
+ *
+ * A calendar-day summary answers a question nobody asks: an afternoon that
+ * blows out the lake reads unfavorable all day even when dawn is glass. Fixed
+ * and identical every day for now; real BHC practice times are a later
+ * refinement, not a prerequisite. Both bounds avoid the DST-changed hour, so
+ * `chicagoToISO` resolves them on every calendar day.
+ */
+export const PRACTICE_WINDOWS = [
+  { id: "morning", label: "Morning", start: "05:30", end: "07:30" },
+  { id: "evening", label: "Evening", start: "18:00", end: "20:00" },
+] as const;
+export type PracticeWindow = (typeof PRACTICE_WINDOWS)[number];
 
 export function windZone(direction: number): 1 | 2 | 3 {
   const d = ((direction % 360) + 360) % 360;

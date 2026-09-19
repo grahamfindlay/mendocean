@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { normalizeWeather, weatherURL } from "../shared/weather";
 import {
-  comparisonTimes,
+  practiceWindows,
   nearTerm,
   precipitationRate,
   timelineSamples,
@@ -165,23 +165,35 @@ test("old hourly cache brackets a minute-specific selection and labels its rain 
   expect(precipitationRate({ ...row(base), precipitation: null })).toBeNull();
   expect(precipitationRate({ ...row(base), precipitation: 0 })).toBe(0);
 });
-test("five-day comparisons retain selected minutes and detect DST nonexistent local times", () => {
-  const times = comparisonTimes(weather, "2026-09-15T09:43", now);
-  expect(times).toHaveLength(5);
-  expect(times.every((t) => localDateTime(t.time!).endsWith("09:43"))).toBe(
-    true,
+test("practice windows summarize the two rowing intervals and stay honest outside the horizon", () => {
+  const windows = practiceWindows(weather, "2026-09-16");
+  expect(windows.map((w) => w.id)).toEqual(["morning", "evening"]);
+  // 05:30 CDT is 10:30Z; the fixture starts at 14:00Z on the 15th, so the
+  // 16th is fully inside the horizon while the 15th's morning is not.
+  expect(localDateTime(new Date(windows[0].startsAt).toISOString())).toBe(
+    "2026-09-16T05:30",
   );
-  const dstBase = Date.parse("2026-03-07T06:00:00Z");
-  const dst = {
-    ...weather,
-    quarter_hours: [],
-    hours: Array.from({ length: 144 }, (_, i) => row(dstBase + i * 3600000)),
-  };
-  expect(
-    comparisonTimes(dst, "2026-03-07T02:30", dstBase).find(
-      (d) => d.day === "2026-03-08",
-    )?.time,
-  ).toBeNull();
+  expect(localDateTime(new Date(windows[0].endsAt).toISOString())).toBe(
+    "2026-09-16T07:30",
+  );
+  expect(windows[0].summary.covered).toBe(true);
+  expect(windows[0].summary.wind).toEqual({ min: 7, max: 7 });
+  expect(windows[0].summary.gust).toBe(12);
+  expect(windows[0].summary.temperature).toEqual({ min: 65, max: 65 });
+  expect(windows[0].summary.status).toBe("unfavorable");
+  const past = practiceWindows(weather, "2026-09-15");
+  expect(past[0].summary.covered).toBe(false);
+  expect(past[0].summary.samples).toBe(0);
+  expect(past[0].summary.wind).toBeNull();
+  expect(past[0].summary.status).toBe("unavailable");
+  // Evening on the 15th runs 23:00Z to 01:00Z and is covered even though the
+  // interval crosses midnight UTC.
+  expect(past[1].summary.covered).toBe(true);
+  // A day past the provider's horizon reports nothing rather than borrowing
+  // the nearest sample.
+  expect(practiceWindows(weather, "2026-10-01")[0].summary.samples).toBe(0);
+});
+test("windows spanning local midnight keep their trailing samples", () => {
   const midnight = chicagoToISO("2026-09-15T23:45");
   const window = windowSamples(
     weather,

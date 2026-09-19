@@ -10,6 +10,7 @@ import {
 import ForecastDayView from "./ForecastDayView";
 import ForecastToday from "./ForecastToday";
 import ForecastRows from "./ForecastRows";
+import ForecastWeek from "./ForecastWeek";
 import { timelineSamples, forecastDays } from "../shared/timeline";
 
 export interface ForecastSelection {
@@ -69,7 +70,7 @@ export default function ForecastView({
     localDateTime(h.time).startsWith(day),
   );
   const today = localDateTime(new Date(now).toISOString()).slice(0, 10);
-  /* Week shows this on its own; Rows shows it below the comparison grid. */
+  /* Week renders its own copy beneath the cards; Rows takes this one. */
   const dayView = (
     <ForecastDayView
       weather={weather}
@@ -109,7 +110,18 @@ export default function ForecastView({
           onSelectHorizon={setHorizon}
         />
       )}
-      {tab === "Week" && dayView}
+      {tab === "Week" && (
+        <ForecastWeek
+          weather={weather}
+          days={days}
+          day={day}
+          today={today}
+          daySamples={daySamples}
+          expired={expired}
+          now={now}
+          onSelectDay={setSelectedDay}
+        />
+      )}
       {tab === "Rows" && (
         <ForecastRows
           weather={weather}
@@ -120,7 +132,6 @@ export default function ForecastView({
           onSelectWhen={setWhen}
           duration={duration}
           onSelectDuration={setDuration}
-          onSelectDay={setSelectedDay}
           dayView={dayView}
           userId={userId}
         />
