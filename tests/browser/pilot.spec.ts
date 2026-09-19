@@ -127,6 +127,15 @@ test("future outing stays forecast-only, past rows sort and saved reports have n
           starts_at: "2026-09-14T14:00:00Z",
           ends_at: "2026-09-14T15:30:00Z",
         },
+        {
+          ...base,
+          id: "logged",
+          title: "Logged practice",
+          attendance: "declined",
+          reports: [{ outcome: "rowed", rating: 2, route: "east" }],
+          starts_at: "2026-09-12T14:00:00Z",
+          ends_at: "2026-09-12T15:30:00Z",
+        },
       ]),
     );
   });
@@ -167,11 +176,32 @@ test("future outing stays forecast-only, past rows sort and saved reports have n
   ]);
   await page.getByRole("button", { name: "My rows", exact: true }).click();
   await page.getByRole("button", { name: "Past", exact: true }).click();
+  // R30. A practice the owner declined and never logged leaves the default
+  // set; one they logged stays whatever BHC now says about attendance.
+  await expect(page.locator(".outing-card h3")).toHaveText([
+    "Recent practice",
+    "Logged practice",
+  ]);
+  await expect(page.getByText("Not attending", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("1 past practice you did not attend is hidden."),
+  ).toBeVisible();
+  expect(
+    (await page.locator(".filter-toggle").boundingBox())!.height,
+  ).toBeLessThan(32);
+  await page.getByRole("checkbox", { name: "Show all practices" }).check();
+  await expect(page.locator(".outing-card h3")).toHaveText([
+    "Recent practice",
+    "Older practice",
+    "Logged practice",
+  ]);
+  await expect(page.getByText("you did not attend")).toHaveCount(0);
+  // The report filter composes with the default set rather than replacing it.
+  await page.getByRole("button", { name: "Unlogged", exact: true }).click();
   await expect(page.locator(".outing-card h3")).toHaveText([
     "Recent practice",
     "Older practice",
   ]);
-  await expect(page.getByText("Not attending", { exact: true })).toBeVisible();
 });
 
 test("uninstalled iOS explains Home Screen setup before requesting permission", async ({
@@ -605,6 +635,12 @@ test("a scheduled row is forecast over its own window, and scheduling is an expl
   await page.mouse.move(box.x + box.width - 40, box.y + 80, { steps: 6 });
   await page.mouse.up();
   await expect(dayChart.locator(".chart-reading time")).not.toHaveText("");
+  // A checkbox label inherits the global rule that stacks a form label above
+  // its input, which doubles this height and centers the box over the text.
+  // Role and text assertions pass either way, which is how it shipped.
+  expect(
+    (await page.locator(".chart-toggle").boundingBox())!.height,
+  ).toBeLessThan(32);
   await page
     .getByRole("checkbox", { name: "Show this row on the day chart" })
     .uncheck();

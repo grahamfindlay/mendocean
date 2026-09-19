@@ -86,6 +86,56 @@ test("the attendance filter describes practices only and never hides independent
     "attending",
   ]);
 });
+test("Past is a union: independent rows, attended practices and anything logged", () => {
+  const at = (hour: number, over: Partial<Outing>): Outing => ({
+    ...outing(`2026-09-14T1${hour}:00:00Z`, `2026-09-14T1${hour}:30:00Z`),
+    ...over,
+  });
+  const rows = [
+    at(0, { id: "attended" }),
+    at(1, { id: "missed", attendance: "declined" }),
+    at(2, {
+      id: "logged-then-dropped",
+      attendance: "declined",
+      reports: [{} as never],
+    }),
+    at(3, { id: "unknown", attendance: undefined }),
+    at(4, {
+      id: "mine",
+      kind: "independent",
+      attendance: undefined,
+      owner_id: "me",
+      bhc_practice_id: null,
+    }),
+  ];
+  const ids = (filters?: RowFilters) =>
+    visibleOutings(rows, "Past", now, filters).map((o) => o.id);
+  // Newest first, and the report survives BHC saying the owner did not attend.
+  // Without that clause a log they wrote would vanish from their own history.
+  expect(ids()).toEqual(["mine", "logged-then-dropped", "attended"]);
+  expect(ids({ allPractices: true })).toEqual([
+    "mine",
+    "unknown",
+    "logged-then-dropped",
+    "missed",
+    "attended",
+  ]);
+  // The report filter composes with the default set rather than replacing it.
+  expect(ids({ reports: "Logged" })).toEqual(["logged-then-dropped"]);
+  expect(ids({ reports: "Unlogged" })).toEqual(["mine", "attended"]);
+  expect(ids({ reports: "Unlogged", allPractices: true })).toEqual([
+    "mine",
+    "unknown",
+    "missed",
+    "attended",
+  ]);
+  // Upcoming is untouched by it: a practice the owner declined is still ahead
+  // of them, and R29's filters decide whether it shows.
+  const ahead = { ...future, id: "ahead", attendance: "declined" };
+  expect(visibleOutings([ahead], "Upcoming", now).map((o) => o.id)).toEqual([
+    "ahead",
+  ]);
+});
 test("Now uses the latest actual timestamp and upcoming rows never look backward", () => {
   const hour = (time: string) => ({
     time,

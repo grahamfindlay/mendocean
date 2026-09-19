@@ -18,9 +18,13 @@ export function canLog(o: Pick<Outing, "starts_at">, now: number) {
 export type RowTypeFilter = "All" | "Practices" | "Independent";
 export type AttendanceFilter =
   "All" | "Attending" | "Unknown" | "Not attending";
+export type ReportFilter = "All" | "Unlogged" | "Logged";
 export interface RowFilters {
   type?: RowTypeFilter;
   attendance?: AttendanceFilter;
+  reports?: ReportFilter;
+  /** Past only: include practices the owner did not attend and never logged. */
+  allPractices?: boolean;
 }
 const ATTENDANCE = {
   Attending: "attending",
@@ -31,13 +35,33 @@ export function visibleOutings(
   outings: Outing[],
   view: "Upcoming" | "Past",
   now: number,
-  { type = "All", attendance = "All" }: RowFilters = {},
+  {
+    type = "All",
+    attendance = "All",
+    reports = "All",
+    allPractices = false,
+  }: RowFilters = {},
 ) {
   return outings
     .filter((o) => (outingPhase(o, now) === "past") === (view === "Past"))
     .filter((o) => {
       const practice = o.kind === "official";
+      const logged = !!o.reports?.length;
       if (type !== "All" && practice !== (type === "Practices")) return false;
+      if (reports !== "All" && logged !== (reports === "Logged")) return false;
+      // Past's default set is a union: independent rows, practices the owner
+      // attended, and anything already logged whatever BHC now says. That last
+      // clause is the whole point -- attendance can change after the fact, and
+      // without it a report the owner wrote would disappear from their own
+      // history. Show all practices relaxes it for correcting old records.
+      if (
+        view === "Past" &&
+        !allPractices &&
+        practice &&
+        !logged &&
+        bhcAttendance(o.attendance) !== "attending"
+      )
+        return false;
       // Attendance describes practices only. An independent row carries no BHC
       // attendance, so an intersection here would hide every row the owner
       // scheduled themselves the moment they asked for the ones they are

@@ -18,10 +18,10 @@ import {
   type Report,
 } from "../shared/domain";
 import ForecastView, { type ForecastSelection } from "./ForecastView";
-import OutingsView, { type ReportFilter } from "./OutingsView";
+import OutingsView from "./OutingsView";
 import AttendanceEditor from "./AttendanceEditor";
 import { useClock } from "./useClock";
-import { canLog, outingPhase } from "../shared/presentation";
+import { canLog, outingPhase, type ReportFilter } from "../shared/presentation";
 import Logger from "./Logger";
 import { Auth, Modal, SettingsForm, PlanForm } from "./Account";
 import { discard, flush, pending, type PendingReport } from "./outbox";
@@ -70,6 +70,9 @@ export default function App() {
   const [resume] = useState(readUpdatePosition);
   const [outingView, setOutingView] = useState<"Upcoming" | "Past">("Upcoming");
   const [reportFilter, setReportFilter] = useState<ReportFilter>("All");
+  // Deliberately not in the resume payload: R30 calls this a filter rather
+  // than a mode, so it starts off on every visit.
+  const [allPractices, setAllPractices] = useState(false);
   const [forecastSelection, setForecastSelection] =
     useState<ForecastSelection>();
   const weatherRequest = useRef<Promise<void> | null>(null);
@@ -528,8 +531,10 @@ export default function App() {
                 weather={weather}
                 view={outingView}
                 filter={reportFilter}
+                allPractices={allPractices}
                 onView={setOutingView}
                 onFilter={setReportFilter}
+                onAllPractices={setAllPractices}
                 busy={busy}
                 onSettings={() => setSettings(true)}
                 onLog={(o) => {
