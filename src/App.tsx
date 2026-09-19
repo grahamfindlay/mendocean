@@ -320,20 +320,20 @@ export default function App() {
           </button>
         ))}
       </nav>
-      {isForecast(tab) && (
-        <nav className="sub-nav" aria-label="Forecasts">
-          {forecastDestinations.map((name) => (
-            <button
-              key={name}
-              aria-current={tab === name ? "page" : undefined}
-              className={tab === name ? "selected" : ""}
-              onClick={() => navigate(name)}
-            >
-              {name}
-            </button>
-          ))}
-        </nav>
-      )}
+      {/* Kept mounted and hidden rather than unmounted: toggling this row
+          between destinations destabilises the tree below it. */}
+      <nav className="sub-nav" aria-label="Forecasts" hidden={!isForecast(tab)}>
+        {forecastDestinations.map((name) => (
+          <button
+            key={name}
+            aria-current={tab === name ? "page" : undefined}
+            className={tab === name ? "selected" : ""}
+            onClick={() => navigate(name)}
+          >
+            {name}
+          </button>
+        ))}
+      </nav>
       {!supabase && (
         <div className="setup-note">
           {previewMode

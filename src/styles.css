@@ -118,6 +118,9 @@ button:disabled {
   border-color: var(--ink);
   font-weight: 700;
 }
+.sub-nav[hidden] {
+  display: none;
+}
 .sub-nav {
   display: flex;
   gap: 20px;
