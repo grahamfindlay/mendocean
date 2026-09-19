@@ -10,6 +10,7 @@ import {
   Check,
   Download,
   Plus,
+  CalendarPlus,
   RefreshCw,
   Settings,
   X,
@@ -370,6 +371,7 @@ export default function App() {
               tab={tab}
               outings={account?.outings || []}
               onLog={() => navigate("Log")}
+              onSchedule={() => setPlanned(true)}
             />
           ) : (
             <section className="empty-state">
@@ -444,13 +446,29 @@ export default function App() {
               <div>
                 <h1>My rows</h1>
               </div>
-              <button
-                className="button subtle"
-                onClick={() => setPlanned(true)}
-              >
-                <Plus size={16} />
-                Add independent row
-              </button>
+              {/* Both entries are explicit: "Log" alone reads as recording
+                  something that already happened, which left scheduling
+                  discoverable only by accident. */}
+              <div className="heading-actions">
+                <button
+                  className="button subtle"
+                  onClick={() => setPlanned(true)}
+                >
+                  <CalendarPlus size={16} />
+                  Schedule independent row
+                </button>
+                <button
+                  className="button subtle"
+                  onClick={() => {
+                    setEditing(undefined);
+                    setSelectedOuting(undefined);
+                    setTab("Log");
+                  }}
+                >
+                  <Plus size={16} />
+                  Log independent row
+                </button>
+              </div>
             </div>
             {!!queue.length && (
               <section className="form-card">
@@ -641,7 +659,10 @@ export default function App() {
         </Modal>
       )}
       {planned && (
-        <Modal title="Add independent row" onClose={() => setPlanned(false)}>
+        <Modal
+          title="Schedule independent row"
+          onClose={() => setPlanned(false)}
+        >
           <PlanForm
             onSave={async (body) => {
               await api("outing", body);

@@ -246,7 +246,7 @@ export default function Logger({
         });
       if (Date.parse(chicagoToISO(start)) > Date.now())
         throw new Error(
-          "This row has not started yet. Use “Add independent row” to schedule it.",
+          "This row has not started yet. Use “Schedule independent row” to schedule it.",
         );
       const extremes = launched.length
         ? boatExtremes(launched)

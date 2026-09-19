@@ -23,6 +23,7 @@ export default function ForecastView({
   tab,
   outings,
   onLog,
+  onSchedule,
   now,
   selection,
   userId,
@@ -31,36 +32,20 @@ export default function ForecastView({
   tab: string;
   outings: Outing[];
   onLog: () => void;
+  onSchedule: () => void;
   now: number;
   selection?: ForecastSelection;
   userId?: string;
 }) {
-  /* Held here rather than in the destination components so a selection, a
-     chosen window and a chosen day survive moving between Today, Week and
-     Rows. */
-  const [when, setWhen] = useState(
-    localDateTime(new Date(Date.now() + 86400000).toISOString()).slice(0, 11) +
-      "07:00",
-  );
+  /* Held here rather than in the destination components so the selected row,
+     day and horizon survive moving between Today, Week and Rows. */
   const [horizon, setHorizon] = useState("4");
   const [selectedDay, setSelectedDay] = useState("");
-  const [duration, setDuration] = useState("90");
+  const [selectedRow, setSelectedRow] = useState("");
   useEffect(() => {
-    if (selection) {
-      setWhen(localDateTime(selection.starts_at));
-      setDuration(
-        String(
-          Math.max(
-            1,
-            Math.round(
-              (Date.parse(selection.ends_at) -
-                Date.parse(selection.starts_at)) /
-                60000,
-            ),
-          ),
-        ),
-      );
-    }
+    // Only the id is consulted: the row supplies its own times. The rest of
+    // ForecastSelection is still carried for the resume payload's shape.
+    if (selection) setSelectedRow(selection.id);
   }, [selection]);
   const fresh = weatherFreshness(weather.fetched_at, now);
   const expired = fresh === "expired";
@@ -128,10 +113,9 @@ export default function ForecastView({
           outings={outings}
           now={now}
           expired={expired}
-          when={when}
-          onSelectWhen={setWhen}
-          duration={duration}
-          onSelectDuration={setDuration}
+          selectedRow={selectedRow}
+          onSelectRow={setSelectedRow}
+          onSchedule={onSchedule}
           dayView={dayView}
           userId={userId}
         />

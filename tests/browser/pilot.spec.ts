@@ -31,12 +31,14 @@ test("public forecast, planner, and invitation boundary", async ({ page }) => {
     page.getByRole("heading", { name: "Today", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Rows", exact: true }).click();
-  await page
-    .getByRole("combobox", { name: "Window", exact: true })
-    .selectOption("1");
   await expect(
-    page.getByText("Samples at or around the selected time"),
+    page.getByRole("heading", { name: "Sign in to forecast your rows" }),
   ).toBeVisible();
+  await expect(
+    page.getByText("Today and Week stay available without one."),
+  ).toBeVisible();
+  // The day timeline stays reachable without an account.
+  await expect(page.locator(".day-picker button")).not.toHaveCount(0);
   await page.getByRole("button", { name: "Log", exact: true }).click();
   await expect(page.getByText("The pilot is invitation-only.")).toBeVisible();
 });
@@ -139,12 +141,15 @@ test("future outing stays forecast-only, past rows sort and saved reports have n
   await page
     .getByRole("button", { name: "View forecast", exact: true })
     .click();
-  await expect(page.getByLabel("Start time · Madison")).toHaveValue(
-    "2026-09-16T09:00",
+  await expect(page.locator('.row-card[aria-pressed="true"] h3')).toHaveText(
+    "Tomorrow practice",
   );
   await expect(
-    page.getByRole("combobox", { name: "Window", exact: true }),
-  ).toHaveValue("90");
+    page.getByRole("heading", { name: "Tomorrow practice", level: 2 }),
+  ).toBeVisible();
+  await expect(page.locator(".section-heading").first()).toContainText(
+    "9:00 AM–10:30 AM",
+  );
   await expect(
     page.getByRole("combobox", { name: "Route", exact: true }),
   ).toHaveCount(0);
@@ -393,22 +398,6 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
     "data-domain-start",
     String(now + 60000),
   );
-  await page.getByRole("button", { name: "Rows", exact: true }).click();
-  await page.getByLabel("Start time · Madison").fill("2026-09-15T09:43");
-  await page
-    .getByRole("combobox", { name: "Window", exact: true })
-    .selectOption("1");
-  const selectedChart = page.getByRole("region", {
-    name: "Selected forecast",
-    exact: true,
-  });
-  await expect(selectedChart.locator(".chart-reading time")).toContainText(
-    "9:30 AM",
-  );
-  await selectedChart.getByRole("slider").press("End");
-  await expect(selectedChart.locator(".chart-reading time")).toContainText(
-    "9:45 AM",
-  );
   await page.getByRole("button", { name: "Week", exact: true }).click();
   const cards = page.locator(".week-grid article");
   await expect(cards).toHaveCount(7);
@@ -495,4 +484,86 @@ test("touch scrubbing preserves vertical scrolling and releases a cancelled gest
     .poll(() => page.evaluate(() => window.scrollY))
     .toBeGreaterThan(before + 30);
   await client.detach();
+});
+
+test("a scheduled row is forecast over its own window, and scheduling is an explicit entry", async ({
+  page,
+}) => {
+  const now = Date.parse("2026-09-15T14:24:00Z"),
+    base = Date.parse("2026-09-15T14:00:00Z");
+  await page.clock.install({ time: now - 1000 });
+  await page.clock.pauseAt(now);
+  const row = (time: number, interval: number) => ({
+    time: new Date(time).toISOString(),
+    interval_minutes: interval,
+    wind: 7,
+    direction: 350,
+    gust: 12,
+    temperature: 65,
+    precipitation: 0.1,
+    probability: interval === 60 ? 30 : null,
+    visibility: null,
+    code: 2,
+  });
+  await page.route("**/api/weather", (r) =>
+    r.fulfill({
+      json: {
+        fetched_at: new Date(now).toISOString(),
+        provider: "Test fixture",
+        source_kind: "fixture",
+        model_version: "hannah-1.0.0",
+        current: null,
+        hours: Array.from({ length: 168 }, (_, i) =>
+          row(base + i * 3600000, 60),
+        ),
+        quarter_hours: Array.from({ length: 192 }, (_, i) =>
+          row(base + i * 900000, 15),
+        ),
+      },
+    }),
+  );
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "mendocean-explicit-preview-v1",
+      JSON.stringify([
+        {
+          kind: "independent",
+          version: 1,
+          owner_id: null,
+          bhc_practice_id: null,
+          reminder: false,
+          attendance: "attending",
+          reports: [],
+          planned_boat: null,
+          id: "scheduled",
+          title: "Morning row",
+          starts_at: "2026-09-15T14:43:00Z",
+          ends_at: "2026-09-15T14:44:00Z",
+        },
+      ]),
+    );
+  });
+  await page.goto("/?preview=1");
+  await page.getByRole("button", { name: "Rows", exact: true }).click();
+  const card = page.locator(".row-card").first();
+  await expect(card.locator("h3")).toHaveText("Morning row");
+  await expect(card).toContainText("9:43 AM–9:44 AM");
+  // The card summarizes the whole scheduled window, not the start instant.
+  await expect(card.locator(".wind-speed")).toContainText("7");
+  await expect(card).toHaveAttribute("aria-pressed", "true");
+  const selectedChart = page.getByRole("region", {
+    name: "Selected forecast",
+    exact: true,
+  });
+  // Bracketing samples, not interpolation to 9:43.
+  await expect(selectedChart.locator(".chart-reading time")).toContainText(
+    "9:30 AM",
+  );
+  await selectedChart.getByRole("slider").press("End");
+  await expect(selectedChart.locator(".chart-reading time")).toContainText(
+    "9:45 AM",
+  );
+  await expect(
+    page.getByRole("button", { name: "Schedule independent row" }).first(),
+  ).toBeVisible();
 });
