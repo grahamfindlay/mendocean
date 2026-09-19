@@ -368,3 +368,152 @@ and it fails on every commit. After deployment, run exact-commit public smoke
 and production browser smoke, and verify seven-day cards and scheduled-row
 forecasts at phone width against real provider data, where days three through
 seven are hourly.
+
+## Milestone 8 implementation plan
+
+Scope: R26–R31. R25 is already complete — its entry-point half was pulled
+forward into M7 and `Schedule independent row` and `Log independent row` are
+live on My rows, both reaching workflows that already existed. M8 introduces no
+database migration, no new service and no change to weather collection cadence.
+It is presentation and filtering work over data the client already holds.
+
+Operating conditions are the same as M7: one test user, no external pilot
+participants, brief downtime acceptable. Prefer the simpler implementation over
+the backward-compatible one, and delete dead paths rather than preserving them.
+
+Five facts from the code govern the sequence.
+
+`src/OutingsView.tsx` is 328 lines and renders one card shape for every state.
+An upcoming practice card can produce ten controls: attendance, View forecast,
+Log this row, Share, Reminder settings, the reminder toggle, snooze, and the
+per-channel status list — none of them subordinated to any other. That is what
+R26 and R28 are reacting to.
+
+`sortedOutings` in `shared/presentation.ts` is the only shared list helper, and
+it takes no account of type, attendance or reports. `src/ForecastRows.tsx` does
+not use it: it re-derives its own upcoming list with `ends_at > now`. The two
+agree today, but by coincidence rather than construction, which is the drift the
+milestone table warns about.
+
+`reminderPresentation` returns the output of `reminderScheduleError` as its
+`text` for any ineligible row. "Logging reminders are available for rows you are
+attending." therefore renders in full on every card for a practice the owner is
+not attending. That sentence is R28's target, and it is a property of the helper
+rather than of the view.
+
+A queued report carries its whole `OutingInput`, including `id`, so a past card
+can be matched to an unsent report by identity rather than by title. R31's third
+state is a lookup, not new persistence. The queue itself is already loaded in
+`App.tsx` as `queue` for the "On this device" banner.
+
+`view` and `filter` live in `App.tsx` and are passed into `OutingsView`. New
+filter state belongs in the same place, and deliberately not in a shared store:
+the milestone table is explicit that the forecast row list and My rows share
+filter _logic_ but need not share the active selection.
+
+### 1. Share the row-list predicate
+
+A pure helper in `shared/presentation.ts` that takes rows, a view, a type
+filter, an attendance filter and `now`, and returns the ordered, filtered list.
+Unit-tested directly and adopted by both `OutingsView` and `ForecastRows` in the
+same change, so the duplication is removed at the moment the logic gains enough
+substance to diverge.
+
+No UI in this step. Like M7's summary helper, the guarantees worth pinning are
+not observable from a rendered card: that the attendance filter applies only to
+practice rows, that independent rows stay governed by the type filter alone, and
+that Past's default is a union rather than an intersection.
+
+**The trap this step exists to prevent.** The obvious implementation ANDs the
+two filters, so choosing Attending silently drops every independent row —
+rows the owner definitely attended, since they scheduled them. R29 says the
+attendance filter applies to practice rows only. Write that test first.
+
+### 2. Past's default set and the historical override
+
+R30, confirmed. Past shows independent rows and attending practices, **plus any
+row carrying a saved report regardless of its current BHC attendance**. The
+exception is the point: attendance can change in BHC after the fact, and without
+it a log the owner already wrote would disappear from their own history.
+
+An optional Show all practices control relaxes the default for correcting or
+importing historical records. It is a filter, not a mode: it does not persist
+across visits.
+
+The existing All / Unlogged / Logged report filter stays and composes with the
+new one.
+
+### 3. Upcoming filters
+
+R29. Practices / Independent / All, plus Attending / Unknown / Not attending /
+All applied to practices only. Both read the step 1 helper.
+
+Two existing controls already sit above the list — the Upcoming/Past segmented
+control and, on Past, the report filter. A third and fourth row of segmented
+buttons will not fit a phone. Expect this step to need a single filter bar that
+collapses, rather than four independent control groups stacked vertically, and
+check it at 375px before the logic is called done.
+
+### 4. Log status
+
+R31. Every past row reads **Logged**, **Needs log**, or **Saved on this device**
+through text plus an icon, never through color alone. The third state comes from
+matching the card's `id` against the outbox queue.
+
+The "On this device · N pending" banner in `App.tsx` stays: it owns Retry upload
+and Discard, which are queue-level actions rather than row-level ones. The card
+marks status; the banner acts on it. Do not duplicate those buttons onto cards.
+
+Report filters and editing are unchanged.
+
+### 5. Reminder prose
+
+R28. An ineligible row should not spend four lines explaining an absence. Carry
+the reason as a code rather than as a finished sentence, show it where it is
+actionable, and put the rest behind the same disclosure step 6 introduces.
+Paused reminders and delivery failures must stay discoverable — those are states
+the owner may need to fix, unlike "you are not attending this practice", which
+is simply the situation.
+
+This is a change to `shared/reminders.ts`, so it carries unit tests and touches
+every consumer of `reminderPresentation`.
+
+### 6. Compact the card
+
+R26, last. Smaller title, a concise date, attendance and summary line, a small
+number of primary actions, and everything else behind a details disclosure.
+
+Sequenced last deliberately: steps 2–5 change what a card contains, and
+compacting first would mean compacting content that then changes underneath the
+new layout. Touch targets keep their current size — this reduces the number of
+controls competing for the card, not the size of the ones that remain, and a
+44px target that has become a 24px one is a regression even if the card is
+shorter.
+
+### 7. Attendance details
+
+R27. The details text mentions requesting changes in BHC or emailing
+coaches@mendotarowingclub.com, with a `mailto:` link, and the BHC link targets
+`https://app.boathouseconnect.com/home/login`. No email is ever sent
+automatically; the link composes one for the owner to send.
+
+Small and independent of the others, which is why it can land whenever it is
+convenient rather than in sequence.
+
+### 8. Verification
+
+Extend the preview browser suite with each filter combination that has a
+distinct predicate — particularly Attending with independent rows present, which
+is the step 1 trap made visible — and with the three log-status marks. Unit-test
+the shared predicate and the reminder reason codes directly.
+
+Check the compacted card at 375px against a row in every state: practice and
+independent, attending and not, logged, unlogged and queued, with a reminder
+scheduled, sent, failed and paused. M7 shipped a phone layout defect that every
+text assertion passed through, so read the rendered card rather than only its
+text, and keep the viewport-width assertion honest.
+
+Both `fast` and `full-stack` are required. Ignore `Workers Builds: mendocean`.
+After deployment, run exact-commit public smoke and production browser smoke,
+and confirm on the installed iPhone app that a past row with an unsent report
+marks itself correctly while offline.
