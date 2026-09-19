@@ -523,8 +523,20 @@ test("Forecast offers only supported model contexts and places fitted results af
       ],
       mine: [],
     });
+    // An assessment needs an instant, and instants now come from scheduled
+    // rows rather than a free-form planner.
+    await import("../support/stack").then((m) =>
+      m.createOuting(actor, {
+        title: "Model context row",
+        starts_at: new Date(Date.now() + 86400000).toISOString(),
+        ends_at: new Date(Date.now() + 91800000).toISOString(),
+      }),
+    );
     await loggedIn(page);
     await page.getByRole("button", { name: "Rows", exact: true }).click();
+    await expect(page.locator('.row-card[aria-pressed="true"] h3')).toHaveText(
+      "Model context row",
+    );
     await page
       .getByRole("combobox", { name: "Route", exact: true })
       .selectOption("east");
@@ -539,7 +551,7 @@ test("Forecast offers only supported model contexts and places fitted results af
     ).toHaveCount(0);
     await expect(page.getByText(/70% estimated rowing rate/)).toBeVisible();
     const weather = await page
-      .getByRole("heading", { name: "Your selected window" })
+      .getByRole("heading", { name: "Model context row", level: 2 })
       .boundingBox();
     const fitted = await page
       .getByRole("heading", { name: "What logged rows suggest" })
