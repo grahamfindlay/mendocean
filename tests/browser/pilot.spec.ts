@@ -566,4 +566,43 @@ test("a scheduled row is forecast over its own window, and scheduling is an expl
   await expect(
     page.getByRole("button", { name: "Schedule independent row" }).first(),
   ).toBeVisible();
+  // R22: the band marks the row's window without taking over inspection.
+  // It shares the axes' scale function and the same frozen domain, so it
+  // cannot drift against them; what is worth asserting is that it lands on
+  // the right time and stays out of the way.
+  const dayChart = page.getByRole("region", { name: /Sep 15$/ });
+  const band = dayChart.locator(".chart-highlight");
+  await expect(band).toHaveCount(1);
+  await expect(band).toHaveCSS("pointer-events", "none");
+  const placement = await band.evaluate((rect) => {
+    const svg = rect.closest("svg")!;
+    const width = Number(svg.getAttribute("viewBox")!.split(" ")[2]);
+    const plot = width - 48 - 16;
+    const box = rect.getBoundingClientRect();
+    const surface = svg.getBoundingClientRect();
+    const scale = width / surface.width;
+    return {
+      // Where the band starts, as a fraction of the plotted day.
+      fraction: ((box.x - surface.x) * scale - 48) / plot,
+      widthFraction: (box.width * scale) / plot,
+    };
+  });
+  // 9:43 AM is 40.5% through a Madison calendar day.
+  expect(placement.fraction).toBeGreaterThan(0.39);
+  expect(placement.fraction).toBeLessThan(0.42);
+  // One minute of a 24-hour day is a sliver, not a block.
+  expect(placement.widthFraction).toBeLessThan(0.02);
+  // Scrubbing still inspects samples: the band did not take the gesture.
+  const surface = dayChart.locator(".chart-surface");
+  const box = (await surface.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + 80);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 40, box.y + 80, { steps: 6 });
+  await page.mouse.up();
+  await expect(dayChart.locator(".chart-reading time")).not.toHaveText("");
+  await page
+    .getByRole("checkbox", { name: "Show this row on the day chart" })
+    .uncheck();
+  await expect(dayChart.locator(".chart-highlight")).toHaveCount(0);
+  await expect(dayChart.locator(".chart-reading time")).not.toHaveText("");
 });

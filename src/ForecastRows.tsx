@@ -1,10 +1,12 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { CalendarPlus, Clock } from "lucide-react";
 import {
   formatDate,
   formatTime,
+  localDateTime,
   type Forecast,
   type Outing,
+  type WeatherHour,
 } from "../shared/domain";
 import type {
   AssessmentCapabilities,
@@ -14,6 +16,7 @@ import { api, supabase } from "./client";
 import WeatherChart from "./WeatherChart";
 import { HourRow } from "./HourRow";
 import { WindowReading } from "./WindowReading";
+import ForecastDayView from "./ForecastDayView";
 import { summarizeWindow, windowSamples } from "../shared/timeline";
 
 const defaultContext = { route: "either", boat: "any", coach: "none" };
@@ -27,7 +30,11 @@ export default function ForecastRows({
   selectedRow,
   onSelectRow,
   onSchedule,
-  dayView,
+  days,
+  day,
+  today,
+  daySamples,
+  onSelectDay,
   userId,
 }: {
   weather: Forecast;
@@ -37,7 +44,11 @@ export default function ForecastRows({
   selectedRow: string;
   onSelectRow: (id: string) => void;
   onSchedule: () => void;
-  dayView: ReactNode;
+  days: string[];
+  day: string;
+  today: string;
+  daySamples: WeatherHour[];
+  onSelectDay: (day: string) => void;
   userId?: string;
 }) {
   const [basis, setBasis] = useState<"pooled" | "mine">("pooled");
@@ -51,12 +62,24 @@ export default function ForecastRows({
     outings: number;
   } | null>(null);
   const [estimateError, setEstimateError] = useState("");
+  const [onChart, setOnChart] = useState(true);
   const upcoming = outings
     .filter((o) => Date.parse(o.ends_at) > now)
     .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
   const row = upcoming.find((o) => o.id === selectedRow) || upcoming[0];
   const start = row ? Date.parse(row.starts_at) : NaN;
   const end = row ? Date.parse(row.ends_at) : NaN;
+  const rowDay = row ? localDateTime(row.starts_at).slice(0, 10) : "";
+  /* The day chart follows the selected row, so the highlight has something to
+     sit on. Picking another day afterwards still sticks: this only re-runs
+     when the row itself changes. */
+  useEffect(() => {
+    if (rowDay) onSelectDay(rowDay);
+  }, [rowDay]);
+  const highlight: [number, number] | undefined =
+    onChart && Number.isFinite(start) && Number.isFinite(end)
+      ? [start, end]
+      : undefined;
   useEffect(() => {
     let active = true;
     setCapabilities(emptyCapabilities);
@@ -123,7 +146,16 @@ export default function ForecastRows({
             stay available without one.
           </p>
         </section>
-        {dayView}
+        <ForecastDayView
+          weather={weather}
+          days={days}
+          day={day}
+          today={today}
+          daySamples={daySamples}
+          expired={expired}
+          now={now}
+          onSelectDay={onSelectDay}
+        />
       </>
     );
   const selected = windowSamples(weather, start, end).samples;
@@ -313,7 +345,27 @@ export default function ForecastRows({
           {estimateError && <p className="help">{estimateError}</p>}
         </>
       )}
-      {dayView}
+      {row && (
+        <label className="chart-toggle">
+          <input
+            type="checkbox"
+            checked={onChart}
+            onChange={(e) => setOnChart(e.target.checked)}
+          />
+          Show this row on the day chart
+        </label>
+      )}
+      <ForecastDayView
+        weather={weather}
+        days={days}
+        day={day}
+        today={today}
+        daySamples={daySamples}
+        expired={expired}
+        now={now}
+        onSelectDay={onSelectDay}
+        highlight={highlight}
+      />
       {!!upcoming.length && (
         <div className="log-callout">
           <h2>Planning another row?</h2>

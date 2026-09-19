@@ -1502,6 +1502,25 @@ button:hover:not(:disabled) {
 .week-grid .wind-speed {
   font-size: 1rem;
 }
+.chart-highlight {
+  fill: #235d51;
+  fill-opacity: 0.1;
+  stroke: #235d51;
+  stroke-opacity: 0.35;
+  stroke-dasharray: 3 3;
+  /* The inspection cursor stays the only thing the surface reacts to. */
+  pointer-events: none;
+}
+.chart-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 1rem 0 0;
+  font-size: 0.85rem;
+}
+.chart-toggle input {
+  width: auto;
+}
 .heading-actions {
   display: flex;
   flex-wrap: wrap;
