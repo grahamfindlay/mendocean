@@ -1,5 +1,8 @@
 import { useState } from "react";
 import {
+  ALL_WEEKDAYS,
+  WEEKDAY_NAMES,
+  periodDaysLabel,
   sortPeriods,
   weekPeriodSchema,
   type WeekPeriod,
@@ -10,6 +13,12 @@ function clockLabel(value: string) {
   const [hour, minute] = value.split(":").map(Number);
   return `${hour % 12 || 12}:${String(minute).padStart(2, "0")} ${hour < 12 ? "AM" : "PM"}`;
 }
+
+const dayPresets = [
+  { label: "Every day", days: ALL_WEEKDAYS },
+  { label: "Weekdays", days: [0, 1, 2, 3, 4] },
+  { label: "Weekends", days: [5, 6] },
+];
 
 export default function WeekPeriodsEditor({
   preferences,
@@ -26,7 +35,7 @@ export default function WeekPeriodsEditor({
   return (
     <details className="week-periods">
       <summary>Times of interest</summary>
-      <p>Repeat every day in Madison time.</p>
+      <p>All times are in Madison time.</p>
       {loading && <p role="status">Loading your periods…</p>}
       {error && <p role="alert">{error}</p>}
       {!ready && !loading && (
@@ -58,6 +67,9 @@ export default function WeekPeriodsEditor({
                 {period.label}
                 <small className="week-period-range">
                   {clockLabel(period.start)} – {clockLabel(period.end)}
+                  <span className="week-period-days-summary">
+                    {periodDaysLabel(period.days)}
+                  </span>
                 </small>
               </span>
             </label>
@@ -96,6 +108,7 @@ export default function WeekPeriodsEditor({
                 start: "09:00",
                 end: "11:00",
                 enabled: true,
+                days: [...ALL_WEEKDAYS],
               })
             }
           >
@@ -118,6 +131,11 @@ export default function WeekPeriodsEditor({
               if (await save(next)) setDraft(null);
             }}
           >
+            <h3>
+              {periods.some((p) => p.id === draft.id)
+                ? "Edit period"
+                : "Add period"}
+            </h3>
             <label>
               Period name
               <input
@@ -150,6 +168,45 @@ export default function WeekPeriodsEditor({
                 />
               </label>
             </div>
+            <fieldset className="week-repeat">
+              <legend>Repeat on</legend>
+              <div className="week-day-presets">
+                {dayPresets.map(({ label, days }) => (
+                  <button
+                    type="button"
+                    key={label}
+                    aria-pressed={draft.days.join() === days.join()}
+                    onClick={() => {
+                      setDraft({ ...draft, days: [...days] });
+                      setValidation("");
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="week-day-buttons">
+                {WEEKDAY_NAMES.map((name, index) => (
+                  <button
+                    type="button"
+                    key={name}
+                    aria-label={name}
+                    aria-pressed={draft.days.includes(index)}
+                    onClick={() => {
+                      setDraft({
+                        ...draft,
+                        days: draft.days.includes(index)
+                          ? draft.days.filter((d) => d !== index)
+                          : [...draft.days, index].sort(),
+                      });
+                      setValidation("");
+                    }}
+                  >
+                    {name[0]}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
             {validation && <p role="alert">{validation}</p>}
             <div className="week-period-actions">
               <button type="submit">Save period</button>

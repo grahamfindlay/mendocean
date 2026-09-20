@@ -1170,3 +1170,21 @@ test("Week periods persist per account with validated authenticated writes", asy
   expect((await api(a, "week-periods", {periods: []})).status).toBe(200);
   expect((await api(a, "week-periods")).data.periods).toEqual([]);
 });
+
+test("weekday preferences are private, validated, and preserved by older clients", async () => {
+  const base = {id:"weekday-test", label:"Early morning", start:"05:30", end:"07:00", enabled:true};
+  // A legacy saved object has no weekdays; the new endpoint supplies every day.
+  await api(a,"week-periods",{periods:[base]});
+  expect((await api(a,"week-periods/v2")).data.periods[0].days).toEqual([0,1,2,3,4,5,6]);
+  const periods = [{...base,days:[0,2,4]}];
+  expect((await api(a,"week-periods/v2",{periods})).status).toBe(200);
+  expect((await api(a,"week-periods/v2")).data.periods).toEqual(periods);
+  expect((await api(b,"week-periods/v2")).data.periods.every((p:any)=>p.days.length===7)).toBe(true);
+  expect((await api(null,"week-periods/v2")).status).toBe(401);
+  expect((await api(unapproved,"week-periods/v2",{periods})).status).toBe(403);
+  for (const days of [[],[0,0],[7],[-1],[1.5]])
+    expect((await api(a,"week-periods/v2",{periods:[{...base,days}]})).status).toBe(400);
+  expect((await api(a,"week-periods")).data.periods).toEqual([base]);
+  expect((await api(a,"week-periods",{periods:[{...base,label:"Dawn"}]})).status).toBe(200);
+  expect((await api(a,"week-periods/v2")).data.periods).toEqual([{...periods[0],label:"Dawn"}]);
+});

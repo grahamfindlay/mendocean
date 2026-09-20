@@ -1,6 +1,6 @@
 import WeekPeriodsEditor from "./WeekPeriodsEditor";
 import { useWeekPeriods } from "./useWeekPeriods";
-import { sortPeriods } from "../shared/weekPeriods";
+import { periodsForDay } from "../shared/weekPeriods";
 import {
   formatDate,
   formatTime,
@@ -33,7 +33,6 @@ export default function ForecastWeek({
   onSelectDay: (day: string) => void;
 }) {
   const preferences = useWeekPeriods(userId);
-  const periods = sortPeriods(preferences.periods.filter((p) => p.enabled));
   return (
     <>
       <WeekPeriodsEditor preferences={preferences} />
@@ -46,7 +45,11 @@ export default function ForecastWeek({
               onClick={() => onSelectDay(d)}
             >
               <span className="row-meta">{formatDate(d + "T12:00:00Z")}</span>
-              {practiceWindows(weather, d, periods).map((w) => (
+              {practiceWindows(
+                weather,
+                d,
+                periodsForDay(preferences.periods, d),
+              ).map((w) => (
                 <span className="practice-window" key={w.id}>
                   <span className="row-meta">
                     {w.label}{" "}

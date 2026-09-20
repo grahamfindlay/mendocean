@@ -223,6 +223,15 @@ Use existing forecast-window summaries for arbitrary local times. Ambiguous or n
 
 ## Shorter default periods — 2026-09-20
 
-Requested defaults: Early morning 05:30–07:00 and Evening 18:00–19:30. Change default definitions without overwriting existing saved preferences, since periods are now editable personal choices. Production build, 77 unit/database tests, and six focused browser cases passed. Release pending.
+Requested defaults: Early morning 05:30–07:00 and Evening 18:00–19:30. Change default definitions without overwriting existing saved preferences, since periods are now editable personal choices. Production build, 77 unit/database tests, and six focused browser cases passed. Released through PR #46 as `0b39968d2343378128dd6eff7fd2adec907ae985`. Fast passed (2m36s); full-stack passed on rerun (4m23s), after the recurring unrelated push-notification assertion failed on the first run. API deployed before frontend merge. Exact-commit production smoke and live shorter-window verification passed. Saved personal periods were preserved. Workspace synchronized to main; final release evidence persisted locally.
 
 Future idea (not requested for implementation): optional weekday selection inside each period editor. Default all seven days for existing/new periods; allow multiple weekdays and quick Every day / Weekdays / Weekends choices. Keep visibility independent from day eligibility. Apply only eligible enabled periods to each local calendar date, leaving the day chart available when none match. Display a concise day summary alongside each saved period.
+
+
+## Weekday restrictions — 2026-09-20
+
+User approved the interactive mockup and requested implementation. Add Monday-first individual day toggles and Every day / Weekdays / Weekends shortcuts inside each period editor. Require at least one day; use the existing enabled checkbox to hide a whole period. Show a concise day summary beside each saved period. Keep draft changes separate until Save and discard them on Cancel. Existing and new periods default to all seven days, preserving saved times and labels. Week cards show only enabled periods assigned to their Madison calendar date; empty cards remain selectable and the full-day chart stays available.
+
+The prior future-idea entry is superseded by this implementation. No database migration is needed: add validated days to existing JSON preferences. New clients use week-periods/v2. Legacy GET responses retain their strict original shape; legacy saves preserve stored weekday choices by period ID. Signed-out v2 local storage reads legacy data as a fallback and defaults missing days to all seven, without letting an old client overwrite newer weekday selections. Deploy the API before frontend release.
+
+Validation: production build and 79 unit/database tests pass; nine focused browser cases plus the final three narrow-phone editor checks pass across desktop Chromium, mobile Chromium, and mobile WebKit. Reviewed the 320px expanded editor with no overflow. Final isolated stack passed 45 backend tests, 43 production browser journeys (2 existing platform skips), and 8 upgrade cases (2 existing WebKit skips). The new persistence assertion waits for the acknowledged save before reading account data. Required CI and release checks pending.

@@ -1222,3 +1222,54 @@ test("Week periods apply every day and survive reloads, edits, and deselection",
   await cards.nth(1).click();
   await expect(cards.nth(1)).toHaveAttribute('aria-pressed','true');
 });
+
+test("weekday controls filter each local day, preserve legacy periods, and keep empty days selectable", async ({page}, testInfo) => {
+  const now=Date.parse('2026-09-21T14:00:00Z');
+  await page.clock.install({time:new Date(now)});
+  await page.addInitScript(()=>localStorage.setItem('mendocean-week-periods-v1',JSON.stringify([
+    {id:'morning',label:'Early morning',start:'05:30',end:'07:00',enabled:true},
+    {id:'evening',label:'Evening',start:'18:00',end:'19:30',enabled:true}
+  ])));
+  await page.route('**/api/weather',route=>route.fulfill({json:{fetched_at:new Date(now).toISOString(),provider:'Test fixture',source_kind:'fixture',model_version:'hannah-1.0.0',current:null,hours:Array.from({length:192},(_,i)=>({time:new Date(now+i*3600000).toISOString(),wind:7,direction:180,gust:10,temperature:65,precipitation:0,probability:0,visibility:16000,code:0}))}}));
+  await page.goto('/?tab=Week');
+  await page.getByText('Times of interest',{exact:true}).click();
+  const editor=page.locator('.week-periods');
+  const cards=page.locator('.week-card');
+  await expect(cards.first()).toContainText('Mon, Sep 21');
+  await editor.getByRole('button',{name:'Edit Early morning',exact:true}).click();
+  const days=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  for(const name of days) await expect(editor.getByRole('button',{name,exact:true})).toHaveAttribute('aria-pressed','true');
+  await editor.getByRole('button',{name:'Weekdays',exact:true}).click();
+  await expect(editor.getByRole('button',{name:'Saturday',exact:true})).toHaveAttribute('aria-pressed','false');
+  await editor.getByRole('button',{name:'Tuesday',exact:true}).click();
+  await editor.getByRole('button',{name:'Thursday',exact:true}).click();
+  await editor.getByRole('button',{name:'Save period',exact:true}).click();
+  for(let i=0;i<7;i++) {
+    if([0,2,4].includes(i)) await expect(cards.nth(i)).toContainText('Early morning');
+    else await expect(cards.nth(i)).not.toContainText('Early morning');
+  }
+  await expect(editor).toContainText('Mon, Wed, Fri');
+  await editor.getByRole('checkbox',{name:'Evening',exact:true}).uncheck();
+  await expect(cards.nth(1).locator('.practice-window')).toHaveCount(0);
+  await cards.nth(1).click();
+  await expect(cards.nth(1)).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('.weather-chart')).toBeVisible();
+  await page.reload();
+  await expect(cards.first()).toContainText('Early morning');
+  await expect(cards.nth(1)).not.toContainText('Early morning');
+  await page.getByText('Times of interest',{exact:true}).click();
+  await editor.getByRole('button',{name:'Edit Early morning',exact:true}).click();
+  for(const name of ['Monday','Wednesday','Friday']) await editor.getByRole('button',{name,exact:true}).click();
+  await editor.getByRole('button',{name:'Save period',exact:true}).click();
+  await expect(editor.getByRole('alert')).toHaveText('Choose at least one day.');
+  await editor.getByRole('button',{name:'Weekends',exact:true}).click();
+  await editor.getByRole('button',{name:'Cancel',exact:true}).click();
+  await expect(editor).toContainText('Mon, Wed, Fri');
+  await editor.getByRole('button',{name:'Edit Early morning',exact:true}).click();
+  await page.setViewportSize({width:320,height:844});
+  await editor.screenshot({path:`/tmp/weekdays-editor-${testInfo.project.name}.png`});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await editor.getByRole('button',{name:'Every day',exact:true}).click();
+  await editor.getByRole('button',{name:'Save period',exact:true}).click();
+  await expect(cards.locator('.practice-window')).toHaveCount(7);
+});
