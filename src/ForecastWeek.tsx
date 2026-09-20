@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
 import WeekPeriodsEditor from "./WeekPeriodsEditor";
 import { useWeekPeriods } from "./useWeekPeriods";
 import { periodsForDay } from "../shared/weekPeriods";
@@ -117,11 +116,6 @@ export default function ForecastWeek({
                   }}
                 >
                   <span className="week-date">
-                    <ChevronDown
-                      className="week-expand-icon"
-                      size={14}
-                      aria-hidden="true"
-                    />
                     <span className="sr-only">{dateLabel}</span>
                     <span aria-hidden="true">
                       {d === today ? "Today" : dateLabel.split(",")[0]}

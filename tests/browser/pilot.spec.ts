@@ -624,14 +624,16 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
   await cards.nth(1).getByRole("button").click();
   const expandedChart = cards.nth(1).locator(".weather-chart");
   await expect(expandedChart).toBeVisible();
-  await expect(expandedChart.locator(".chart-date, .chart-reading, .chart-header")).toHaveCount(0);
+  await expect(expandedChart.locator(".chart-date, .chart-window-key, .week-expand-icon, .card-expand-icon")).toHaveCount(0);
   await expect(expandedChart.locator(".chart-surface")).toHaveAttribute("data-domain-start", String(Date.parse("2026-09-16T05:00:00Z")));
   const gridBox = await page.locator(".week-grid").boundingBox();
   const expandedBox = await cards.nth(1).boundingBox();
   expect(Math.abs(gridBox!.width - expandedBox!.width)).toBeLessThan(1);
   const slider = expandedChart.getByRole("slider");
   await slider.press("Home");
+  const initialReading = await expandedChart.locator(".chart-reading time").textContent();
   await slider.press("ArrowRight");
+  await expect(expandedChart.locator(".chart-reading time")).not.toHaveText(initialReading!);
   await expect(slider).toHaveAttribute("aria-valuenow", "1");
   await cards.nth(2).getByRole("button").click();
   await expect(cards.nth(1).locator(".weather-chart")).toHaveCount(0);
@@ -782,7 +784,8 @@ test("a scheduled row is forecast over its own window, and scheduling is an expl
   await expect(card).toHaveAttribute("aria-expanded", "true");
   await expect(page.locator(".weather-chart")).toHaveCount(1);
   await expect(page.getByRole("slider")).toHaveAttribute("aria-valuetext", /9:45 AM/);
-  await expect(page.locator(".chart-header")).toHaveCount(0);
+  await expect(page.locator(".chart-reading")).toBeVisible();
+  await expect(page.locator(".card-expand-icon")).toHaveCount(0);
   await expect(
     page.locator("input[type=range], .sample-details, .hour-table, .day-nav"),
   ).toHaveCount(0);
@@ -950,7 +953,8 @@ test("scheduled filters, card-driven days, and accessible full-day inspection", 
   await expect(page.locator(".weather-chart")).toHaveCount(0);
   await cards.first().click();
   await expect(cards.first()).toHaveAttribute("aria-expanded", "true");
-  await expect(page.locator(".chart-header")).toHaveCount(0);
+  await expect(page.locator(".chart-reading")).toBeVisible();
+  await expect(page.locator(".card-expand-icon")).toHaveCount(0);
   await expect(page.getByRole("slider")).toHaveAttribute("aria-valuetext", /5:30 AM.*19% rain/);
   await expect(page.locator(".chart-probability-interval")).toHaveCount(24);
   await expect(page.locator(".chart-surface")).toHaveAttribute(
@@ -972,6 +976,7 @@ test("scheduled filters, card-driven days, and accessible full-day inspection", 
   await expect(page.getByRole("slider")).toHaveAttribute("aria-valuetext", /1:00 PM/);
   await page.getByRole("slider", { name: "Forecast time" }).press("ArrowRight");
   await expect(page.getByRole("slider")).toHaveAttribute("aria-valuetext", /1:15 PM/);
+  await expect(page.locator(".chart-reading time")).toHaveText("1:15 PM");
   await expect(page.locator(".chart-highlight")).toHaveCount(1);
   await page.getByRole("checkbox", { name: "Unknown", exact: true }).check();
   await cards.filter({ hasText: "Unknown practice" }).click();

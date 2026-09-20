@@ -1,5 +1,4 @@
 import { type ReactNode, useId } from "react";
-import { ChevronDown } from "lucide-react";
 import { type Forecast, type Outing } from "../shared/domain";
 import { summarizeWindow } from "../shared/timeline";
 import { scheduledAttendance } from "../shared/presentation";
@@ -96,15 +95,6 @@ export function ScheduledRowCards({
                   >
                     {attendanceLabel}
                   </span>
-                }
-                trailing={
-                  expandable ? (
-                    <ChevronDown
-                      className="card-expand-icon"
-                      size={18}
-                      aria-hidden="true"
-                    />
-                  ) : undefined
                 }
               />
               <WindowReading summary={summary} expired={expired} />
