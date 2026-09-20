@@ -63,16 +63,22 @@ button:disabled {
   border-bottom: 1px solid var(--line);
 }
 .wordmark {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+  display: inline-block;
   text-decoration: none;
   font-size: 30px;
   font-weight: 700;
   letter-spacing: -1.5px;
 }
+.wordmark-name {
+  display: flex;
+  align-items: baseline;
+  gap: 1px;
+}
 .wordmark-icon {
   flex-shrink: 0;
+  width: 0.88em;
+  height: 0.64em;
+  fill: #005b45;
 }
 .wordmark span {
   display: block;
@@ -312,10 +318,6 @@ footer {
   .wordmark {
     font-size: 27px;
   }
-  .wordmark-icon {
-    width: 30px;
-    height: 30px;
-  }
   .wordmark span {
     font-size: 8px;
   }
@@ -368,12 +370,7 @@ footer {
 }
 @media (max-width: 380px) {
   .wordmark {
-    gap: 6px;
     font-size: 24px;
-  }
-  .wordmark-icon {
-    width: 26px;
-    height: 26px;
   }
   .wordmark span {
     font-size: 7px;

@@ -58,6 +58,8 @@ async function startLog(page: Page) {
   ).toBeVisible();
 }
 async function chooseRow(page: Page) {
+  const boat = page.getByRole("combobox", { name: "Your boat", exact: true });
+  if (!(await boat.inputValue())) await boat.selectOption("1x");
   await page.getByRole("button", { name: "2 Good", exact: true }).click();
   await page.getByRole("button", { name: "East", exact: true }).click();
 }
