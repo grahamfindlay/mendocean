@@ -1523,11 +1523,6 @@ button:hover:not(:disabled) {
 }
 .week-grid article { min-width: 0; }
 .week-card { height: 100%; }
-.week-card .practice-window { display: block; margin-top: 12px; }
-.week-card .practice-window + .practice-window {
-  border-top: 1px solid var(--line);
-  padding-top: 12px;
-}
 .window-time {
   display: block;
   white-space: nowrap;
