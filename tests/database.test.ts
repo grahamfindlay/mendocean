@@ -50,6 +50,9 @@ describe("actual PostgreSQL permissions and transactions", () => {
     expect(
       (await as(ALICE, "select * from public.outing_members")).rows,
     ).toHaveLength(1);
+    expect(
+      (await as(ALICE, "select attendance from public.outing_members")).rows,
+    ).toEqual([{ attendance: "attending" }]);
   });
   it("isolates other users and blocks private data and privilege escalation", async () => {
     expect((await as(BOB, "select * from public.outings")).rows).toHaveLength(

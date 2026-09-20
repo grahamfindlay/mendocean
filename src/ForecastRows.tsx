@@ -1,27 +1,33 @@
-import { useEffect, useState } from "react";
-import { CalendarPlus, Clock } from "lucide-react";
+import { useEffect } from "react";
+import { CalendarPlus } from "lucide-react";
 import {
+  directionLabel,
   formatDate,
   formatTime,
   localDateTime,
   type Forecast,
   type Outing,
-  type WeatherHour,
 } from "../shared/domain";
-import type {
-  AssessmentCapabilities,
-  AssessmentContext,
-} from "../shared/model";
-import { api, supabase } from "./client";
+import { dayBounds, summarizeWindow, windowSamples } from "../shared/timeline";
+import {
+  visibleOutings,
+  scheduledAttendance,
+  weatherDescription,
+} from "../shared/presentation";
 import WeatherChart from "./WeatherChart";
-import { HourRow } from "./HourRow";
-import { WindowReading } from "./WindowReading";
-import ForecastDayView from "./ForecastDayView";
-import { summarizeWindow, windowSamples } from "../shared/timeline";
-import { visibleOutings } from "../shared/presentation";
+import WeatherIcon from "./WeatherIcon";
 
-const defaultContext = { route: "either", boat: "any", coach: "none" };
-const emptyCapabilities: AssessmentCapabilities = { pooled: [], mine: [] };
+const choices = [
+  ["attending", "Attending"],
+  ["unknown", "Unknown"],
+  ["declined", "Not attending"],
+] as const;
+const range = (value: { min: number; max: number } | null) =>
+  !value
+    ? "—"
+    : Math.round(value.min) === Math.round(value.max)
+      ? String(Math.round(value.min))
+      : `${Math.round(value.min)}–${Math.round(value.max)}`;
 
 export default function ForecastRows({
   weather,
@@ -31,12 +37,9 @@ export default function ForecastRows({
   selectedRow,
   onSelectRow,
   onSchedule,
-  days,
-  day,
-  today,
-  daySamples,
-  onSelectDay,
   userId,
+  attendance,
+  onAttendanceChange,
 }: {
   weather: Forecast;
   outings: Outing[];
@@ -45,336 +48,187 @@ export default function ForecastRows({
   selectedRow: string;
   onSelectRow: (id: string) => void;
   onSchedule: () => void;
-  days: string[];
-  day: string;
-  today: string;
-  daySamples: WeatherHour[];
-  onSelectDay: (day: string) => void;
   userId?: string;
+  attendance: string[];
+  onAttendanceChange: (values: string[]) => void;
 }) {
-  const [basis, setBasis] = useState<"pooled" | "mine">("pooled");
-  const [context, setContext] = useState<AssessmentContext>(defaultContext);
-  const [capabilities, setCapabilities] = useState(emptyCapabilities);
-  const [estimate, setEstimate] = useState<{
-    source: string;
-    reason: string | null;
-    launch_probability: number | null;
-    water_probabilities: number[] | null;
-    outings: number;
-  } | null>(null);
-  const [estimateError, setEstimateError] = useState("");
-  const [onChart, setOnChart] = useState(true);
-  // The same list helper My rows uses, so the two cannot answer "upcoming"
-  // differently. This view holds no filter selection of its own.
   const upcoming = visibleOutings(outings, "Upcoming", now);
-  const row = upcoming.find((o) => o.id === selectedRow) || upcoming[0];
-  const start = row ? Date.parse(row.starts_at) : NaN;
-  const end = row ? Date.parse(row.ends_at) : NaN;
-  const rowDay = row ? localDateTime(row.starts_at).slice(0, 10) : "";
-  /* The day chart follows the selected row, so the highlight has something to
-     sit on. Picking another day afterwards still sticks: this only re-runs
-     when the row itself changes. */
+  const matching = upcoming.filter((o) =>
+    attendance.includes(scheduledAttendance(o)),
+  );
+  const row = matching.find((o) => o.id === selectedRow) || matching[0];
   useEffect(() => {
-    if (rowDay) onSelectDay(rowDay);
-  }, [rowDay]);
-  const highlight: [number, number] | undefined =
-    onChart && Number.isFinite(start) && Number.isFinite(end)
-      ? [start, end]
-      : undefined;
-  useEffect(() => {
-    let active = true;
-    setCapabilities(emptyCapabilities);
-    setBasis("pooled");
-    setContext(defaultContext);
-    if (supabase)
-      void api<AssessmentCapabilities>("assessment/capabilities")
-        .then((v) => {
-          if (active) setCapabilities(v);
-        })
-        .catch(() => {
-          /* Weather remains useful if model metadata is unavailable. */
-        });
-    return () => {
-      active = false;
-    };
-  }, [userId]);
-  const effectiveBasis = capabilities[basis].length
-    ? basis
-    : capabilities.pooled.length
-      ? "pooled"
-      : "mine";
-  const contexts = capabilities[effectiveBasis];
-  const effectiveContext =
-    contexts.find((c) => JSON.stringify(c) === JSON.stringify(context)) ||
-    contexts[0] ||
-    defaultContext;
-  const { route, boat, coach } = effectiveContext;
-  const startsAt = row?.starts_at;
-  useEffect(() => {
-    let active = true;
-    setEstimate(null);
-    setEstimateError("");
-    if (!supabase || !contexts.length || !startsAt) return;
-    const timer = setTimeout(() => {
-      void api<typeof estimate>("assessment", {
-        // Normalized, not passed through: Postgres returns "+00:00" and the
-        // endpoint's schema accepts only a "Z" suffix.
-        time: new Date(startsAt).toISOString(),
-        basis: effectiveBasis,
-        route,
-        boat,
-        coach,
-      })
-        .then((v) => {
-          if (active) setEstimate(v);
-        })
-        .catch((e) => {
-          if (active) setEstimateError(e.message);
-        });
-    }, 300);
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [startsAt, effectiveBasis, route, boat, coach, contexts.length, userId]);
+    if (row?.id !== selectedRow) onSelectRow(row?.id || "");
+  }, [row?.id]);
   if (!userId)
     return (
-      <>
-        <section className="form-card">
-          <h2>Sign in to forecast your rows</h2>
-          <p>
-            Scheduled rows and their forecasts need an account. Today and Week
-            stay available without one.
-          </p>
-        </section>
-        <ForecastDayView
-          weather={weather}
-          days={days}
-          day={day}
-          today={today}
-          daySamples={daySamples}
-          expired={expired}
-          now={now}
-          onSelectDay={onSelectDay}
-        />
-      </>
+      <section className="form-card">
+        <h2>Sign in to forecast your rows</h2>
+        <p>Scheduled rows and their forecasts need an account.</p>
+        <p>Today and Week stay available without one.</p>
+      </section>
     );
-  const selected = windowSamples(weather, start, end).samples;
+  const day = row ? localDateTime(row.starts_at).slice(0, 10) : "";
+  const domain = day ? dayBounds(day) : undefined;
+  const samples = domain ? windowSamples(weather, ...domain).samples : [];
+  const start = row ? Date.parse(row.starts_at) : 0;
+  const closest = samples.reduce<number | undefined>(
+    (best, h) =>
+      best === undefined ||
+      Math.abs(Date.parse(h.time) - start) < Math.abs(best - start)
+        ? Date.parse(h.time)
+        : best,
+    undefined,
+  );
   return (
     <>
-      {upcoming.length ? (
-        <div className="row-grid">
-          {upcoming.map((o) => (
-            <button
-              className="row-card"
-              key={o.id}
-              aria-pressed={o.id === row?.id}
-              onClick={() => onSelectRow(o.id)}
-            >
-              <span className="eyebrow">{formatDate(o.starts_at)}</span>
-              <h3>{o.title}</h3>
-              <span className="window-facts">
-                {formatTime(o.starts_at)}–{formatTime(o.ends_at)}
-              </span>
-              <WindowReading
-                summary={summarizeWindow(
-                  weather,
-                  Date.parse(o.starts_at),
-                  Date.parse(o.ends_at),
-                )}
-                expired={expired}
-              />
-            </button>
-          ))}
-        </div>
-      ) : (
-        <section className="form-card">
-          <h2>No rows scheduled</h2>
-          <p>
-            Schedule an independent row for any time and its forecast appears
-            here.
-          </p>
-          <button className="button" onClick={onSchedule}>
-            <CalendarPlus size={17} />
-            Schedule independent row
-          </button>
-        </section>
-      )}
-      {row && (
-        <>
-          <div className="section-heading">
-            <h2>{row.title}</h2>
-            <span>
-              <Clock size={14} /> {formatDate(row.starts_at)} ·{" "}
-              {formatTime(row.starts_at)}–{formatTime(row.ends_at)}
-            </span>
-          </div>
-          <p className="help">
-            Actual samples include the row’s boundaries; values are not
-            interpolated to its exact minute.
-          </p>
-          {!!contexts.length && (
-            <section className="form-card">
-              <div className="field-grid">
-                {!!capabilities.mine.length && (
-                  <label>
-                    Use observations
-                    <select
-                      value={effectiveBasis}
-                      onChange={(e) =>
-                        setBasis(e.target.value as "pooled" | "mine")
-                      }
-                    >
-                      {!!capabilities.pooled.length && (
-                        <option value="pooled">Everyone’s data</option>
-                      )}
-                      <option value="mine">Only my data</option>
-                    </select>
-                  </label>
-                )}
-                {(["route", "boat", "coach"] as const).map((field) => {
-                  const options = [...new Set(contexts.map((c) => c[field]))];
-                  if (
-                    options.length < 2 &&
-                    (!options[0] || options[0] === defaultContext[field])
+      <div className="scheduled-toolbar">
+        <fieldset className="attendance-filters">
+          <legend className="sr-only">
+            Filter scheduled rows by attendance
+          </legend>
+          {choices.map(([value, label]) => (
+            <label key={value}>
+              <input
+                type="checkbox"
+                checked={attendance.includes(value)}
+                onChange={(e) =>
+                  onAttendanceChange(
+                    e.target.checked
+                      ? [...attendance, value]
+                      : attendance.filter((v) => v !== value),
                   )
-                    return null;
-                  return (
-                    <label key={field}>
-                      {
-                        { route: "Route", boat: "Boat", coach: "Coach factor" }[
-                          field
-                        ]
-                      }
-                      <select
-                        value={effectiveContext[field]}
-                        onChange={(e) => {
-                          const matches = contexts.filter(
-                            (c) => c[field] === e.target.value,
-                          );
-                          matches.sort((a, b) =>
-                            Object.keys(defaultContext).reduce(
-                              (score, key) =>
-                                score +
-                                Number(
-                                  b[key as keyof AssessmentContext] ===
-                                    effectiveContext[
-                                      key as keyof AssessmentContext
-                                    ],
-                                ) -
-                                Number(
-                                  a[key as keyof AssessmentContext] ===
-                                    effectiveContext[
-                                      key as keyof AssessmentContext
-                                    ],
-                                ),
-                              0,
-                            ),
-                          );
-                          setContext(matches[0]);
-                        }}
-                      >
-                        {options.map((v) => (
-                          <option key={v} value={v}>
-                            {(
-                              {
-                                either: "Either direction",
-                                any: "Any boat",
-                                none: "No coach factor",
-                                east: "East",
-                                west: "West",
-                                uncoached: "Uncoached",
-                              } as Record<string, string>
-                            )[v] || v}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-          <WeatherChart
-            key={row.id}
-            samples={selected}
-            expired={expired}
-            title="Selected forecast"
-          />
-          <section className="hour-table">
-            {selected.length ? (
-              selected.map((h) => (
-                <HourRow
-                  key={h.time}
-                  hour={h}
-                  hours={weather.hours}
-                  expired={expired}
-                />
-              ))
-            ) : (
-              <p className="empty">
-                Forecast not available for this row. It may be beyond the
-                forecast horizon.
-              </p>
-            )}
-          </section>
-          {estimate && estimate.source !== "heuristic" && !expired && (
-            <section className="form-card assessment-result">
-              <h2>What logged rows suggest</h2>
-              {estimate.launch_probability !== null && (
-                <p>
-                  {Math.round(estimate.launch_probability * 100)}% estimated
-                  rowing rate in similar conditions.
-                </p>
-              )}
-              {estimate.water_probabilities && (
-                <p>
-                  Water ratings:{" "}
-                  {estimate.water_probabilities
-                    .map((p, i) => `${i + 1}: ${Math.round(p * 100)}%`)
-                    .join(" · ")}
-                </p>
-              )}
-              <p className="help">
-                Based on {estimate.outings} distinct outings ·{" "}
-                {effectiveBasis === "mine" ? "Only your data" : "Pooled data"} ·
-                Hourly weather near the row’s start · Assessment:{" "}
-                {estimate.source}
-              </p>
-            </section>
-          )}
-          {estimateError && <p className="help">{estimateError}</p>}
-        </>
+                }
+              />
+              {label}
+            </label>
+          ))}
+        </fieldset>
+        <button className="button subtle" onClick={onSchedule}>
+          <CalendarPlus size={16} /> Schedule independent row
+        </button>
+      </div>
+      {!matching.length ? (
+        <section className="form-card">
+          <h2>
+            {upcoming.length
+              ? "No rows match these filters"
+              : "No rows scheduled"}
+          </h2>
+          <p>
+            {upcoming.length
+              ? "Select an attendance status to see more scheduled rows."
+              : "Schedule an independent row for any time and its forecast appears here."}
+          </p>
+        </section>
+      ) : (
+        <div className="row-grid scheduled-row-grid">
+          {matching.map((o) => {
+            const summary = summarizeWindow(
+              weather,
+              Date.parse(o.starts_at),
+              Date.parse(o.ends_at),
+            );
+            const bearing = summary.direction?.variable
+              ? null
+              : summary.direction?.bearing;
+            const code = summary.codes.length
+              ? Math.max(...summary.codes)
+              : null;
+            return (
+              <button
+                className="row-card scheduled-row-card"
+                key={o.id}
+                aria-pressed={o.id === row?.id}
+                onClick={() => onSelectRow(o.id)}
+              >
+                <span className="scheduled-card-top">
+                  <span className="row-meta">{formatDate(o.starts_at)}</span>
+                  <span className="attendance-badge">
+                    {choices.find(([v]) => v === scheduledAttendance(o))![1]}
+                  </span>
+                </span>
+                <span className="row-meta">
+                  {formatTime(o.starts_at)} – {formatTime(o.ends_at)}
+                </span>
+                <h3 className="row-meta">{o.title}</h3>
+                <span className="scheduled-card-weather">
+                  {!summary.samples ? (
+                    <span>Forecast not available.</span>
+                  ) : (
+                    <>
+                      <span className="scheduled-weather-line">
+                        <svg
+                          viewBox="0 0 24 24"
+                          width="20"
+                          height="20"
+                          role="img"
+                          aria-label={
+                            bearing == null
+                              ? "Wind direction unavailable or variable"
+                              : `Wind from ${directionLabel(bearing)}`
+                          }
+                        >
+                          {bearing == null ? (
+                            <text x="12" y="17" textAnchor="middle">
+                              —
+                            </text>
+                          ) : (
+                            <path
+                              d="M12 3V21 M6 15L12 21L18 15"
+                              transform={`rotate(${bearing} 12 12)`}
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            />
+                          )}
+                        </svg>
+                        <span>
+                          <span
+                            className={`wind-speed ${expired ? "unavailable" : summary.status}`}
+                          >
+                            {range(summary.wind)} mph
+                          </span>{" "}
+                          • G{summary.gust?.toFixed(0) ?? "—"} •{" "}
+                          {summary.direction?.variable
+                            ? "Variable"
+                            : `from ${directionLabel(bearing ?? null)}`}
+                        </span>
+                      </span>
+                      <span className="scheduled-weather-line">
+                        <WeatherIcon code={code} />
+                        <span>
+                          {range(summary.temperature)}°F •{" "}
+                          {weatherDescription(code)} •{" "}
+                          {summary.probability
+                            ? `${range(summary.probability)}% rain`
+                            : "Rain chance unknown"}
+                        </span>
+                      </span>
+                      {!summary.covered && (
+                        <span className="window-partial">
+                          Partial forecast coverage
+                        </span>
+                      )}
+                    </>
+                  )}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       )}
       {row && (
-        <label className="chart-toggle">
-          <input
-            type="checkbox"
-            checked={onChart}
-            onChange={(e) => setOnChart(e.target.checked)}
-          />
-          Show this row on the day chart
-        </label>
-      )}
-      <ForecastDayView
-        weather={weather}
-        days={days}
-        day={day}
-        today={today}
-        daySamples={daySamples}
-        expired={expired}
-        now={now}
-        onSelectDay={onSelectDay}
-        highlight={highlight}
-      />
-      {!!upcoming.length && (
-        <div className="log-callout">
-          <h2>Planning another row?</h2>
-          <button className="button" onClick={onSchedule}>
-            <CalendarPlus size={17} />
-            Schedule independent row
-          </button>
-        </div>
+        <WeatherChart
+          key={row.id + row.starts_at}
+          samples={samples}
+          probabilityHours={weather.hours}
+          domain={domain}
+          initialTime={closest}
+          expired={expired}
+          title={formatDate(row.starts_at)}
+          highlight={[start, Date.parse(row.ends_at)]}
+        />
       )}
     </>
   );

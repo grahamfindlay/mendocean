@@ -194,7 +194,7 @@ test("first install, signed-out foreground A→B→C, no reload loop, coherent o
   await foreground(page, 1);
   await expect(build(page)).toHaveAttribute("content", b);
   await expect(
-    page.getByRole("img", { name: /^Wind from/ }).first(),
+    page.getByRole("heading", { name: "Sign in to forecast your rows" }),
   ).toBeVisible();
   const c = await release("c");
   await foreground(page, 2);
