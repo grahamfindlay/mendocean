@@ -176,7 +176,7 @@ test("practice windows summarize the two rowing intervals and stay honest outsid
     "2026-09-16T05:30",
   );
   expect(localDateTime(new Date(windows[0].endsAt).toISOString())).toBe(
-    "2026-09-16T07:30",
+    "2026-09-16T07:00",
   );
   expect(windows[0].summary.covered).toBe(true);
   expect(windows[0].summary.wind).toEqual({ min: 7, max: 7 });
@@ -188,7 +188,7 @@ test("practice windows summarize the two rowing intervals and stay honest outsid
   expect(past[0].summary.samples).toBe(0);
   expect(past[0].summary.wind).toBeNull();
   expect(past[0].summary.status).toBe("unavailable");
-  // Evening on the 15th runs 23:00Z to 01:00Z and is covered even though the
+  // Evening on the 15th runs 23:00Z to 00:30Z and is covered even though the
   // interval crosses midnight UTC.
   expect(past[1].summary.covered).toBe(true);
   // A day past the provider's horizon reports nothing rather than borrowing
