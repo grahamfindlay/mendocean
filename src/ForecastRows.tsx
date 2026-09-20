@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { CalendarPlus } from "lucide-react";
 import {
   formatDate,
@@ -22,6 +22,7 @@ export default function ForecastRows({
   userId,
   attendance,
   onAttendanceChange,
+  onAttendance,
 }: {
   weather: Forecast;
   outings: Outing[];
@@ -33,15 +34,26 @@ export default function ForecastRows({
   userId?: string;
   attendance: string[];
   onAttendanceChange: (values: string[]) => void;
+  onAttendance: (outing: Outing) => void;
 }) {
   const upcoming = visibleOutings(outings, "Upcoming", now);
   const matching = upcoming.filter((o) =>
     attendance.includes(scheduledAttendance(o)),
   );
-  const row = matching.find((o) => o.id === selectedRow) || matching[0];
+  const [expandedRow, setExpandedRow] = useState<string | null>(
+    selectedRow || null,
+  );
+  // An explicit "View forecast" action can open a row; ordinary visits start collapsed.
   useEffect(() => {
-    if (row?.id !== selectedRow) onSelectRow(row?.id || "");
-  }, [row?.id]);
+    if (selectedRow) {
+      setExpandedRow(selectedRow);
+      onSelectRow("");
+    }
+  }, [selectedRow, onSelectRow]);
+  const row = matching.find((o) => o.id === expandedRow);
+  useEffect(() => {
+    if (!row) setExpandedRow(null);
+  }, [row]);
   if (!userId)
     return (
       <section className="form-card">
@@ -95,22 +107,29 @@ export default function ForecastRows({
       ) : (
         <ScheduledRowCards
           weather={weather}
+          onAttendance={onAttendance}
           rows={matching}
           selectedRow={row?.id}
-          onSelectRow={onSelectRow}
+          onSelectRow={(id) => {
+            setExpandedRow(expandedRow === id ? null : id);
+          }}
           expired={expired}
-        />
-      )}
-      {row && (
-        <WeatherChart
-          key={row.id + row.starts_at}
-          samples={samples}
-          probabilityHours={weather.hours}
-          domain={domain}
-          initialTime={closest}
-          expired={expired}
-          title={formatDate(row.starts_at)}
-          highlight={[start, Date.parse(row.ends_at)]}
+          expandedContent={
+            row ? (
+              <WeatherChart
+                key={row.id + row.starts_at}
+                showTitle={false}
+                showReading={false}
+                samples={samples}
+                probabilityHours={weather.hours}
+                domain={domain}
+                initialTime={closest}
+                expired={expired}
+                title={formatDate(row.starts_at)}
+                highlight={[start, Date.parse(row.ends_at)]}
+              />
+            ) : null
+          }
         />
       )}
     </>
