@@ -576,9 +576,16 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
   await page.getByRole("button", { name: "Week", exact: true }).click();
   const cards = page.locator(".week-grid article");
   await expect(cards).toHaveCount(7);
+  if (page.viewportSize()!.width <= 600) {
+    await expect.poll(async () => {
+      const grid = await page.locator(".week-grid").boundingBox();
+      const card = await cards.first().boundingBox();
+      return Math.abs(grid!.width - card!.width);
+    }).toBeLessThan(1);
+  }
   await expect(cards.first().locator(".practice-window")).toHaveCount(2);
-  await expect(cards.first()).toContainText("Morning 5:30 AM–7:30 AM");
-  await expect(cards.first()).toContainText("Evening 6:00 PM–8:00 PM");
+  await expect(cards.first()).toContainText("Morning 5:30 AM – 7:30 AM");
+  await expect(cards.first()).toContainText("Evening 6:00 PM – 8:00 PM");
   // A time range split across lines reads as two times; found on the live site.
   await expect(cards.first().locator(".window-time").first()).toHaveCSS(
     "white-space",
