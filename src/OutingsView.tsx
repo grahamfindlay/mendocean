@@ -21,6 +21,8 @@ import {
   type RowFilters,
 } from "../shared/presentation";
 import {
+  accountReminderBlock,
+  reminderBlockMessage,
   reminderPresentation,
   type ReminderProfile,
 } from "../shared/reminders";
@@ -87,6 +89,7 @@ export default function OutingsView({
   ].filter(Boolean).length;
   const set = (patch: RowFilters) => onFilters({ ...filters, ...patch });
   const visible = visibleOutings(outings, view, now, inView);
+  const accountBlock = accountReminderBlock(visible, profile, now);
   // A second pass rather than a flag on the first: the count is only wanted
   // when the list looks emptier than the owner expects.
   const hidden =
@@ -197,6 +200,16 @@ export default function OutingsView({
             : view === "Upcoming"
               ? "No upcoming rows. Add an independent row or connect Boathouse Connect in Account."
               : "No past rows yet."}
+        </p>
+      )}
+      {/* One notice for the whole list rather than the same sentence on every
+          card: the owner clears it once, in Account. */}
+      {accountBlock && (
+        <p className="help reminder-notice">
+          {reminderBlockMessage(accountBlock)}{" "}
+          <button className="text-button" onClick={onSettings}>
+            Reminder settings
+          </button>
         </p>
       )}
       {!!hidden && (
@@ -382,7 +395,6 @@ export default function OutingsView({
                   </p>
                   {o.reminder &&
                     !o.skipped &&
-                    !reminder.settings &&
                     !!o.reminder_state?.channels?.length && (
                       <ul className="channel-status">
                         {o.reminder_state.channels.map((c) => (
@@ -413,14 +425,12 @@ export default function OutingsView({
                         ))}
                       </ul>
                     )}
-                  {phase !== "past" &&
-                    !reminder.settings &&
-                    reminder.toggle && (
-                      <small>
-                        To log after the outing, normally 15 minutes after it
-                        ends.
-                      </small>
-                    )}
+                  {phase !== "past" && reminder.toggle && (
+                    <small>
+                      To log after the outing, normally 15 minutes after it
+                      ends.
+                    </small>
+                  )}
                   {reminder.partial && reminder.snooze && (
                     <small>
                       Requesting another reminder sends all your selected
@@ -428,8 +438,7 @@ export default function OutingsView({
                     </small>
                   )}
                   <div className="card-actions">
-                    {(reminder.settings ||
-                      o.reminder_state?.channels?.some((c) => c.error)) && (
+                    {o.reminder_state?.channels?.some((c) => c.error) && (
                       <button className="text-button" onClick={onSettings}>
                         Reminder settings
                       </button>

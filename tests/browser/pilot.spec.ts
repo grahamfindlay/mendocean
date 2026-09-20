@@ -183,6 +183,12 @@ test("future outing stays forecast-only, past rows sort and saved reports have n
     "Logged practice",
   ]);
   await expect(page.getByText("Not attending", { exact: true })).toBeVisible();
+  // R28. The account-level reason is stated once for the list, and no card
+  // carries a reminder sentence explaining a reminder it cannot have.
+  await expect(
+    page.getByText("Choose a logging reminder channel in Account first."),
+  ).toHaveCount(1);
+  await expect(page.locator(".outing-reminder")).toHaveCount(0);
   await expect(
     page.getByText("1 past practice you did not attend is hidden."),
   ).toBeVisible();
