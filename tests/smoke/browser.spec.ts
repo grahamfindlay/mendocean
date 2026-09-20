@@ -10,10 +10,10 @@ test("production forecast renders and public navigation works", async ({
   ).toBeVisible();
   await expect(page.locator("main")).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Scheduled rows", exact: true }),
+    page.getByRole("button", { name: "Today", exact: true }),
   ).toHaveAttribute("aria-current", "page");
   await expect(
-    page.getByRole("heading", { name: "Sign in to forecast your rows" }),
+    page.getByRole("heading", { name: "Now", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Today", exact: true }).click();
   // A rendered forecast must include actual conditions, not just the static shell.

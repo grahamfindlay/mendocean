@@ -28,7 +28,7 @@ test.beforeEach(async ({ page }) => {
 test("public forecast, planner, and invitation boundary", async ({ page }) => {
   await page.goto("/");
   await expect(
-    page.getByRole("button", { name: "Scheduled rows", exact: true }),
+    page.getByRole("button", { name: "Today", exact: true }),
   ).toHaveAttribute("aria-current", "page");
   await page
     .getByRole("button", { name: "Scheduled rows", exact: true })
@@ -888,7 +888,7 @@ test("scheduled filters, card-driven days, and accessible full-day inspection", 
       },
     }),
   );
-  await page.goto("/?preview=1");
+  await page.goto("/?preview=1&tab=Rows");
   await expect(
     page.getByRole("button", { name: "Scheduled rows", exact: true }),
   ).toHaveAttribute("aria-current", "page");
@@ -978,6 +978,12 @@ test("scheduled filters, card-driven days, and accessible full-day inspection", 
   await expect(cards).toHaveCount(1);
   await page.getByRole("button", { name: "My rows", exact: true }).click();
   await page.getByRole("button", { name: "Forecasts", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Today", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+  await page
+    .getByRole("button", { name: "Scheduled rows", exact: true })
+    .click();
   await expect(cards).toHaveCount(1);
   await page.getByRole("button", { name: "My rows", exact: true }).click();
   await page
