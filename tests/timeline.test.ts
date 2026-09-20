@@ -2,6 +2,8 @@ import { expect, test } from "vitest";
 import { normalizeWeather, weatherURL } from "../shared/weather";
 import {
   practiceWindows,
+  rainChanceIntervals,
+  dayChartTicks,
   nearTerm,
   precipitationRate,
   timelineSamples,
@@ -321,4 +323,38 @@ test("rain probability survives the quarter-hour horizon that masks it", () => {
   ];
   const s = summarizeWindow(windowOf(hours, quarter), base, base + 3600000);
   expect(s.probability).toEqual({ min: 20, max: 55 });
+});
+
+test("probability graph preserves zero, unknown gaps, and preceding-hour bounds", () => {
+  const hours = [
+    { ...row(base), probability: 0 },
+    { ...row(base + 3600000), probability: null },
+    { ...row(base + 7200000), probability: 80 },
+  ];
+  expect(rainChanceIntervals(hours, base - 1800000, base + 5400000)).toEqual([
+    { start: base - 1800000, end: base, probability: 0 },
+    { start: base + 3600000, end: base + 5400000, probability: 80 },
+  ]);
+  expect(
+    hourlyRainChance(hours, new Date(base).toISOString())?.probability,
+  ).toBe(0);
+  expect(hourlyRainChance(hours, new Date(base + 1).toISOString())).toBeNull();
+  expect(rainChanceIntervals(hours, base + 7200000, base + 10800000)).toEqual(
+    [],
+  );
+});
+test("day rulers stay at local midnight, six, noon and eighteen across DST", () => {
+  for (const day of ["2026-03-08", "2026-11-01", "2026-09-21"]) {
+    const bounds = dayBounds(day);
+    expect(
+      dayChartTicks(...bounds).map((t) =>
+        localDateTime(new Date(t).toISOString()).slice(11, 16),
+      ),
+    ).toEqual(["00:00", "06:00", "12:00", "18:00"]);
+  }
+  expect(
+    dayChartTicks(base + 24 * 60000, base + 86400000).every(
+      (t) => t % 3600000 === 0,
+    ),
+  ).toBe(true);
 });

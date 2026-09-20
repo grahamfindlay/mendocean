@@ -1779,3 +1779,161 @@ button:hover:not(:disabled) {
 .horizon-picker select {
   width: auto;
 }
+
+/* Scheduled forecasts: compact cards and an almost edge-to-edge plotting area. */
+.scheduled-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 20px 0;
+}
+.attendance-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.attendance-filters label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 14px;
+}
+.attendance-filters input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+}
+.scheduled-row-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
+}
+.scheduled-card-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.scheduled-row-card .row-meta {
+  display: block;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+  margin: 0 0 5px;
+  line-height: 1.45;
+}
+.scheduled-row-card .attendance-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.scheduled-card-weather {
+  display: grid;
+  gap: 7px;
+  border-top: 1px solid var(--line);
+  margin-top: 12px;
+  padding-top: 12px;
+  font-size: 13px;
+}
+.scheduled-weather-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.5;
+}
+.scheduled-weather-line svg {
+  flex: 0 0 20px;
+}
+.scheduled-row-card .wind-speed {
+  font-size: inherit;
+  font-weight: inherit;
+}
+.weather-chart {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.chart-header {
+  padding: 0 8px;
+}
+.chart-date {
+  margin: 0;
+  padding: 12px 0;
+  text-align: center;
+  border-bottom: 1px solid var(--line);
+  font-size: 16px;
+}
+.chart-reading {
+  background: none;
+  border-radius: 0;
+  text-align: center;
+  gap: 4px;
+  padding: 16px 0 8px;
+  min-height: 144px;
+  color: var(--ink);
+}
+.chart-reading time {
+  color: var(--muted);
+  font-weight: 400;
+}
+.chart-primary-reading {
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #252525;
+}
+.chart-primary-reading small {
+  font-size: 18px;
+}
+.chart-secondary-reading {
+  color: var(--muted);
+}
+.weather-chart .chart-wind {
+  stroke: #252525;
+}
+.weather-chart .chart-wind-fill {
+  fill: #25252512;
+}
+.weather-chart .chart-gust {
+  stroke: #747474;
+}
+.weather-chart .chart-gust-fill {
+  fill: #7474740a;
+}
+.chart-legend .wind-key {
+  border-color: #252525;
+}
+.chart-legend .gust-key {
+  border-color: #747474;
+}
+.chart-time-grid {
+  stroke-dasharray: 3 4;
+  opacity: 0.7;
+}
+.chart-cursor {
+  stroke: #535353;
+  stroke-dasharray: none;
+}
+.chart-surface:focus-visible {
+  outline-offset: 2px;
+}
+@media (max-width: 600px) {
+  .weather-chart {
+    margin-left: -12px;
+    margin-right: -12px;
+    padding: 0;
+  }
+  .scheduled-row-grid {
+    grid-template-columns: 1fr;
+  }
+  .attendance-filters {
+    gap: 12px;
+  }
+}

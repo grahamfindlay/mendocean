@@ -1,17 +1,17 @@
 import { useId, useState, useEffect, useRef } from "react";
+import { directionLabel, formatTime, type WeatherHour } from "../shared/domain";
 import {
-  directionLabel,
-  formatDate,
-  formatTime,
-  type WeatherHour,
-} from "../shared/domain";
-import { precipitationRate, sampleMinutes } from "../shared/timeline";
+  hourlyRainChance,
+  sampleMinutes,
+  rainChanceIntervals,
+  dayChartTicks,
+} from "../shared/timeline";
 import { weatherDescription } from "../shared/presentation";
-import { WindSpeed, Gust, WindVector } from "./WindReading";
+import { WindVector } from "./WindReading";
 import WeatherIcon from "./WeatherIcon";
 
-const left = 48,
-  right = 16;
+const left = 8,
+  right = 30;
 /** Straight segments preserve peaks; nulls and missing time intervals break paths. */
 function segments(
   samples: WeatherHour[],
@@ -44,8 +44,10 @@ export default function WeatherChart({
   expired = false,
   title = "Weather over time",
   highlight,
+  probabilityHours = [],
 }: {
   samples: WeatherHour[];
+  probabilityHours?: WeatherHour[];
   domain?: [number, number];
   initialTime?: number;
   expired?: boolean;
@@ -60,6 +62,7 @@ export default function WeatherChart({
   const [frozen, setFrozen] = useState<{
     samples: WeatherHour[];
     domain: [number, number];
+    probabilityHours: WeatherHour[];
   } | null>(null);
   const pointer = useRef<{
     id: number;
@@ -80,11 +83,12 @@ export default function WeatherChart({
   if (!samples.length && !frozen)
     return (
       <section className="weather-chart" aria-label={title}>
-        <h2>{title}</h2>
+        <p className="chart-date">{title}</p>
         <p>Forecast samples unavailable.</p>
       </section>
     );
   const data = frozen?.samples || samples;
+  const rainHours = frozen?.probabilityHours || probabilityHours;
   const [start, end] = frozen?.domain ||
     domain || [Date.parse(data[0].time), Date.parse(data.at(-1)!.time)];
   const targetTime = selected ? Date.parse(selected) : (initialTime ?? start);
@@ -107,7 +111,14 @@ export default function WeatherChart({
   );
   const tempMin = Math.floor(Math.min(...temps, 60) / 5) * 5;
   const tempMax = Math.ceil(Math.max(...temps, 65) / 5) * 5;
-  const rainMax = Math.max(0.05, ...data.map((h) => precipitationRate(h) ?? 0));
+  const windMax = Math.max(
+    30,
+    Math.ceil(
+      Math.max(...data.map((h) => Math.max(h.wind ?? 0, h.gust ?? 0))) / 10,
+    ) * 10,
+  );
+  const chance = hourlyRainChance(rainHours, h.time);
+  const rainIntervals = rainChanceIntervals(rainHours, start, end);
   const plot = (
     value: (h: WeatherHour) => number | null,
     top: number,
@@ -177,11 +188,13 @@ export default function WeatherChart({
       (point) =>
         Date.parse(point.time) >= start && Date.parse(point.time) <= end,
     );
-  const tickCount = W < 400 ? 3 : 5;
-  const ticks = Array.from(
-    { length: tickCount },
-    (_, i) => start + ((end - start) * i) / (tickCount - 1),
-  );
+  const ticks =
+    hours >= 23
+      ? dayChartTicks(start, end)
+      : Array.from(
+          { length: W < 400 ? 3 : 5 },
+          (_, i) => start + ((end - start) * i) / (W < 400 ? 2 : 4),
+        );
   const cursor = Math.min(W - right, Math.max(left, x(h.time)));
   const finish = () => {
     pointer.current = null;
@@ -189,47 +202,64 @@ export default function WeatherChart({
   };
   return (
     <section className="weather-chart" aria-label={title}>
-      <div className="section-heading">
-        <h2>{title}</h2>
-        <span>Drag or use the time slider</span>
-      </div>
-      <div className="chart-reading" aria-live="polite" aria-atomic="true">
-        <time dateTime={h.time}>
-          {formatDate(h.time)} · {formatTime(h.time)}{" "}
-          {
-            new Intl.DateTimeFormat("en-US", {
-              timeZone: "America/Chicago",
-              timeZoneName: "short",
-            })
-              .formatToParts(new Date(h.time))
-              .find((p) => p.type === "timeZoneName")?.value
-          }
-        </time>
-        <span>
-          <WindSpeed hour={h} expired={expired} /> <Gust value={h.gust} /> ·
-          From {directionLabel(h.direction)}
-        </span>
-        <span>
-          {h.temperature?.toFixed(0) ?? "—"}°F · {weatherDescription(h.code)}
-        </span>
-      </div>
-      <div className="chart-legend">
-        <span>
-          <i className="wind-key" />
-          Wind
-        </span>
-        <span>
-          <i className="gust-key" />
-          Gusts
-        </span>
-        <span>mph</span>
-      </div>
+      <header className="chart-header">
+        <p className="chart-date">{title}</p>
+        <div className="chart-reading" aria-live="polite" aria-atomic="true">
+          <time dateTime={h.time}>{formatTime(h.time)}</time>
+          <span className="chart-primary-reading">
+            {h.wind?.toFixed(0) ?? "—"}{" "}
+            <small>mph · {directionLabel(h.direction)}</small>
+          </span>
+          <span className="chart-secondary-reading">
+            Gusts: {h.gust?.toFixed(0) ?? "—"} mph
+          </span>
+          <span>
+            {h.temperature?.toFixed(0) ?? "—"}°F · {weatherDescription(h.code)}{" "}
+            · {chance ? `${chance.probability}% rain` : "Rain chance unknown"}
+          </span>
+        </div>
+        <div className="chart-legend">
+          <span>
+            <i className="wind-key" />
+            Wind
+          </span>
+          <span>
+            <i className="gust-key" />
+            Gusts
+          </span>
+          <span>mph</span>
+        </div>
+      </header>
       <svg
         ref={surface}
         className="chart-surface"
-        viewBox={`0 0 ${W} 400`}
-        role="img"
-        aria-labelledby={id}
+        viewBox={`0 0 ${W} 440`}
+        role="slider"
+        tabIndex={0}
+        aria-label="Forecast time"
+        aria-describedby={id}
+        aria-valuemin={0}
+        aria-valuemax={Math.max(0, data.length - 1)}
+        aria-valuenow={index}
+        aria-valuetext={`${formatTime(h.time)}, wind ${h.wind ?? "unknown"} mph, gusts ${h.gust ?? "unknown"} mph, ${h.temperature ?? "unknown"} degrees Fahrenheit, ${chance ? chance.probability + "% rain" : "rain chance unknown"}`}
+        onKeyDown={(e) => {
+          const next =
+            e.key === "Home"
+              ? 0
+              : e.key === "End"
+                ? data.length - 1
+                : ["ArrowRight", "ArrowUp"].includes(e.key)
+                  ? Math.min(data.length - 1, index + 1)
+                  : ["ArrowLeft", "ArrowDown"].includes(e.key)
+                    ? Math.max(0, index - 1)
+                    : null;
+          if (next !== null) {
+            e.preventDefault();
+            setSelected(data[next].time);
+          }
+        }}
+        data-wind-max={windMax}
+        data-plot-width={plotWidth}
         data-domain-start={start}
         data-domain-end={end}
         data-sample-count={data.length}
@@ -242,7 +272,11 @@ export default function WeatherChart({
             y: e.clientY,
             dragged: false,
           };
-          setFrozen({ samples: data, domain: [start, end] });
+          setFrozen({
+            samples: data,
+            domain: [start, end],
+            probabilityHours: rainHours,
+          });
           e.currentTarget.setPointerCapture(e.pointerId);
           inspect(e.clientX, e.currentTarget.getBoundingClientRect());
         }}
@@ -269,32 +303,25 @@ export default function WeatherChart({
         onLostPointerCapture={finish}
       >
         <title id={id}>
-          Wind and gusts from 0 to 30 mph, temperature, downwind arrows, weather
-          conditions, and precipitation over time. Upward triangles mark wind or
-          gusts above 30 mph. Use the slider for exact values.
+          Forecast over time. Tap or drag to inspect. Use arrow keys to move
+          between samples, Home for the first sample, and End for the last.
         </title>
         <defs>
-          <clipPath id={id + "-wind"}>
-            <rect x={left} y="12" width={plotWidth} height="108" />
-          </clipPath>
-          <clipPath id={id + "-lower"}>
-            <rect x={left} y="145" width={plotWidth} height="210" />
+          <clipPath id={id + "-plot"}>
+            <rect x={left} y="0" width={plotWidth} height="400" />
           </clipPath>
         </defs>
         {highlight &&
           (() => {
-            /* Clamped to the plotted domain -- which is the frozen one during a
-             gesture -- so the band cannot drift against the axes mid-scrub or
-             spill past them when the period runs off either edge. */
             const from = Math.max(start, Math.min(end, highlight[0]));
             const to = Math.max(start, Math.min(end, highlight[1]));
             return to <= from ? null : (
               <rect
                 className="chart-highlight"
                 x={x(from)}
-                y="12"
+                y="0"
                 width={Math.max(1, x(to) - x(from))}
-                height="343"
+                height="400"
               >
                 <title>
                   Selected period:{" "}
@@ -304,117 +331,132 @@ export default function WeatherChart({
               </rect>
             );
           })()}
-        {[120, 215, 355].map((y) => (
+        {ticks.map((t) => (
           <line
-            key={y}
-            x1={left}
-            x2={W - right}
-            y1={y}
-            y2={y}
-            className="chart-grid"
+            key={t}
+            className="chart-grid chart-time-grid"
+            x1={x(t)}
+            x2={x(t)}
+            y1="65"
+            y2="405"
           />
         ))}
-        <text x="2" y="20">
-          30
-        </text>
-        <text x="20" y="120">
-          0
-        </text>
-        <g clipPath={`url(#${id}-wind)`}>
-          {plot((h) => h.gust, 12, 108, 0, 30, "chart-gust", true)}
-          {plot((h) => h.wind, 12, 108, 0, 30, "chart-wind", true)}
-        </g>
-        {data
-          .filter(
-            (h) =>
-              Date.parse(h.time) >= start &&
-              Date.parse(h.time) <= end &&
-              Math.max(h.wind ?? 0, h.gust ?? 0) > 30,
-          )
-          .map((h) => (
-            <path
-              key={h.time}
-              className="chart-overflow"
-              d={`M${x(h.time) - 3} 11L${x(h.time)} 6L${x(h.time) + 3} 11Z`}
-            >
-              <title>
-                {formatTime(h.time)}: wind {h.wind ?? "unavailable"}, gusts{" "}
-                {h.gust ?? "unavailable"} mph
-              </title>
-            </path>
-          ))}
-        <text x="2" y="156">
-          °F {tempMax}
-        </text>
-        <text x="18" y="215">
-          {tempMin}
-        </text>
-        <g clipPath={`url(#${id}-lower)`}>
-          {plot((h) => h.temperature, 150, 65, tempMin, tempMax, "chart-temp")}
-          {plot(precipitationRate, 310, 45, 0, rainMax, "chart-rain", true)}
-        </g>
-        <text x="2" y="249">
-          Wind
-        </text>
-        <text x="2" y="322">
-          in/h
-        </text>
-        <text x="2" y="338">
-          {rainMax.toFixed(2)}
-        </text>
-        {annotations(windCount).map((point) => (
-          <g
-            key={point.time}
-            className="chart-annotation"
-            transform={`translate(${x(point.time)}, 0)`}
-          >
-            <g
-              transform={`translate(${-16 * vectorScale},${242 - 16 * vectorScale}) scale(${vectorScale})`}
-            >
-              <WindVector hour={point} expired={expired} />
-            </g>
+        {[0, 0.5, 1].map((f) => (
+          <g key={f}>
+            <line
+              className="chart-grid"
+              x1={left}
+              x2={W - right}
+              y1={225 - f * 150}
+              y2={225 - f * 150}
+            />
+            <text x={W - right + 4} y={229 - f * 150}>
+              {windMax * f}
+            </text>
           </g>
         ))}
+        <g clipPath={`url(#${id}-plot)`}>
+          {plot((h) => h.gust, 75, 150, 0, windMax, "chart-gust", true)}
+          {plot((h) => h.wind, 75, 150, 0, windMax, "chart-wind", true)}
+          {plot((h) => h.temperature, 260, 55, tempMin, tempMax, "chart-temp")}
+          {rainIntervals.map((point) => {
+            const from = point.start;
+            const to = point.end;
+            const y = 400 - (point.probability! / 100) * 50;
+            return (
+              <g
+                key={point.end}
+                className="chart-probability-interval"
+                data-probability={point.probability}
+              >
+                <path
+                  className="chart-rain-fill"
+                  d={`M${x(from)} 400V${y}H${x(to)}V400Z`}
+                />
+                <path className="chart-rain" d={`M${x(from)} ${y}H${x(to)}`} />
+              </g>
+            );
+          })}
+        </g>
+        <text x={left} y="251">
+          Temperature · °F
+        </text>
+        <text x={W - right + 4} y="269">
+          {tempMax}
+        </text>
+        <text x={W - right + 4} y="318">
+          {tempMin}
+        </text>
+        <line
+          className="chart-grid"
+          x1={left}
+          x2={W - right}
+          y1="315"
+          y2="315"
+        />
+        <text x={left} y="339">
+          Rain chance
+        </text>
+        <text x={W - right + 2} y="354">
+          100
+        </text>
+        <text x={W - right + 4} y="400">
+          0%
+        </text>
+        <line
+          className="chart-grid"
+          x1={left}
+          x2={W - right}
+          y1="400"
+          y2="400"
+        />
+        {!rainIntervals.length && (
+          <text x={left + plotWidth / 2} y="380" textAnchor="middle">
+            Rain chance unavailable
+          </text>
+        )}
         {annotations(weatherCount).map((point) => (
           <g
             key={point.time}
             className="chart-annotation"
-            transform={`translate(${x(point.time) - 10 * weatherScale},${283 - 10 * weatherScale}) scale(${weatherScale})`}
+            transform={`translate(${x(point.time) - 10 * weatherScale},${18 - 10 * weatherScale}) scale(${weatherScale})`}
           >
             <WeatherIcon code={point.code} />
+          </g>
+        ))}
+        {annotations(windCount).map((point) => (
+          <g
+            key={point.time}
+            className="chart-annotation"
+            transform={`translate(${x(point.time) - 16 * vectorScale},${49 - 16 * vectorScale}) scale(${vectorScale})`}
+          >
+            <WindVector hour={point} expired={expired} compact />
           </g>
         ))}
         <line
           x1={cursor}
           x2={cursor}
-          y1="8"
-          y2="360"
+          y1="0"
+          y2="405"
           className="chart-cursor"
         />
         {ticks.map((t, i) => (
           <text
-            key={i}
+            key={t}
             x={x(t)}
-            y="383"
+            y="426"
             textAnchor={
-              i === 0 ? "start" : i === ticks.length - 1 ? "end" : "middle"
+              i === 0
+                ? "start"
+                : i === ticks.length - 1 && hours < 23
+                  ? "end"
+                  : "middle"
             }
           >
-            {formatTime(new Date(t).toISOString())}
+            {formatTime(new Date(t).toISOString()).replace(":00", "")}
           </text>
         ))}
       </svg>
-      <label className="chart-slider">
-        Inspect forecast time
-        <input
-          type="range"
-          min="0"
-          max={Math.max(0, data.length - 1)}
-          value={index}
-          onChange={(e) => setSelected(data[Number(e.target.value)].time)}
-          aria-valuetext={`${formatDate(h.time)}, ${formatTime(h.time)}`}
-        />
-      </label>
     </section>
   );
 }

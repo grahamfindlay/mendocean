@@ -1,3 +1,4 @@
+import { scheduledAttendance } from "../shared/presentation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
@@ -34,6 +35,7 @@ import {
   isForecast,
   topLevel,
   forecastDestinations,
+  destinationLabel,
 } from "./navigation";
 const NO_FILTERS: RowFilters = {
   type: "All",
@@ -93,6 +95,9 @@ export default function App() {
   const now = useClock();
   const [resume] = useState(readUpdatePosition);
   const [outingView, setOutingView] = useState<"Upcoming" | "Past">("Upcoming");
+  const [forecastAttendance, setForecastAttendance] = useState<string[]>([
+    "attending",
+  ]);
   const [rowFilters, setRowFilters] = useState<RowFilters>(NO_FILTERS);
   const [forecastSelection, setForecastSelection] =
     useState<ForecastSelection>();
@@ -111,6 +116,27 @@ export default function App() {
   const currentUser = useRef<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [account, setAccount] = useState<AccountData | null>(null);
+  const restoredForecast = useRef(false);
+  useEffect(() => {
+    if (
+      !restoredForecast.current &&
+      account &&
+      user?.id === resume?.userId &&
+      resume?.forecastSelection
+    ) {
+      const row = account.outings.find(
+        (o) => o.id === resume.forecastSelection?.id,
+      );
+      if (row) {
+        restoredForecast.current = true;
+        setForecastSelection({ ...resume.forecastSelection });
+        const category = scheduledAttendance(row);
+        setForecastAttendance((values) =>
+          values.includes(category) ? values : [...values, category],
+        );
+      }
+    }
+  }, [account, user?.id, resume]);
   const [authOpen, setAuthOpen] = useState(false);
   const [settings, setSettings] = useState(
     new URLSearchParams(location.search).has("account"),
@@ -214,6 +240,7 @@ export default function App() {
         setForecastSelection(undefined);
         setOutingView("Upcoming");
         setRowFilters(NO_FILTERS);
+        setForecastAttendance(["attending"]);
         if (
           resume &&
           next &&
@@ -330,7 +357,7 @@ export default function App() {
             className={tab === name ? "selected" : ""}
             onClick={() => navigate(name)}
           >
-            {name}
+            {destinationLabel(name)}
           </button>
         ))}
       </nav>
@@ -365,6 +392,8 @@ export default function App() {
             <ForecastView
               now={now}
               selection={forecastSelection}
+              attendance={forecastAttendance}
+              onAttendanceChange={setForecastAttendance}
               userId={user?.id}
               weather={weather}
               tab={tab}
@@ -562,6 +591,10 @@ export default function App() {
                   setTab("Log");
                 }}
                 onForecast={(o) => {
+                  const category = scheduledAttendance(o);
+                  setForecastAttendance((values) =>
+                    values.includes(category) ? values : [...values, category],
+                  );
                   setForecastSelection({
                     id: o.id,
                     starts_at: o.starts_at,

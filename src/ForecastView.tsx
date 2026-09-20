@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   formatDate,
   formatTime,
@@ -26,6 +26,8 @@ export default function ForecastView({
   now,
   selection,
   userId,
+  attendance,
+  onAttendanceChange,
 }: {
   weather: Forecast;
   tab: string;
@@ -35,16 +37,20 @@ export default function ForecastView({
   now: number;
   selection?: ForecastSelection;
   userId?: string;
+  attendance: string[];
+  onAttendanceChange: (values: string[]) => void;
 }) {
   /* Held here rather than in the destination components so the selected row,
      day and horizon survive moving between Today, Week and Rows. */
   const [horizon, setHorizon] = useState("4");
   const [selectedDay, setSelectedDay] = useState("");
-  const [selectedRow, setSelectedRow] = useState("");
+  const [selectedRow, setSelectedRow] = useState(selection?.id || "");
+  const handledSelection = useRef(selection);
   useEffect(() => {
-    // Only the id is consulted: the row supplies its own times. The rest of
-    // ForecastSelection is still carried for the resume payload's shape.
-    if (selection) setSelectedRow(selection.id);
+    if (selection && handledSelection.current !== selection) {
+      handledSelection.current = selection;
+      setSelectedRow(selection.id);
+    }
   }, [selection]);
   const fresh = weatherFreshness(weather.fetched_at, now);
   const expired = fresh === "expired";
@@ -56,14 +62,11 @@ export default function ForecastView({
   const today = localDateTime(new Date(now).toISOString()).slice(0, 10);
   return (
     <>
-      <div className="page-heading concise-heading">
-        <div>
+      {tab !== "Rows" && (
+        <div className="page-heading concise-heading">
           <h1>{tab}</h1>
-          {tab === "Rows" && (
-            <p>Select a scheduled row to forecast its window.</p>
-          )}
         </div>
-      </div>
+      )}
       {fresh !== "fresh" && (
         <div className="alert">
           {expired
@@ -102,11 +105,8 @@ export default function ForecastView({
           selectedRow={selectedRow}
           onSelectRow={setSelectedRow}
           onSchedule={onSchedule}
-          days={days}
-          day={day}
-          today={today}
-          daySamples={daySamples}
-          onSelectDay={setSelectedDay}
+          attendance={attendance}
+          onAttendanceChange={onAttendanceChange}
           userId={userId}
         />
       )}

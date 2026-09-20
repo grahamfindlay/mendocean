@@ -11,7 +11,7 @@ export const DESTINATIONS = [
 ] as const;
 export type Destination = (typeof DESTINATIONS)[number]["id"];
 export const FORECASTS = "Forecasts";
-export const DEFAULT_DESTINATION: Destination = "Today";
+export const DEFAULT_DESTINATION: Destination = "Rows";
 export const forecastDestinations = DESTINATIONS.filter(
   (d) => d.group === FORECASTS,
 ).map((d) => d.id);
@@ -29,3 +29,7 @@ export function isDestination(value: unknown): value is Destination {
 export function isForecast(value: string): boolean {
   return (forecastDestinations as readonly string[]).includes(value);
 }
+
+/** Keep stored destination IDs compatible while allowing clearer labels. */
+export const destinationLabel = (id: string) =>
+  id === "Rows" ? "Scheduled rows" : id;

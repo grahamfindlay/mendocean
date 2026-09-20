@@ -54,9 +54,11 @@ export function WindCompass({ direction }: { direction: number | null }) {
 export function WindVector({
   hour,
   expired = false,
+  compact = false,
 }: {
   hour: WeatherHour;
   expired?: boolean;
+  compact?: boolean;
 }) {
   const calm = hour.wind === 0;
   const valid =
@@ -67,7 +69,9 @@ export function WindVector({
   const status = expired
     ? "unavailable"
     : windStatus(hour.wind, hour.direction);
-  const length = 10 + (Math.min(30, Math.max(0, hour.wind ?? 0)) / 30) * 14;
+  const length = compact
+    ? 26
+    : 10 + (Math.min(30, Math.max(0, hour.wind ?? 0)) / 30) * 14;
   return (
     <svg
       className={`wind-vector ${status}`}

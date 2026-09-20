@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import {
   canLog,
+  scheduledAttendance,
   outingPhase,
   visibleOutings,
   forecastSamples,
@@ -310,4 +311,19 @@ test("multiple reminder channels treat an explicit empty selection as off and su
   );
   expect(state?.text).toBe("Logging reminder partially sent");
   expect(state?.snooze).toBe(true);
+});
+
+test("scheduled attendance classifies independent rows as attending and missing practices as unknown", () => {
+  expect(
+    scheduledAttendance({ kind: "independent", attendance: undefined }),
+  ).toBe("attending");
+  expect(scheduledAttendance({ kind: "official", attendance: undefined })).toBe(
+    "unknown",
+  );
+  expect(
+    scheduledAttendance({ kind: "official", attendance: "declined" }),
+  ).toBe("declined");
+  expect(
+    scheduledAttendance({ kind: "official", attendance: "attending" }),
+  ).toBe("attending");
 });

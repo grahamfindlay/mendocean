@@ -68,6 +68,7 @@ export default function ForecastDayView({
         </button>
       </div>
       <WeatherChart
+        probabilityHours={weather.hours}
         key={day}
         samples={
           day ? windowSamples(weather, ...dayBounds(day)).samples : daySamples

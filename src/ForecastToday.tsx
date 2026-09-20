@@ -95,6 +95,7 @@ export default function ForecastToday({
         )}
       </section>
       <WeatherChart
+        probabilityHours={weather.hours}
         samples={todaySamples}
         domain={todayDomain}
         initialTime={now}
@@ -115,6 +116,7 @@ export default function ForecastToday({
         </select>
       </label>
       <WeatherChart
+        probabilityHours={weather.hours}
         key={horizon}
         samples={rolling.samples}
         domain={rollingDomain}

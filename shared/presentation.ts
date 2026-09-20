@@ -110,3 +110,8 @@ export function weatherDescription(code: number | null) {
   if ([95, 96, 99].includes(code)) return "Thunderstorms";
   return "Conditions unavailable";
 }
+
+/** Forecast filters include independent rows in the owner's Attending category. */
+export function scheduledAttendance(o: Pick<Outing, "kind" | "attendance">) {
+  return o.kind === "independent" ? "attending" : bhcAttendance(o.attendance);
+}

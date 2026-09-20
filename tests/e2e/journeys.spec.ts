@@ -497,7 +497,7 @@ test("upcoming, past and saved outing actions follow server reminder state", asy
   await expect(page.getByRole("heading", { name: past.title })).toBeVisible();
 });
 
-test("Forecast offers only supported model contexts and places fitted results after weather", async ({
+test("Scheduled forecasts remain chart-only when model contexts are available", async ({
   page,
 }) => {
   const id = crypto.randomUUID();
@@ -528,8 +528,8 @@ test("Forecast offers only supported model contexts and places fitted results af
       ],
       mine: [],
     });
-    // An assessment needs an instant, and instants now come from scheduled
-    // rows rather than a free-form planner.
+    // Model capabilities remain available to the API without adding assessment
+    // controls or results to the scheduled forecast view.
     await import("../support/stack").then((m) =>
       m.createOuting(actor, {
         title: "Model context row",
@@ -538,30 +538,20 @@ test("Forecast offers only supported model contexts and places fitted results af
       }),
     );
     await loggedIn(page);
-    await page.getByRole("button", { name: "Rows", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Scheduled rows", exact: true })
+      .click();
     await expect(page.locator('.row-card[aria-pressed="true"] h3')).toHaveText(
       "Model context row",
     );
-    await page
-      .getByRole("combobox", { name: "Route", exact: true })
-      .selectOption("east");
     await expect(
-      page.getByRole("combobox", { name: "Boat", exact: true }),
-    ).toHaveValue("2x");
-    await expect(
-      page.getByRole("combobox", { name: "Coach factor", exact: true }),
-    ).toHaveValue("Charlie");
-    await expect(
-      page.getByRole("combobox", { name: "Use observations", exact: true }),
+      page.getByRole("combobox", { name: "Route", exact: true }),
     ).toHaveCount(0);
-    await expect(page.getByText(/70% estimated rowing rate/)).toBeVisible();
-    const weather = await page
-      .getByRole("heading", { name: "Model context row", level: 2 })
-      .boundingBox();
-    const fitted = await page
-      .getByRole("heading", { name: "What logged rows suggest" })
-      .boundingBox();
-    expect(fitted!.y).toBeGreaterThan(weather!.y);
+    await expect(
+      page.getByRole("heading", { name: "What logged rows suggest" }),
+    ).toHaveCount(0);
+    await expect(page.locator(".weather-chart")).toHaveCount(1);
+    await expect(page.locator(".chart-highlight")).toHaveCount(1);
   } finally {
     await sql.query("delete from private.model_runs where id=$1", [id]);
   }
@@ -570,14 +560,14 @@ test("Forecast offers only supported model contexts and places fitted results af
 test("production timeline offers quarter-hour inspection and selectable daily forecasts", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/?tab=Today");
   const chart = page.getByRole("region", {
     name: "Next 4 hours",
     exact: true,
   });
   await expect(chart).toBeVisible();
   await chart.getByRole("slider").press("ArrowRight");
-  await expect(chart.getByRole("slider")).toHaveValue("1");
+  await expect(chart.getByRole("slider")).toHaveAttribute("aria-valuenow", "1");
   await expect(chart.locator(".chart-reading")).not.toContainText(
     "Precipitation",
   );

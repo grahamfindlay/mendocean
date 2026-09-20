@@ -216,3 +216,37 @@ export function summarizeWindow(
     ],
   };
 }
+
+/** Actual hourly probability intervals, clipped to the visible domain; gaps stay gaps. */
+export function rainChanceIntervals(
+  hours: WeatherHour[],
+  start: number,
+  end: number,
+) {
+  return hours
+    .filter(
+      (h) =>
+        h.probability !== null &&
+        Number.isFinite(h.probability) &&
+        stamp(h) > start &&
+        stamp(h) - 3600000 < end,
+    )
+    .map((h) => ({
+      start: Math.max(start, stamp(h) - 3600000),
+      end: Math.min(end, stamp(h)),
+      probability: h.probability!,
+    }));
+}
+
+/** Clock-aligned six-hour rulers, including on 23/25-hour Chicago calendar days. */
+export function dayChartTicks(start: number, end: number) {
+  const ticks: number[] = [];
+  for (let t = Math.ceil(start / 3600000) * 3600000; t < end; t += 3600000) {
+    if (
+      Number(localDateTime(new Date(t).toISOString()).slice(11, 13)) % 6 ===
+      0
+    )
+      ticks.push(t);
+  }
+  return ticks;
+}

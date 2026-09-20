@@ -28,16 +28,19 @@ test.beforeEach(async ({ page }) => {
 test("public forecast, planner, and invitation boundary", async ({ page }) => {
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Today", exact: true }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Rows", exact: true }).click();
+    page.getByRole("button", { name: "Scheduled rows", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+  await page
+    .getByRole("button", { name: "Scheduled rows", exact: true })
+    .click();
   await expect(
     page.getByRole("heading", { name: "Sign in to forecast your rows" }),
   ).toBeVisible();
   await expect(
     page.getByText("Today and Week stay available without one."),
   ).toBeVisible();
-  // The day timeline stays reachable without an account.
+  // Public forecasts remain reachable through the other forecast tabs.
+  await page.getByRole("button", { name: "Week", exact: true }).click();
   await expect(page.locator(".day-picker button")).not.toHaveCount(0);
   await page.getByRole("button", { name: "Log", exact: true }).click();
   await expect(page.getByText("The pilot is invitation-only.")).toBeVisible();
@@ -153,12 +156,10 @@ test("future outing stays forecast-only, past rows sort and saved reports have n
   await expect(page.locator('.row-card[aria-pressed="true"] h3')).toHaveText(
     "Tomorrow practice",
   );
-  await expect(
-    page.getByRole("heading", { name: "Tomorrow practice", level: 2 }),
-  ).toBeVisible();
-  await expect(page.locator(".section-heading").first()).toContainText(
-    "9:00 AM–10:30 AM",
+  await expect(page.locator('.row-card[aria-pressed="true"]')).toContainText(
+    "9:00 AM – 10:30 AM",
   );
+  await expect(page.locator(".weather-chart")).toHaveCount(1);
   await expect(
     page.getByRole("combobox", { name: "Route", exact: true }),
   ).toHaveCount(0);
@@ -451,7 +452,7 @@ test("wind bearing indicates source direction and a current sample keeps its val
       },
     }),
   );
-  await page.goto("/");
+  await page.goto("/?tab=Today");
   await expect(
     page.getByRole("img", { name: "Wind from E (90°)", exact: true }),
   ).toBeVisible();
@@ -505,7 +506,7 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
       },
     }),
   );
-  await page.goto("/");
+  await page.goto("/?tab=Today");
   await expect(page.locator(".sample-time time")).toContainText("9:15 AM");
   await expect(page.locator(".hour-row time").first()).toHaveText("9:30 AM");
   const chart = page.getByRole("region", {
@@ -514,9 +515,12 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
   });
   await chart.getByRole("slider").press("ArrowRight");
   await expect(chart.locator(".chart-reading time")).toContainText("9:30 AM");
-  await expect(chart.locator(".chart-reading")).toContainText("G38");
-  await expect(chart.locator(".chart-overflow")).toHaveCount(1);
-  await expect(chart.locator(".chart-overflow title")).toContainText("38 mph");
+  await expect(chart.locator(".chart-reading")).toContainText("Gusts: 38 mph");
+  await expect(chart.locator(".chart-overflow")).toHaveCount(0);
+  await expect(chart.locator(".chart-surface")).toHaveAttribute(
+    "data-wind-max",
+    "40",
+  );
   await expect(chart.locator(".wind-vector")).toHaveCount(16);
   await expect(chart.locator(".weather-icon")).toHaveCount(8);
   const vector = chart.locator(".wind-vector").first();
@@ -605,7 +609,7 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
     steps: 8,
   });
   expect(
-    Number(await longChart.getByRole("slider").inputValue()),
+    Number(await longChart.getByRole("slider").getAttribute("aria-valuenow")),
   ).toBeGreaterThan(60);
   await page.clock.fastForward(60000);
   await expect(longChart.locator(".chart-surface")).toHaveAttribute(
@@ -637,11 +641,14 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
     page.locator(".day-picker button[aria-pressed=true]"),
   ).toContainText("Sep 17");
   await page.getByRole("button", { name: "Earlier day" }).click();
-  await page.getByRole("button", { name: "Rows", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Scheduled rows", exact: true })
+    .click();
+  await expect(page.locator(".day-picker")).toHaveCount(0);
+  await page.getByRole("button", { name: "Week", exact: true }).click();
   await expect(
     page.locator(".day-picker button[aria-pressed=true]"),
   ).toContainText("Sep 16");
-  await page.getByRole("button", { name: "Week", exact: true }).click();
   await page
     .getByText("Detailed forecast for this day", { exact: true })
     .click();
@@ -670,7 +677,7 @@ test("touch scrubbing preserves vertical scrolling and releases a cancelled gest
     testInfo.project.name !== "phone",
     "Touch input requires the phone project",
   );
-  await page.goto("/");
+  await page.goto("/?tab=Today");
   const chart = page.getByRole("region", { name: "Next 4 hours", exact: true });
   const surface = chart.locator(".chart-surface");
   await surface.scrollIntoViewIfNeeded();
@@ -692,14 +699,16 @@ test("touch scrubbing preserves vertical scrolling and releases a cancelled gest
   await touch("touchStart", x, y);
   for (let i = 1; i <= 6; i++)
     await touch("touchMove", x + ((bounds.width - 95) * i) / 6, y);
-  expect(Number(await chart.getByRole("slider").inputValue())).toBeGreaterThan(
-    2,
-  );
+  expect(
+    Number(await chart.getByRole("slider").getAttribute("aria-valuenow")),
+  ).toBeGreaterThan(2);
   await touch("touchCancel");
   // A fresh tap must work after cancellation instead of leaving the old pointer captured.
   await touch("touchStart", x, y);
   await touch("touchEnd");
-  expect(Number(await chart.getByRole("slider").inputValue())).toBeLessThan(2);
+  expect(
+    Number(await chart.getByRole("slider").getAttribute("aria-valuenow")),
+  ).toBeLessThan(2);
   const before = await page.evaluate(() => window.scrollY);
   await touch("touchStart", x, y + 80);
   for (let i = 1; i <= 8; i++) await touch("touchMove", x, y + 80 - i * 15);
@@ -768,25 +777,20 @@ test("a scheduled row is forecast over its own window, and scheduling is an expl
     );
   });
   await page.goto("/?preview=1");
-  await page.getByRole("button", { name: "Rows", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Scheduled rows", exact: true })
+    .click();
   const card = page.locator(".row-card").first();
   await expect(card.locator("h3")).toHaveText("Morning row");
-  await expect(card).toContainText("9:43 AM–9:44 AM");
+  await expect(card).toContainText("9:43 AM – 9:44 AM");
   // The card summarizes the whole scheduled window, not the start instant.
   await expect(card.locator(".wind-speed")).toContainText("7");
   await expect(card).toHaveAttribute("aria-pressed", "true");
-  const selectedChart = page.getByRole("region", {
-    name: "Selected forecast",
-    exact: true,
-  });
-  // Bracketing samples, not interpolation to 9:43.
-  await expect(selectedChart.locator(".chart-reading time")).toContainText(
-    "9:30 AM",
-  );
-  await selectedChart.getByRole("slider").press("End");
-  await expect(selectedChart.locator(".chart-reading time")).toContainText(
-    "9:45 AM",
-  );
+  await expect(page.locator(".weather-chart")).toHaveCount(1);
+  await expect(page.locator(".chart-reading time")).toHaveText("9:45 AM");
+  await expect(
+    page.locator("input[type=range], .sample-details, .hour-table, .day-nav"),
+  ).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Schedule independent row" }).first(),
   ).toBeVisible();
@@ -801,13 +805,13 @@ test("a scheduled row is forecast over its own window, and scheduling is an expl
   const placement = await band.evaluate((rect) => {
     const svg = rect.closest("svg")!;
     const width = Number(svg.getAttribute("viewBox")!.split(" ")[2]);
-    const plot = width - 48 - 16;
+    const plot = width - 8 - 30;
     const box = rect.getBoundingClientRect();
     const surface = svg.getBoundingClientRect();
     const scale = width / surface.width;
     return {
       // Where the band starts, as a fraction of the plotted day.
-      fraction: ((box.x - surface.x) * scale - 48) / plot,
+      fraction: ((box.x - surface.x) * scale - 8) / plot,
       widthFraction: (box.width * scale) / plot,
     };
   });
@@ -824,15 +828,209 @@ test("a scheduled row is forecast over its own window, and scheduling is an expl
   await page.mouse.move(box.x + box.width - 40, box.y + 80, { steps: 6 });
   await page.mouse.up();
   await expect(dayChart.locator(".chart-reading time")).not.toHaveText("");
-  // A checkbox label inherits the global rule that stacks a form label above
-  // its input, which doubles this height and centers the box over the text.
-  // Role and text assertions pass either way, which is how it shipped.
+  await expect(
+    page.getByRole("checkbox", { name: "Show this row on the day chart" }),
+  ).toHaveCount(0);
+  await expect(band).toHaveCount(1);
+});
+
+test("scheduled filters, card-driven days, and accessible full-day inspection", async ({
+  page,
+}, testInfo) => {
+  const now = Date.parse("2026-09-20T12:00:00Z");
+  await page.clock.install({ time: now });
+  await page.addInitScript(() => {
+    const base = {
+      kind: "official",
+      version: 1,
+      owner_id: null,
+      bhc_practice_id: 1,
+      reminder: false,
+      reports: [],
+      planned_boat: null,
+    };
+    localStorage.setItem(
+      "mendocean-explicit-preview-v1",
+      JSON.stringify([
+        {
+          ...base,
+          id: "a",
+          title: "Master Novice & Recreational",
+          attendance: "attending",
+          starts_at: "2026-09-21T10:30:00Z",
+          ends_at: "2026-09-21T12:00:00Z",
+        },
+        {
+          ...base,
+          id: "b",
+          title: "Unknown practice",
+          attendance: "unknown",
+          starts_at: "2026-09-22T10:30:00Z",
+          ends_at: "2026-09-22T12:00:00Z",
+        },
+        {
+          ...base,
+          id: "c",
+          title: "Declined practice",
+          attendance: "declined",
+          starts_at: "2026-09-23T10:30:00Z",
+          ends_at: "2026-09-23T12:00:00Z",
+        },
+        {
+          ...base,
+          kind: "independent",
+          id: "d",
+          title: "Independent afternoon",
+          starts_at: "2026-09-21T18:00:00Z",
+          ends_at: "2026-09-21T19:00:00Z",
+        },
+        {
+          ...base,
+          kind: "independent",
+          id: "e",
+          title: "Beyond forecast",
+          starts_at: "2026-10-21T18:00:00Z",
+          ends_at: "2026-10-21T19:00:00Z",
+        },
+      ]),
+    );
+  });
+  // Full local days with null fine-resolution probability: hourly data must survive.
+  const base = Date.parse("2026-09-20T05:00:00Z");
+  const sample = (time: number, fine = false) => ({
+    time: new Date(time).toISOString(),
+    wind: 8,
+    gust: 44,
+    direction: 45,
+    temperature: 54,
+    probability: fine ? null : 19,
+    precipitation: 0,
+    code: 3,
+    visibility: null,
+    interval_minutes: fine ? 15 : 60,
+  });
+  await page.route("**/api/weather", (route) =>
+    route.fulfill({
+      json: {
+        fetched_at: new Date(now).toISOString(),
+        provider: "Fixture",
+        model_version: "hannah-1.0.0",
+        hours: Array.from({ length: 169 }, (_, i) =>
+          sample(base + i * 3600000),
+        ),
+        quarter_hours: Array.from({ length: 193 }, (_, i) =>
+          sample(base + i * 900000, true),
+        ),
+      },
+    }),
+  );
+  await page.goto("/?preview=1");
+  await expect(
+    page.getByRole("button", { name: "Scheduled rows", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+  const cards = page.locator(".row-card");
+  await expect(cards).toHaveCount(3);
   expect(
-    (await page.locator(".chart-toggle").boundingBox())!.height,
+    (await page.locator(".attendance-filters label").first().boundingBox())!
+      .height,
   ).toBeLessThan(32);
+  await expect(
+    page.getByRole("checkbox", { name: "Attending", exact: true }),
+  ).toBeChecked();
+  await expect(
+    page.getByRole("checkbox", { name: "Unknown", exact: true }),
+  ).not.toBeChecked();
+  await expect(cards.first()).toContainText("5:30 AM – 7:00 AM");
+  await expect(cards.first()).toContainText("54°F • Overcast • 19% rain");
+  const typography = await cards
+    .first()
+    .locator(".row-meta")
+    .evaluateAll((nodes) =>
+      nodes.map((n) => {
+        const s = getComputedStyle(n);
+        return [s.fontSize, s.fontWeight, s.color].join("|");
+      }),
+    );
+  expect(new Set(typography).size).toBe(1);
+  await expect(page.locator(".chart-date")).toHaveText("Mon, Sep 21");
+  await expect(page.locator(".chart-reading time")).toHaveText("5:30 AM");
+  await expect(page.locator(".chart-reading")).toContainText("19% rain");
+  await expect(page.locator(".chart-probability-interval")).toHaveCount(24);
+  await expect(page.locator(".chart-surface")).toHaveAttribute(
+    "data-wind-max",
+    "50",
+  );
+  await expect(page.locator(".chart-surface .wind-vector")).toHaveCount(24);
+  await cards.filter({ hasText: "Independent afternoon" }).click();
+  await expect(page.locator(".chart-reading time")).toHaveText("1:00 PM");
+  await page.getByRole("slider", { name: "Forecast time" }).press("ArrowRight");
+  await expect(page.locator(".chart-reading time")).toHaveText("1:15 PM");
+  await expect(page.locator(".chart-highlight")).toHaveCount(1);
+  await page.getByRole("checkbox", { name: "Unknown", exact: true }).check();
+  await cards.filter({ hasText: "Unknown practice" }).click();
+  await expect(page.locator(".chart-date")).toHaveText("Tue, Sep 22");
+  await page.getByRole("checkbox", { name: "Unknown", exact: true }).uncheck();
+  await expect(cards.first()).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".chart-date")).toHaveText("Mon, Sep 21");
   await page
-    .getByRole("checkbox", { name: "Show this row on the day chart" })
+    .getByRole("checkbox", { name: "Attending", exact: true })
     .uncheck();
-  await expect(dayChart.locator(".chart-highlight")).toHaveCount(0);
-  await expect(dayChart.locator(".chart-reading time")).not.toHaveText("");
+  await expect(cards).toHaveCount(0);
+  await expect(page.locator(".weather-chart")).toHaveCount(0);
+  await expect(page.getByText("No rows match these filters")).toBeVisible();
+  await page
+    .getByRole("checkbox", { name: "Not attending", exact: true })
+    .check();
+  await expect(cards).toHaveCount(1);
+  await page.getByRole("button", { name: "Today", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Scheduled rows", exact: true })
+    .click();
+  await expect(cards).toHaveCount(1);
+  await page.getByRole("button", { name: "My rows", exact: true }).click();
+  await page.getByRole("button", { name: "Forecasts", exact: true }).click();
+  await expect(cards).toHaveCount(1);
+  await page.getByRole("button", { name: "My rows", exact: true }).click();
+  await page
+    .locator(".outing-card")
+    .filter({ hasText: "Unknown practice" })
+    .getByRole("button", { name: "View forecast", exact: true })
+    .click();
+  await expect(
+    page.getByRole("checkbox", { name: "Unknown", exact: true }),
+  ).toBeChecked();
+  await expect(cards.filter({ hasText: "Unknown practice" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByRole("checkbox", { name: "Unknown", exact: true }).uncheck();
+  await page.getByRole("checkbox", { name: "Attending", exact: true }).check();
+  await cards.filter({ hasText: "Beyond forecast" }).click();
+  await expect(page.locator(".weather-chart")).toContainText(
+    "Forecast samples unavailable.",
+  );
+  await expect(page.locator(".weather-chart")).toContainText("Oct 21");
+  await cards.first().click();
+  for (const width of [320, 375, 390, 430, 768, 1280]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBe(width);
+    if (width >= 375 && width <= 430) {
+      await expect
+        .poll(
+          async () =>
+            Number(
+              await page
+                .locator(".chart-surface")
+                .getAttribute("data-plot-width"),
+            ) / width,
+        )
+        .toBeGreaterThanOrEqual(0.85);
+    }
+    await page.screenshot({
+      path: `/tmp/mendocean-scheduled-${testInfo.project.name}-${width}.png`,
+      fullPage: true,
+    });
+  }
 });

@@ -9,6 +9,13 @@ test("production forecast renders and public navigation works", async ({
     page.getByRole("button", { name: "Forecasts", exact: true }),
   ).toBeVisible();
   await expect(page.locator("main")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Scheduled rows", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+  await expect(
+    page.getByRole("heading", { name: "Sign in to forecast your rows" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Today", exact: true }).click();
   // A rendered forecast must include actual conditions, not just the static shell.
   await expect(page.getByText("mph", { exact: false }).first()).toBeVisible();
   // Verify the deployed shell installs and controls the browser, including its asset hashes.
