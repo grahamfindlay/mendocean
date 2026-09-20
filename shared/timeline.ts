@@ -99,22 +99,33 @@ export function forecastDays(weather: Forecast, now: number) {
     .slice(0, 7);
 }
 /**
- * Each fixed practice window on a Madison calendar day, summarized.
+ * Each selected period on a Madison calendar day, summarized.
  *
  * `end` is exclusive of nothing -- `summarizeWindow` brackets the interval --
  * but a window whose bounds fall outside the forecast horizon returns an
  * uncovered summary rather than being dropped, so a short provider response
  * shows as unknown instead of silently shortening the week.
  */
-export function practiceWindows(weather: Forecast, day: string) {
-  return PRACTICE_WINDOWS.map((window) => {
+export function practiceWindows(
+  weather: Forecast,
+  day: string,
+  periods: readonly {
+    id: string;
+    label: string;
+    start: string;
+    end: string;
+  }[] = PRACTICE_WINDOWS,
+) {
+  return periods.map((window) => {
     let startsAt = NaN;
     let endsAt = NaN;
     try {
       startsAt = Date.parse(chicagoToISO(day + "T" + window.start));
       endsAt = Date.parse(chicagoToISO(day + "T" + window.end));
     } catch {
-      /* Both bounds dodge the DST-changed hour; an unparsable day is unknown. */
+      /* Ambiguous/nonexistent DST bounds cannot define a precise window. */
+      startsAt = NaN;
+      endsAt = NaN;
     }
     return {
       ...window,

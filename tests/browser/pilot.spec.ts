@@ -584,7 +584,7 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
     }).toBeLessThan(1);
   }
   await expect(cards.first().locator(".practice-window")).toHaveCount(2);
-  await expect(cards.first()).toContainText("Morning 5:30 AM – 7:30 AM");
+  await expect(cards.first()).toContainText("Early morning 5:30 AM – 7:30 AM");
   await expect(cards.first()).toContainText("Evening 6:00 PM – 8:00 PM");
   // A time range split across lines reads as two times; found on the live site.
   await expect(cards.first().locator(".window-time").first()).toHaveCSS(
@@ -1182,4 +1182,43 @@ test("Today shows only today's rows and keeps its chart and clock marker without
     String(Date.parse("2026-09-21T05:01:00Z")),
   );
   await emptyPage.close();
+});
+
+test("Week periods apply every day and survive reloads, edits, and deselection", async ({page}, testInfo) => {
+  await page.goto("/?tab=Week");
+  await page.getByText("Times of interest", {exact:true}).click();
+  const editor = page.locator('.week-periods');
+  const cards = page.locator('.week-card');
+  const count = await cards.count();
+  await expect(editor.getByRole('checkbox', {name:'Early morning',exact:true})).toBeChecked();
+  await editor.getByRole('button',{name:'Add period',exact:true}).click();
+  await editor.getByLabel('Period name').fill('Mid morning');
+  await editor.getByLabel('Start time').fill('09:15');
+  await editor.getByLabel('End time').fill('08:00');
+  await editor.getByRole('button',{name:'Save period',exact:true}).click();
+  await expect(editor.getByRole('alert')).toContainText('End time must be after');
+  await editor.getByLabel('End time').fill('11:00');
+  await editor.getByRole('button',{name:'Save period',exact:true}).click();
+  await expect(cards.locator('.practice-window')).toHaveCount(count * 3);
+  for (const card of await cards.all()) await expect(card).toContainText('Mid morning 9:15 AM – 11:00 AM');
+  await page.reload();
+  await expect(cards.first()).toContainText('Mid morning');
+  await page.getByText("Times of interest", {exact:true}).click();
+  await editor.getByRole('button',{name:'Edit Mid morning',exact:true}).click();
+  await editor.getByLabel('Period name').fill('Late morning');
+  await editor.getByLabel('Start time').fill('10:00');
+  await editor.getByRole('button',{name:'Save period',exact:true}).click();
+  await expect(cards.first()).toContainText('Late morning 10:00 AM – 11:00 AM');
+  await editor.getByRole('checkbox',{name:'Early morning',exact:true}).uncheck();
+  await expect(cards.locator('.practice-window')).toHaveCount(count * 2);
+  await page.setViewportSize({width:390,height:844});
+  await editor.screenshot({path:`/tmp/week-periods-${testInfo.project.name}.png`});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await editor.getByRole('button',{name:'Remove Late morning',exact:true}).click();
+  await editor.getByRole('checkbox',{name:'Evening',exact:true}).uncheck();
+  await expect(cards.locator('.practice-window')).toHaveCount(0);
+  await page.reload();
+  await expect(cards.locator('.practice-window')).toHaveCount(0);
+  await cards.nth(1).click();
+  await expect(cards.nth(1)).toHaveAttribute('aria-pressed','true');
 });

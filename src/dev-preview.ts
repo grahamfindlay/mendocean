@@ -1,3 +1,4 @@
+import { DEFAULT_WEEK_PERIODS, weekPeriodsSchema } from "../shared/weekPeriods";
 // Development-only fixture adapter. Vite removes this import from production builds.
 import { COACH_NAMES, type Outing, type Report } from "../shared/domain";
 const USER = "10000000-0000-4000-8000-000000000001";
@@ -6,6 +7,11 @@ const load = (): Outing[] => JSON.parse(localStorage.getItem(KEY) || "[]");
 const save = (o: Outing[]) => localStorage.setItem(KEY, JSON.stringify(o));
 export async function previewAPI(path: string, body: any) {
   const outings = load();
+  if (path === "week-periods") {
+    const key = "mendocean-preview-week-periods";
+    if (body) localStorage.setItem(key, JSON.stringify(weekPeriodsSchema.parse(body.periods)));
+    return { periods: JSON.parse(localStorage.getItem(key) || "null") ?? DEFAULT_WEEK_PERIODS };
+  }
   if (path === "account")
     return {
       outings,
