@@ -383,4 +383,33 @@ describe("actual PostgreSQL permissions and transactions", () => {
       ).rows,
     ).toHaveLength(1);
   });
+  it("exposes model eligibility and revision freshness only to administrators", async () => {
+    const { rows } = await admin("select revision from private.dataset_state");
+    const revision = Number((rows[0] as any).revision);
+    const fresh = crypto.randomUUID(),
+      stale = crypto.randomUUID(),
+      ineligible = crypto.randomUUID();
+    for (const [id, artifact] of [
+      [fresh, { eligible: true, dataset_revision: revision }],
+      [stale, { eligible: true, dataset_revision: revision - 1 }],
+      [ineligible, { eligible: false, dataset_revision: revision }],
+    ]) {
+      await admin(
+        "insert into private.model_runs(id,family,artifact,metrics) values($1,'fixture',$2,'{}')",
+        [id, artifact],
+      );
+    }
+    const health = (await admin("select public.pilot_health() as health"))
+      .rows[0] as any;
+    expect(health.health.models.find((m: any) => m.id === fresh)).toMatchObject(
+      { eligible: true, current_revision: true },
+    );
+    expect(health.health.models.find((m: any) => m.id === stale)).toMatchObject(
+      { eligible: true, current_revision: false },
+    );
+    expect(
+      health.health.models.find((m: any) => m.id === ineligible),
+    ).toMatchObject({ eligible: false, current_revision: true });
+    await expect(as(ALICE, "select public.pilot_health()")).rejects.toThrow();
+  });
 });

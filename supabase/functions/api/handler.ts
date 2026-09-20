@@ -208,6 +208,12 @@ export function createApiHandler(providers: Providers = liveProviders) {
       if (path === "admin/outings" && req.method === "GET") {
         if (profile.role !== "admin")
           throw new HttpError(403, "Administrator access required.");
+        const offset = z.coerce
+          .number()
+          .int()
+          .min(0)
+          .max(1_000_000)
+          .parse(new URL(req.url).searchParams.get("offset") ?? 0);
         return json(
           req,
           check(
@@ -217,7 +223,8 @@ export function createApiHandler(providers: Providers = liveProviders) {
                 "id,title,kind,starts_at,ends_at,actual_starts_at,actual_ends_at",
               )
               .order("starts_at", { ascending: false })
-              .limit(200),
+              .order("id", { ascending: false })
+              .range(offset, offset + 199),
           ),
         );
       }
