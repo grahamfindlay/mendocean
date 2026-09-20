@@ -11,7 +11,6 @@ import {
   formatTime,
   outingSchema,
   reportSchema,
-  type Coach,
   type Outing,
   type OutingInput,
   type Report,
@@ -23,14 +22,12 @@ import { clearDraft, draft, flush, stage } from "./outbox";
 export default function Logger({
   user,
   outings,
-  coaches,
   editing,
   initialOuting,
   onSaved,
 }: {
   user: string;
   outings: Outing[];
-  coaches: Coach[];
   editing?: { outing: Outing; report: Report };
   initialOuting?: string;
   onSaved: (message: string) => void;
@@ -80,6 +77,7 @@ export default function Logger({
   const [reason, setReason] = useState<ReportInput["reason"]>(
     editing?.report.reason ?? "unknown",
   );
+  // Preserve existing report metadata; BHC planned coaches stay on the linked outing.
   const [coachState, setCoachState] = useState<ReportInput["coach_state"]>(
     editing?.report.coach_state ||
       (initial?.kind === "official" ? "unknown" : "uncoached"),
@@ -201,13 +199,6 @@ export default function Logger({
     segments,
   ]);
   const chosen = outings.find((o) => o.id === selected);
-  const toggleCoach = (id: string) => {
-    const ids = coachIds.includes(id)
-      ? coachIds.filter((c) => c !== id)
-      : [...coachIds, id];
-    setCoachIds(ids);
-    setCoachCount(ids.length || null);
-  };
   function choose(id: string) {
     setSelected(id);
     const o = outings.find((o) => o.id === id);
@@ -233,6 +224,8 @@ export default function Logger({
     setBusy(true);
     setError("");
     try {
+      if (outcome === "rowed" && !boat)
+        throw new Error("Choose your boat class.");
       const outing: OutingInput =
         chosen ??
         outingSchema.parse({
@@ -291,8 +284,11 @@ export default function Logger({
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">A SMALL EFFORT. A BETTER FORECAST.</p>
           <h1>{editing ? "Edit your report." : "How was the water?"}</h1>
+          <p className="help">
+            Your reports help build better wind-wave models and rowing
+            forecasts.
+          </p>
         </div>
       </div>
       {restored && (
@@ -416,6 +412,27 @@ export default function Logger({
           )}
           {outcome === "rowed" && (
             <>
+              <label>
+                Your boat
+                <select
+                  required
+                  aria-describedby="boat-required"
+                  value={boat ?? ""}
+                  onChange={(e) =>
+                    setBoat(
+                      (e.target.value as ReportInput["boat_class"]) || null,
+                    )
+                  }
+                >
+                  <option value="">Select your boat class</option>
+                  {BOAT_CLASSES.map((b) => (
+                    <option key={b}>{b}</option>
+                  ))}
+                </select>
+              </label>
+              <p className="help" id="boat-required">
+                Required when you row.
+              </p>
               <fieldset>
                 <legend>How was the water?</legend>
                 <div className="rating-choices">
@@ -454,54 +471,42 @@ export default function Logger({
             </>
           )}
         </section>
+        {outcome === "rowed" && (
+          <section className="form-card">
+            <fieldset>
+              <legend>Boat classes that actually went out (optional)</legend>
+              <p className="help">Select any you noticed, if you remember.</p>
+              <div className="choices wrap">
+                {BOAT_CLASSES.map((b) => (
+                  <button
+                    type="button"
+                    key={b}
+                    aria-pressed={launched.includes(b)}
+                    className={launched.includes(b) ? "active" : ""}
+                    onClick={() =>
+                      setLaunched(
+                        launched.includes(b)
+                          ? launched.filter((x) => x !== b)
+                          : [...launched, b],
+                      )
+                    }
+                  >
+                    {b}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          </section>
+        )}
         <details className="form-card" open={!!editing}>
           <summary>
-            Boats, coaches & more <ChevronDown size={18} />
+            More details <ChevronDown size={18} />
           </summary>
           <p className="help">
-            Optional details help explain why the same wind can mean different
-            things to different crews.
+            Optional notes and extra detail about your row.
           </p>
           {outcome === "rowed" && (
             <>
-              <label>
-                Your boat
-                <select
-                  value={boat ?? ""}
-                  onChange={(e) =>
-                    setBoat(
-                      (e.target.value as ReportInput["boat_class"]) || null,
-                    )
-                  }
-                >
-                  <option value="">Unknown / not recorded</option>
-                  {BOAT_CLASSES.map((b) => (
-                    <option key={b}>{b}</option>
-                  ))}
-                </select>
-              </label>
-              <fieldset>
-                <legend>Boat classes that actually went out</legend>
-                <div className="choices wrap">
-                  {BOAT_CLASSES.map((b) => (
-                    <button
-                      type="button"
-                      key={b}
-                      aria-pressed={launched.includes(b)}
-                      className={launched.includes(b) ? "active" : ""}
-                      onClick={() =>
-                        setLaunched(
-                          launched.includes(b)
-                            ? launched.filter((x) => x !== b)
-                            : [...launched, b],
-                        )
-                      }
-                    >
-                      {b}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
               {!launched.length && (
                 <div className="field-grid">
                   <label>
@@ -538,56 +543,6 @@ export default function Logger({
                   </label>
                 </div>
               )}
-            </>
-          )}
-          <label>
-            Coaching
-            <select
-              value={coachState}
-              onChange={(e) => {
-                setCoachState(e.target.value as ReportInput["coach_state"]);
-                setCoachIds([]);
-                setCoachCount(e.target.value === "uncoached" ? 0 : null);
-              }}
-            >
-              <option value="uncoached">N/A — uncoached</option>
-              <option value="known">Coached</option>
-              <option value="unknown">Unknown</option>
-            </select>
-          </label>
-          {coachState === "known" && (
-            <>
-              <fieldset>
-                <legend>Which coaches?</legend>
-                <div className="choices wrap">
-                  {coaches.map((c) => (
-                    <button
-                      type="button"
-                      key={c.id}
-                      aria-pressed={coachIds.includes(c.id)}
-                      className={coachIds.includes(c.id) ? "active" : ""}
-                      onClick={() => toggleCoach(c.id)}
-                    >
-                      {c.name}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-              <label>
-                Coach count{coachIds.length ? " (from your selection)" : ""}
-                <input
-                  type="number"
-                  min="0"
-                  max="30"
-                  value={coachCount ?? ""}
-                  disabled={!!coachIds.length}
-                  onChange={(e) =>
-                    setCoachCount(
-                      e.target.value === "" ? null : Number(e.target.value),
-                    )
-                  }
-                />
-              </label>
             </>
           )}
           {route === "both" && outcome === "rowed" && (
