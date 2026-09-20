@@ -162,3 +162,95 @@ test("additional periods wrap in pairs, including long names on narrow phones", 
     ),
   ).toBe(true);
 });
+
+test("day chart marks enabled weekday periods and keeps scrubbing independent", async ({
+  page,
+}, testInfo) => {
+  await page.addInitScript((periods) => {
+    localStorage.setItem(
+      "mendocean-week-periods-v2",
+      JSON.stringify([
+        periods[0],
+        { ...periods[1], days: [0] },
+        {
+          ...periods[0],
+          id: "overlap",
+          label: "Second session",
+          start: "06:00",
+          end: "08:00",
+        },
+        {
+          ...periods[0],
+          id: "disabled",
+          label: "Disabled session",
+          enabled: false,
+        },
+      ]),
+    );
+  }, defaults);
+  await page.goto("/?tab=Week");
+  const bands = page.locator(".chart-period-highlight");
+  await expect(bands).toHaveCount(2);
+  await expect(page.locator(".chart-window-key")).toContainText(
+    "Early morning: 5:30 AM–7:00 AM",
+  );
+  await expect(page.locator(".chart-window-key")).not.toContainText("Evening");
+  await expect(page.locator(".chart-window-key")).not.toContainText(
+    "Disabled session",
+  );
+  await expect(bands.first()).toHaveAttribute(
+    "data-start",
+    String(Date.parse("2026-09-20T10:30:00Z")),
+  );
+  await expect(bands.first()).toHaveAttribute(
+    "data-end",
+    String(Date.parse("2026-09-20T12:00:00Z")),
+  );
+  await expect(bands.first()).toHaveCSS("pointer-events", "none");
+  const surface = page.locator(".chart-surface");
+  const geometry = await surface.evaluate((e) => {
+    const band = e.querySelector(".chart-period-highlight")!;
+    return {
+      x: Number(band.getAttribute("x")),
+      width: Number(band.getAttribute("width")),
+      plot: Number(e.getAttribute("data-plot-width")),
+    };
+  });
+  expect(geometry.x).toBeCloseTo(8 + (geometry.plot * 5.5) / 24, 1);
+  expect(geometry.width).toBeCloseTo((geometry.plot * 1.5) / 24, 1);
+  await surface.focus();
+  await page.keyboard.press("End");
+  const inspected = await surface.getAttribute("aria-valuenow");
+  await expect(bands).toHaveCount(2);
+  await page.getByText("Times of interest", { exact: true }).click();
+  await page
+    .getByRole("checkbox", { name: "Second session", exact: true })
+    .uncheck();
+  await expect(bands).toHaveCount(1);
+  await expect(surface).toHaveAttribute("aria-valuenow", inspected!);
+  await page.locator(".week-card").nth(1).click();
+  await expect(bands).toHaveCount(2);
+  await expect(page.locator(".chart-window-key")).toContainText("Evening");
+  await expect(bands.first()).toHaveAttribute(
+    "data-start",
+    String(Date.parse("2026-09-21T10:30:00Z")),
+  );
+  await page
+    .getByRole("checkbox", { name: "Early morning", exact: true })
+    .uncheck();
+  await page.getByRole("checkbox", { name: "Evening", exact: true }).uncheck();
+  await expect(bands).toHaveCount(0);
+  await expect(page.locator(".chart-window-key")).toHaveCount(0);
+  await expect(surface).toBeVisible();
+  await expect(
+    page.getByText("Detailed forecast for this day", { exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("checkbox", { name: "Early morning", exact: true })
+    .check();
+  await page.getByRole("checkbox", { name: "Evening", exact: true }).check();
+  await page.getByText("Times of interest", { exact: true }).click();
+  await page
+    .locator(".weather-chart")
+    .screenshot({ path: testInfo.outputPath("week-period-chart.png") });
+});
