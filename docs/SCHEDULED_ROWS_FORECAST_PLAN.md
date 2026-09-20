@@ -123,6 +123,16 @@ Remove assessment controls/results from this tab's rendering and avoid their now
 
 ## Continuation notes
 
+### Deferred idea: show the chart beneath the selected card
+
+Recorded 2026-09-20. **Deferred at the user's request; do not implement without a new request.** This is an optional future idea, not an unfinished implementation requirement. Keep the current chart behavior for now.
+
+- Initially show only the scheduled-row cards, with no card selected and no chart visible. Selecting a card would reveal the full-day interactive chart directly beneath it. Omit the chart's date header because the card supplies the date.
+- Keep only one chart mounted; selecting another card would move the chart. Tapping the selected card again to collapse it is an optional interaction, not a confirmed requirement.
+- Feasibility: a small-to-moderate UI change using the existing selection and chart components. No backend or weather-fetching changes are expected. Rendering cost should remain similar, with less initial chart work while collapsed; weather fetching would still occur as it does today.
+- Main layout decision: the phone's single-column cards make placement straightforward. For the desktop grid, a possible approach is a full-width chart beneath the grid row containing the selected card. This needs a design decision before implementation.
+- Account for scroll position, keyboard focus, accessible expanded state, filter changes that hide the selected card, and explicit cross-view requests to forecast a row. Avoid unexpected page jumps when the chart opens or moves.
+
 Both clarification questions are resolved. All five implementation and verification milestones are complete. Physical iPhone review has not been performed. Production deployment is complete. Useful files: `src/navigation.ts`, `src/App.tsx`, `src/ForecastView.tsx`, `src/ForecastRows.tsx`, `src/ForecastDayView.tsx`, `src/WeatherChart.tsx`, `src/WindowReading.tsx`, `src/WindReading.tsx`, `src/styles.css`, `shared/presentation.ts`, `shared/timeline.ts`, `shared/weather.ts`.
 
 Implementation was merged through PR #37 and deployed as commit `a5cff222c496033ed7568ac1e1f44e3f94f9970c`. Independent creation already persisted Attending, so no database migration was necessary. The internal Rows destination ID remains compatible while its visible label is Scheduled rows.
@@ -161,3 +171,20 @@ Screenshots are reproducible through the scheduled-filters browser test, which w
 - 2026-09-20: User explicitly authorized merging and deploying PR #38. Merged as `84c3c858e7b8a479aa4249550af8bd961ae56a0c` and verified live at https://mendocean.fyi. Exact-commit production smoke and browser smoke passed. A read-only 390px browser check confirmed no legend, the Wind • mph title, guides at 0/10/20/30/40 mph for the current data, and compact stats (~107px high). Follow-up deployment is complete; workspace synchronized to main.
 
 - 2026-09-20 page-spacing follow-up: User requested tighter space before the first card and explicitly requested merge/deploy. Reduced shared header/navigation padding and scheduled toolbar margins; on phones the accessible 44px scheduling action now sits beside the filters. The first card starts roughly 100px higher at 390px. Production build and nine focused Chromium/WebKit browser cases passed; mobile layout reviewed. Releasing through the protected PR workflow.
+
+- 2026-09-20: Page-spacing follow-up deployed through PR #39 as `cbb8ee0d66242945f57b57c755265909d1062821`. Required fast (2m6s) and full-stack (4m28s) checks passed after making the layout assertion exclude the development-only notice and the gesture assertion independent of wall-clock sample indices. Exact-commit production smoke and production browser smoke passed. Workspace synchronized to main.
+
+
+## Today redesign follow-up — 2026-09-20
+
+The user now requests removal of Today’s short-window forecasts and 30-minute lists, superseding the earlier decision to retain them on Today. Week remains unchanged. The deferred idea of placing a chart directly under a selected card remains on hold.
+
+- [x] Replace the oversized current-conditions panel with a compact panel titled Now; retain the actual sample timestamp in Weather details.
+- [x] Reuse the scheduled-row cards and attendance filters for rows starting on today's America/Chicago calendar date, including rows earlier in the day. Omit the entire rows section when there are no rows today; show no empty-state message when filters hide all cards.
+- [x] Show one full-day chart regardless of rows or filter matches; highlight the selected row when present. Selection changes the highlight without changing Today’s day or forcing inspection to another time.
+- [x] Add a distinct labeled current-time line, independent of the inspection cursor and selected row. Keep it live during dragging; reset the day domain at local midnight. Render the day axis and clock marker even when weather samples are unavailable.
+- [x] Remove Today’s short-window selector/chart, vertical sample list, and trailing logging callout. Existing top-level Log remains available.
+- [x] Extract shared AttendanceFilters and ScheduledRowCards components to keep Today and Scheduled rows consistent without duplicating card rendering.
+- [ ] Complete final checks and release verification.
+
+Validation so far: production build and 75 unit/database tests pass. Existing 34 browser cases pass (2 platform skips); three additional Today cases pass across desktop Chromium, mobile Chromium, and mobile WebKit. Mobile Today layout visually reviewed. Added a local-midnight rollover assertion for the final run. Production release is not yet performed for this follow-up.

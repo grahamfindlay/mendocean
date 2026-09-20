@@ -1936,3 +1936,78 @@ button:hover:not(:disabled) {
     min-height: 32px;
   }
 }
+
+/* Today puts current conditions, any scheduled rows, and one full-day chart together. */
+.current-panel.now-panel {
+  display: block;
+  min-height: 0;
+  padding: 12px 14px;
+  margin-top: 10px;
+}
+.now-panel h1 {
+  font-size: 18px;
+  line-height: 1.2;
+  margin: 0 0 8px;
+}
+.now-conditions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.now-panel .wind-compass {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
+}
+.now-readings {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  font-size: 13px;
+}
+.now-wind {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+.now-wind .wind-speed {
+  font-size: 22px;
+  line-height: 1.1;
+}
+.now-wind .wind-speed small {
+  font-size: 13px;
+}
+.now-weather {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.now-weather .weather-icon {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+}
+.now-panel .sample-time {
+  margin-top: 7px;
+  font-size: 11px;
+}
+.now-panel .sample-time p {
+  margin: 4px 0 0;
+}
+.today-attendance {
+  margin: 10px 0;
+}
+.chart-now-marker {
+  pointer-events: none;
+}
+.chart-now {
+  stroke: #a05219;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+.weather-chart svg .chart-now-label {
+  fill: #a05219;
+  font-size: 10px;
+  font-weight: 600;
+}
