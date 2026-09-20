@@ -635,14 +635,8 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
   await expect(
     page.locator(".day-picker button[aria-pressed=true]"),
   ).toContainText("Sep 16");
-  await page
-    .getByText("Detailed forecast for this day", { exact: true })
-    .click();
-  const dailyTimes = await page
-    .locator(".sample-details .hour-row time")
-    .allTextContents();
-  expect(dailyTimes.length).toBe(48);
-  expect(dailyTimes.every((time) => /:(00|30) [AP]M$/.test(time))).toBe(true);
+  await expect(page.getByText("Detailed forecast for this day", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".chart-period-highlight")).toHaveCount(2);
   await expect(page.locator("body")).not.toHaveCSS("overflow-x", "scroll");
   // innerWidth is asserted too: content wider than the screen makes the phone
   // widen the layout viewport and zoom the page out, which would satisfy

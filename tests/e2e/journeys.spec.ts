@@ -589,10 +589,8 @@ test("production timeline offers quarter-hour inspection and selectable daily fo
     "aria-pressed",
     "true",
   );
-  await page
-    .getByText("Detailed forecast for this day", { exact: true })
-    .click();
-  await expect(page.locator(".hour-row").first()).toBeVisible();
+  await expect(page.getByText("Detailed forecast for this day", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".chart-period-highlight")).toHaveCount(2);
 });
 
 test("partial reminder delivery is visible without implying device registration", async ({
