@@ -63,10 +63,16 @@ button:disabled {
   border-bottom: 1px solid var(--line);
 }
 .wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   text-decoration: none;
   font-size: 30px;
   font-weight: 700;
   letter-spacing: -1.5px;
+}
+.wordmark-icon {
+  flex-shrink: 0;
 }
 .wordmark span {
   display: block;
@@ -305,6 +311,10 @@ footer {
   }
   .wordmark {
     font-size: 27px;
+  }
+  .wordmark-icon {
+    width: 30px;
+    height: 30px;
   }
   .wordmark span {
     font-size: 8px;
