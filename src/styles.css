@@ -2063,3 +2063,10 @@ button:hover:not(:disabled) {
   border: 1px dashed #235d51;
   background: #235d511a;
 }
+
+.scheduled-row-entry { min-width: 0; }
+.scheduled-row-entry > .row-card { height: 100%; }
+.scheduled-row-grid > .scheduled-row-expanded { grid-column: 1 / -1; }
+.scheduled-row-grid > .scheduled-row-expanded > .row-card { height: auto; }
+.card-expand-icon { flex-shrink: 0; }
+.row-card[aria-expanded="true"] .card-expand-icon { transform: rotate(180deg); }

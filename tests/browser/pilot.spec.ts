@@ -41,7 +41,8 @@ test("public forecast, planner, and invitation boundary", async ({ page }) => {
   ).toBeVisible();
   // Public forecasts remain reachable through the other forecast tabs.
   await page.getByRole("button", { name: "Week", exact: true }).click();
-  await expect(page.locator(".day-picker button")).not.toHaveCount(0);
+  await expect(page.locator(".week-card").first()).toBeVisible();
+  await expect(page.locator(".weather-chart")).toHaveCount(0);
   await page.getByRole("button", { name: "Log", exact: true }).click();
   await expect(page.getByText("The pilot is invitation-only.")).toBeVisible();
 });
@@ -618,25 +619,30 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
     "white-space",
     "nowrap",
   );
-  await cards.nth(1).getByRole("button").click();
-  await expect(
-    page.locator(".day-picker button[aria-pressed=true]"),
-  ).toContainText("Sep 16");
-  await page.getByRole("button", { name: "Later day" }).click();
-  await expect(
-    page.locator(".day-picker button[aria-pressed=true]"),
-  ).toContainText("Sep 17");
-  await page.getByRole("button", { name: "Earlier day" }).click();
-  await page
-    .getByRole("button", { name: "Scheduled rows", exact: true })
-    .click();
+  await expect(page.locator(".weather-chart")).toHaveCount(0);
   await expect(page.locator(".day-picker")).toHaveCount(0);
+  await cards.nth(1).getByRole("button").click();
+  const expandedChart = cards.nth(1).locator(".weather-chart");
+  await expect(expandedChart).toBeVisible();
+  await expect(expandedChart.locator(".chart-date, .chart-reading, .chart-header")).toHaveCount(0);
+  await expect(expandedChart.locator(".chart-surface")).toHaveAttribute("data-domain-start", String(Date.parse("2026-09-16T05:00:00Z")));
+  const gridBox = await page.locator(".week-grid").boundingBox();
+  const expandedBox = await cards.nth(1).boundingBox();
+  expect(Math.abs(gridBox!.width - expandedBox!.width)).toBeLessThan(1);
+  const slider = expandedChart.getByRole("slider");
+  await slider.press("Home");
+  await slider.press("ArrowRight");
+  await expect(slider).toHaveAttribute("aria-valuenow", "1");
+  await cards.nth(2).getByRole("button").click();
+  await expect(cards.nth(1).locator(".weather-chart")).toHaveCount(0);
+  await expect(cards.nth(2).locator(".weather-chart")).toBeVisible();
+  await cards.nth(2).getByRole("button").click();
+  await expect(page.locator(".weather-chart")).toHaveCount(0);
+  await expect(cards.nth(2).getByRole("button")).toHaveAttribute("aria-expanded", "false");
+  await page.getByRole("button", { name: "Scheduled rows", exact: true }).click();
   await page.getByRole("button", { name: "Week", exact: true }).click();
-  await expect(
-    page.locator(".day-picker button[aria-pressed=true]"),
-  ).toContainText("Sep 16");
-  await expect(page.getByText("Detailed forecast for this day", { exact: true })).toHaveCount(0);
-  await expect(page.locator(".chart-period-highlight")).toHaveCount(2);
+  await expect(page.locator(".weather-chart")).toHaveCount(0);
+  await cards.nth(1).getByRole("button").click();
   await expect(page.locator("body")).not.toHaveCSS("overflow-x", "scroll");
   // innerWidth is asserted too: content wider than the screen makes the phone
   // widen the layout viewport and zoom the page out, which would satisfy
@@ -770,9 +776,13 @@ test("a scheduled row is forecast over its own window, and scheduling is an expl
   await expect(card).toContainText("9:43 AM – 9:44 AM");
   // The card summarizes the whole scheduled window, not the start instant.
   await expect(card.locator(".wind-speed")).toContainText("7");
-  await expect(card).toHaveAttribute("aria-pressed", "true");
+  await expect(card).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator(".weather-chart")).toHaveCount(0);
+  await card.click();
+  await expect(card).toHaveAttribute("aria-expanded", "true");
   await expect(page.locator(".weather-chart")).toHaveCount(1);
-  await expect(page.locator(".chart-reading time")).toHaveText("9:45 AM");
+  await expect(page.getByRole("slider")).toHaveAttribute("aria-valuetext", /9:45 AM/);
+  await expect(page.locator(".chart-header")).toHaveCount(0);
   await expect(
     page.locator("input[type=range], .sample-details, .hour-table, .day-nav"),
   ).toHaveCount(0);
@@ -812,7 +822,7 @@ test("a scheduled row is forecast over its own window, and scheduling is an expl
   await page.mouse.down();
   await page.mouse.move(box.x + box.width - 40, box.y + 80, { steps: 6 });
   await page.mouse.up();
-  await expect(dayChart.locator(".chart-reading time")).not.toHaveText("");
+  await expect(surface).not.toHaveAttribute("aria-valuetext", /9:45 AM/);
   await expect(
     page.getByRole("checkbox", { name: "Show this row on the day chart" }),
   ).toHaveCount(0);
@@ -937,9 +947,11 @@ test("scheduled filters, card-driven days, and accessible full-day inspection", 
       }),
     );
   expect(new Set(typography).size).toBe(1);
-  await expect(page.locator(".chart-date")).toHaveText("Mon, Sep 21");
-  await expect(page.locator(".chart-reading time")).toHaveText("5:30 AM");
-  await expect(page.locator(".chart-reading")).toContainText("19% rain");
+  await expect(page.locator(".weather-chart")).toHaveCount(0);
+  await cards.first().click();
+  await expect(cards.first()).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator(".chart-header")).toHaveCount(0);
+  await expect(page.getByRole("slider")).toHaveAttribute("aria-valuetext", /5:30 AM.*19% rain/);
   await expect(page.locator(".chart-probability-interval")).toHaveCount(24);
   await expect(page.locator(".chart-surface")).toHaveAttribute(
     "data-wind-max",
@@ -955,33 +967,22 @@ test("scheduled filters, card-driven days, and accessible full-day inspection", 
     "40",
     "50",
   ]);
-  const reading = await page.locator(".chart-reading").boundingBox();
-  expect(reading!.height).toBeLessThan(115);
-  await expect
-    .poll(() =>
-      page.locator(".weather-chart").evaluate((chart) => {
-        const reading = chart
-          .querySelector(".chart-reading")!
-          .getBoundingClientRect();
-        return (
-          chart.querySelector(".chart-surface")!.getBoundingClientRect().top -
-          reading.bottom
-        );
-      }),
-    )
-    .toBeLessThan(8);
   await expect(page.locator(".chart-surface .wind-vector")).toHaveCount(24);
   await cards.filter({ hasText: "Independent afternoon" }).click();
-  await expect(page.locator(".chart-reading time")).toHaveText("1:00 PM");
+  await expect(page.getByRole("slider")).toHaveAttribute("aria-valuetext", /1:00 PM/);
   await page.getByRole("slider", { name: "Forecast time" }).press("ArrowRight");
-  await expect(page.locator(".chart-reading time")).toHaveText("1:15 PM");
+  await expect(page.getByRole("slider")).toHaveAttribute("aria-valuetext", /1:15 PM/);
   await expect(page.locator(".chart-highlight")).toHaveCount(1);
   await page.getByRole("checkbox", { name: "Unknown", exact: true }).check();
   await cards.filter({ hasText: "Unknown practice" }).click();
-  await expect(page.locator(".chart-date")).toHaveText("Tue, Sep 22");
+  await expect(page.getByRole("region", { name: "Tue, Sep 22", exact: true })).toBeVisible();
+  await expect(page.locator(".weather-chart")).toHaveCount(1);
+  await cards.filter({ hasText: "Unknown practice" }).click();
+  await expect(page.locator(".weather-chart")).toHaveCount(0);
+  await cards.filter({ hasText: "Unknown practice" }).click();
   await page.getByRole("checkbox", { name: "Unknown", exact: true }).uncheck();
-  await expect(cards.first()).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(".chart-date")).toHaveText("Mon, Sep 21");
+  await expect(cards.first()).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator(".weather-chart")).toHaveCount(0);
   await page
     .getByRole("checkbox", { name: "Attending", exact: true })
     .uncheck();
@@ -999,12 +1000,7 @@ test("scheduled filters, card-driven days, and accessible full-day inspection", 
   await expect(cards).toHaveCount(1);
   await page.getByRole("button", { name: "My rows", exact: true }).click();
   await page.getByRole("button", { name: "Forecasts", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Today", exact: true }),
-  ).toHaveAttribute("aria-current", "page");
-  await page
-    .getByRole("button", { name: "Scheduled rows", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Scheduled rows", exact: true }).click();
   await expect(cards).toHaveCount(1);
   await page.getByRole("button", { name: "My rows", exact: true }).click();
   await page
@@ -1025,7 +1021,7 @@ test("scheduled filters, card-driven days, and accessible full-day inspection", 
   await expect(page.locator(".weather-chart")).toContainText(
     "Forecast samples unavailable.",
   );
-  await expect(page.locator(".weather-chart")).toContainText("Oct 21");
+  await expect(page.locator(".weather-chart")).toHaveAttribute("aria-label", /Oct 21/);
   await cards.first().click();
   for (const width of [320, 375, 390, 430, 768, 1280]) {
     await page.setViewportSize({ width, height: 1000 });

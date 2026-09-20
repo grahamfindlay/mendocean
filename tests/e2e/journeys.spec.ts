@@ -543,6 +543,8 @@ test("Scheduled forecasts remain chart-only when model contexts are available", 
     await page
       .getByRole("button", { name: "Scheduled rows", exact: true })
       .click();
+    await expect(page.locator(".weather-chart")).toHaveCount(0);
+    await page.locator(".row-card").filter({ hasText: "Model context row" }).click();
     await expect(page.locator('.row-card[aria-pressed="true"] h3')).toHaveText(
       "Model context row",
     );
@@ -584,8 +586,8 @@ test("production timeline offers quarter-hour inspection and selectable daily fo
     page.getByRole("region", { name: "All day", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Week", exact: true }).click();
-  await page.locator(".day-picker button").nth(1).click();
-  await expect(page.locator(".day-picker button").nth(1)).toHaveAttribute(
+  await page.locator(".week-card").nth(1).click();
+  await expect(page.locator(".week-card").nth(1)).toHaveAttribute(
     "aria-pressed",
     "true",
   );

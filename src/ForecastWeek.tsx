@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import WeekPeriodsEditor from "./WeekPeriodsEditor";
 import { useWeekPeriods } from "./useWeekPeriods";
 import { periodsForDay } from "../shared/weekPeriods";
@@ -44,7 +46,6 @@ export default function ForecastWeek({
   weather,
   userId,
   days,
-  day,
   today,
   daySamples,
   expired,
@@ -62,6 +63,7 @@ export default function ForecastWeek({
   onSelectDay: (day: string) => void;
 }) {
   const preferences = useWeekPeriods(userId);
+  const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const summaries = days.map((date) => ({
     date,
     windows: practiceWindows(
@@ -100,13 +102,26 @@ export default function ForecastWeek({
           {summaries.map(({ date: d, windows }) => {
             const dateLabel = formatDate(d + "T12:00:00Z");
             return (
-              <article key={d} aria-current={d === day ? "true" : undefined}>
+              <article
+                key={d}
+                className={expandedDay === d ? "week-day-expanded" : undefined}
+              >
                 <button
                   className="row-card scheduled-row-card week-card"
-                  aria-pressed={d === day}
-                  onClick={() => onSelectDay(d)}
+                  aria-pressed={expandedDay === d}
+                  aria-expanded={expandedDay === d}
+                  aria-controls={`week-chart-${d}`}
+                  onClick={() => {
+                    setExpandedDay(expandedDay === d ? null : d);
+                    onSelectDay(d);
+                  }}
                 >
                   <span className="week-date">
+                    <ChevronDown
+                      className="week-expand-icon"
+                      size={14}
+                      aria-hidden="true"
+                    />
                     <span className="sr-only">{dateLabel}</span>
                     <span aria-hidden="true">
                       {d === today ? "Today" : dateLabel.split(",")[0]}
@@ -131,29 +146,32 @@ export default function ForecastWeek({
                     ))}
                   </span>
                 </button>
+                <div id={`week-chart-${d}`} hidden={expandedDay !== d}>
+                  {expandedDay === d && (
+                    <ForecastDayView
+                      embedded
+                      weather={weather}
+                      days={days}
+                      day={d}
+                      today={today}
+                      daySamples={daySamples}
+                      expired={expired}
+                      now={now}
+                      onSelectDay={onSelectDay}
+                      windows={windows.map((w) => ({
+                        id: w.id,
+                        label: w.label,
+                        start: w.startsAt,
+                        end: w.endsAt,
+                      }))}
+                    />
+                  )}
+                </div>
               </article>
             );
           })}
         </div>
       </div>
-      <ForecastDayView
-        weather={weather}
-        days={days}
-        day={day}
-        today={today}
-        daySamples={daySamples}
-        expired={expired}
-        now={now}
-        onSelectDay={onSelectDay}
-        windows={(
-          summaries.find(({ date }) => date === day)?.windows ?? []
-        ).map((w) => ({
-          id: w.id,
-          label: w.label,
-          start: w.startsAt,
-          end: w.endsAt,
-        }))}
-      />
     </>
   );
 }

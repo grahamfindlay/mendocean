@@ -52,6 +52,8 @@ export default function WeatherChart({
   expired = false,
   title = "Weather over time",
   showTitle = true,
+  showReading = true,
+  showWindowLegend = true,
   highlight,
   windows = [],
   probabilityHours = [],
@@ -65,6 +67,8 @@ export default function WeatherChart({
   expired?: boolean;
   title?: string;
   showTitle?: boolean;
+  showReading?: boolean;
+  showWindowLegend?: boolean;
   /** A period to mark, in epoch ms. Drawn behind the series, never inspected. */
   highlight?: [number, number];
   /** Enabled Week periods for the displayed local day. */
@@ -247,25 +251,34 @@ export default function WeatherChart({
   };
   return (
     <section className="weather-chart" aria-label={title}>
-      <header className="chart-header">
-        {showTitle && <p className="chart-date">{title}</p>}
-        {!data.length && <p>Forecast samples unavailable.</p>}
-        <div className="chart-reading" aria-live="polite" aria-atomic="true">
-          <time dateTime={h.time}>{formatTime(h.time)}</time>
-          <span className="chart-primary-reading">
-            {h.wind?.toFixed(0) ?? "—"}{" "}
-            <small>mph · {directionLabel(h.direction)}</small>
-          </span>
-          <span className="chart-secondary-reading">
-            Gusts: {h.gust?.toFixed(0) ?? "—"} mph
-          </span>
-          <span>
-            {h.temperature?.toFixed(0) ?? "—"}°F · {weatherDescription(h.code)}{" "}
-            · {chance ? `${chance.probability}% rain` : "Rain chance unknown"}
-          </span>
-        </div>
-      </header>
-      {markedWindows.length > 0 && (
+      {(showTitle || showReading || !data.length) && (
+        <header className="chart-header">
+          {showTitle && <p className="chart-date">{title}</p>}
+          {!data.length && <p>Forecast samples unavailable.</p>}
+          {showReading && (
+            <div
+              className="chart-reading"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              <time dateTime={h.time}>{formatTime(h.time)}</time>
+              <span className="chart-primary-reading">
+                {h.wind?.toFixed(0) ?? "—"}{" "}
+                <small>mph · {directionLabel(h.direction)}</small>
+              </span>
+              <span className="chart-secondary-reading">
+                Gusts: {h.gust?.toFixed(0) ?? "—"} mph
+              </span>
+              <span>
+                {h.temperature?.toFixed(0) ?? "—"}°F ·{" "}
+                {weatherDescription(h.code)} ·{" "}
+                {chance ? `${chance.probability}% rain` : "Rain chance unknown"}
+              </span>
+            </div>
+          )}
+        </header>
+      )}
+      {showWindowLegend && markedWindows.length > 0 && (
         <ul
           className="chart-window-key"
           aria-label="Times of interest shown on chart"

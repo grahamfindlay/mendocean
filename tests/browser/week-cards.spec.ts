@@ -76,9 +76,8 @@ test("two periods share mobile headings and retain accessible wind and weather s
   ).toBeLessThanOrEqual(530);
   await cards.nth(3).click();
   await expect(cards.nth(3)).toHaveAttribute("aria-pressed", "true");
-  await expect(
-    page.locator('.day-picker button[aria-pressed="true"]'),
-  ).toContainText("Sep 23");
+  await expect(page.locator(".day-picker")).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Wed, Sep 23", exact: true })).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath("week-two-periods.png"),
     fullPage: true,
@@ -189,15 +188,11 @@ test("day chart marks enabled weekday periods and keeps scrubbing independent", 
     );
   }, defaults);
   await page.goto("/?tab=Week");
+  await expect(page.locator(".weather-chart")).toHaveCount(0);
+  await page.locator(".week-card").first().click();
   const bands = page.locator(".chart-period-highlight");
   await expect(bands).toHaveCount(2);
-  await expect(page.locator(".chart-window-key")).toContainText(
-    "Early morning: 5:30 AM–7:00 AM",
-  );
-  await expect(page.locator(".chart-window-key")).not.toContainText("Evening");
-  await expect(page.locator(".chart-window-key")).not.toContainText(
-    "Disabled session",
-  );
+  await expect(page.locator(".chart-window-key")).toHaveCount(0);
   await expect(bands.first()).toHaveAttribute(
     "data-start",
     String(Date.parse("2026-09-20T10:30:00Z")),
@@ -230,7 +225,7 @@ test("day chart marks enabled weekday periods and keeps scrubbing independent", 
   await expect(surface).toHaveAttribute("aria-valuenow", inspected!);
   await page.locator(".week-card").nth(1).click();
   await expect(bands).toHaveCount(2);
-  await expect(page.locator(".chart-window-key")).toContainText("Evening");
+  await expect(page.locator(".chart-window-key")).toHaveCount(0);
   await expect(bands.first()).toHaveAttribute(
     "data-start",
     String(Date.parse("2026-09-21T10:30:00Z")),
