@@ -314,7 +314,8 @@ export default function App() {
       <UpdateBanner />
       <header className="site-header">
         <a className="wordmark" href="/">
-          mendocean<span>LAKE MENDOTA / MADISON, WI</span>
+          <img className="wordmark-icon" src="/logo.svg" alt="" width="38" height="38" />
+          <div>mendocean<span>LAKE MENDOTA / MADISON, WI</span></div>
         </a>
         {user ? (
           <button className="button subtle" onClick={() => setSettings(true)}>
