@@ -104,8 +104,14 @@ export default function ForecastRows({
             </label>
           ))}
         </fieldset>
-        <button className="button subtle" onClick={onSchedule}>
-          <CalendarPlus size={16} /> Schedule independent row
+        <button
+          className="button subtle"
+          onClick={onSchedule}
+          aria-label="Schedule independent row"
+          title="Schedule independent row"
+        >
+          <CalendarPlus size={18} />
+          <span className="scheduled-add-label">Schedule independent row</span>
         </button>
       </div>
       {!matching.length ? (

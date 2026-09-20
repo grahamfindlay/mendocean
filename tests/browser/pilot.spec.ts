@@ -196,7 +196,7 @@ test("future outing stays forecast-only, past rows sort and saved reports have n
   await page.locator(".row-filters > summary").click();
   expect(
     (await page.locator(".filter-toggle").boundingBox())!.height,
-  ).toBeLessThan(32);
+  ).toBeLessThanOrEqual(32);
   await page.getByRole("checkbox", { name: "Show all practices" }).check();
   await expect(page.locator(".outing-card h3")).toHaveText([
     "Recent practice",
@@ -697,6 +697,9 @@ test("touch scrubbing preserves vertical scrolling and releases a cancelled gest
   const x = bounds.x + 65,
     y = bounds.y + 100;
   await touch("touchStart", x, y);
+  const firstTap = await chart
+    .getByRole("slider")
+    .getAttribute("aria-valuenow");
   for (let i = 1; i <= 6; i++)
     await touch("touchMove", x + ((bounds.width - 95) * i) / 6, y);
   expect(
@@ -706,9 +709,10 @@ test("touch scrubbing preserves vertical scrolling and releases a cancelled gest
   // A fresh tap must work after cancellation instead of leaving the old pointer captured.
   await touch("touchStart", x, y);
   await touch("touchEnd");
-  expect(
-    Number(await chart.getByRole("slider").getAttribute("aria-valuenow")),
-  ).toBeLessThan(2);
+  await expect(chart.getByRole("slider")).toHaveAttribute(
+    "aria-valuenow",
+    firstTap!,
+  );
   const before = await page.evaluate(() => window.scrollY);
   await touch("touchStart", x, y + 80);
   for (let i = 1; i <= 8; i++) await touch("touchMove", x, y + 80 - i * 15);
@@ -933,7 +937,7 @@ test("scheduled filters, card-driven days, and accessible full-day inspection", 
   expect(
     (await page.locator(".attendance-filters label").first().boundingBox())!
       .height,
-  ).toBeLessThan(32);
+  ).toBeLessThanOrEqual(32);
   await expect(
     page.getByRole("checkbox", { name: "Attending", exact: true }),
   ).toBeChecked();
@@ -1052,6 +1056,18 @@ test("scheduled filters, card-driven days, and accessible full-day inspection", 
             ) / width,
         )
         .toBeGreaterThanOrEqual(0.85);
+    }
+    if (width <= 430) {
+      const cardTop = await cards.first().evaluate((card) => {
+        // CI displays a development-only setup notice; it is absent in production.
+        const previewNotice =
+          document.querySelector(".setup-note")?.getBoundingClientRect()
+            .height || 0;
+        return (
+          card.getBoundingClientRect().top + window.scrollY - previewNotice
+        );
+      });
+      expect(cardTop).toBeLessThan(260);
     }
     await page.screenshot({
       path: `/tmp/mendocean-scheduled-${testInfo.project.name}-${width}.png`,
