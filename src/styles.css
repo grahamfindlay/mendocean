@@ -652,16 +652,14 @@ input[type="checkbox"] {
 }
 .outing-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
+  gap: 0.75rem;
   margin: 20px 0 40px;
 }
 .outing-card {
-  padding: 19px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: var(--paper);
-  text-align: left;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 .outing-card p {
   font-size: 13px;
@@ -1335,9 +1333,6 @@ button:hover:not(:disabled) {
     gap: 20px;
     flex-wrap: wrap;
   }
-  .outing-card {
-    padding: 17px;
-  }
   .outing-filters {
     align-items: flex-start;
     flex-direction: column;
@@ -1602,8 +1597,8 @@ button:hover:not(:disabled) {
   gap: 0.75rem;
   margin-bottom: 1.2rem;
 }
-.row-card {
-  display: block;
+.row-card,
+.outing-card {
   width: 100%;
   border: 1px solid #deddd3;
   border-radius: 10px;
@@ -1611,6 +1606,9 @@ button:hover:not(:disabled) {
   background: var(--paper);
   text-align: left;
   font-size: 0.8rem;
+}
+.row-card {
+  display: block;
   cursor: pointer;
 }
 .row-card[aria-pressed="true"] {
@@ -1788,7 +1786,7 @@ button:hover:not(:disabled) {
   justify-content: space-between;
   gap: 8px;
 }
-.scheduled-row-card .row-meta {
+.row-card-header .row-meta {
   display: block;
   font-size: 15px;
   font-weight: 500;
@@ -1796,7 +1794,7 @@ button:hover:not(:disabled) {
   margin: 0 0 5px;
   line-height: 1.45;
 }
-.scheduled-row-card .attendance-badge {
+.row-card-header .attendance-badge {
   flex-shrink: 0;
   font-size: 11px;
 }
@@ -1817,7 +1815,7 @@ button:hover:not(:disabled) {
 .scheduled-weather-line svg {
   flex: 0 0 20px;
 }
-.scheduled-row-card .wind-speed {
+.scheduled-card-weather .wind-speed {
   font-size: inherit;
   font-weight: inherit;
 }
@@ -2084,3 +2082,10 @@ button:hover:not(:disabled) {
   right: calc(0.8rem + 1px);
   font-size: 11px;
 }
+
+.row-card-header { overflow-wrap: anywhere; }
+.row-kind { display: block; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.outing-card .report-summary { margin-top: 12px; padding: 12px 0 0; font-size: 13px; gap: 7px; flex-direction: column; }
+.outing-card-actions { margin-top: auto; padding-top: 12px; align-items: center; justify-content: space-between; gap: 0 12px; }
+.outing-card-actions .subtle-action { margin-left: auto; }
+.outing-card-actions [aria-expanded="true"] .card-expand-icon { transform: rotate(180deg); }
