@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   formatDate,
   formatTime,
@@ -72,6 +73,7 @@ export default function OutingsView({
   bhcConnected: boolean;
   busy: boolean;
 }) {
+  const [expanded, setExpanded] = useState<string[]>([]);
   // A filter applies only where it is offered, so leaving Past on Unlogged and
   // switching to Upcoming cannot silently thin a list with no control for it.
   // One place decides that, rather than each caller remembering.
@@ -235,6 +237,14 @@ export default function OutingsView({
                 ? ("needed" as const)
                 : null;
           const reminder = reminderPresentation(o, profile, now);
+          // Rendered only when it would hold something. An upcoming practice
+          // with no BHC connection and no reminder has nothing to disclose.
+          const more =
+            (o.kind === "official" && phase === "future" && bhcConnected) ||
+            (o.kind === "independent" && o.owner_id === user) ||
+            !!report ||
+            !!reminder;
+          const open = expanded.includes(o.id);
           const preview = weather
             ? windowSamples(
                 weather,
@@ -265,10 +275,10 @@ export default function OutingsView({
               <p>
                 {formatDate(o.starts_at)} · {formatTime(o.starts_at)}–
                 {formatTime(o.ends_at)}
+                {phase === "in_progress" && (
+                  <span className="phase-label"> · In progress</span>
+                )}
               </p>
-              {phase === "in_progress" && (
-                <p className="phase-label">In progress</p>
-              )}
               {status && (
                 <div className={`report-summary log-status log-${status}`}>
                   <span className="log-mark">
@@ -317,42 +327,22 @@ export default function OutingsView({
                   )}
                 </div>
               )}
+              {/* One thing to do with this row, plus the forecast it is
+                  scheduled against. Everything else is a tap away rather than
+                  competing for the card. */}
               <div className="card-actions">
-                {o.kind === "official" &&
-                  phase === "future" &&
-                  bhcConnected && (
-                    <button
-                      className="text-button"
-                      disabled={busy}
-                      onClick={() => onAttendance(o)}
-                    >
-                      {o.attendance_deadline &&
-                      now >= Date.parse(o.attendance_deadline)
-                        ? "Attendance details"
-                        : "Change attendance"}
-                    </button>
-                  )}
                 {phase !== "past" && (
                   <button className="text-button" onClick={() => onForecast(o)}>
                     View forecast
                   </button>
                 )}
                 {report ? (
-                  <>
-                    <button
-                      className="text-button"
-                      onClick={() => onEdit(o, report)}
-                    >
-                      Edit report
-                    </button>
-                    <button
-                      className="text-button danger"
-                      disabled={busy}
-                      onClick={() => onDelete(report)}
-                    >
-                      Delete
-                    </button>
-                  </>
+                  <button
+                    className="text-button"
+                    onClick={() => onEdit(o, report)}
+                  >
+                    Edit report
+                  </button>
                 ) : (
                   // Withheld while a report for this row sits in the outbox:
                   // tapping it would stage a second one under a new submission
@@ -365,109 +355,164 @@ export default function OutingsView({
                     </button>
                   )
                 )}
-                {o.kind === "independent" && o.owner_id === user && (
+                {more && (
                   <button
-                    className="text-button"
-                    disabled={busy}
-                    onClick={() => onShare(o)}
+                    className="text-button subtle-action"
+                    aria-expanded={open}
+                    aria-controls={`more-${o.id}`}
+                    onClick={() =>
+                      setExpanded((ids) =>
+                        open ? ids.filter((id) => id !== o.id) : [...ids, o.id],
+                      )
+                    }
                   >
-                    Share
+                    More
+                    <ChevronDown
+                      className={open ? "chevron open" : "chevron"}
+                      size={15}
+                    />
                   </button>
                 )}
               </div>
+              {/* The state stays on the face of the card; only its controls
+                  move, so a scheduled or failed reminder is still legible at a
+                  glance. */}
               {reminder && (
-                <div className="outing-reminder">
-                  <p>
-                    {reminder.text}
-                    {reminder.due && (
-                      <>
-                        {" "}
-                        · {formatDate(reminder.due)}, {formatTime(reminder.due)}
-                      </>
-                    )}
-                    {reminder.sent && (
-                      <>
-                        {" "}
-                        · {formatDate(reminder.sent)},{" "}
-                        {formatTime(reminder.sent)}
-                      </>
-                    )}
-                  </p>
-                  {o.reminder &&
-                    !o.skipped &&
-                    !!o.reminder_state?.channels?.length && (
-                      <ul className="channel-status">
-                        {o.reminder_state.channels.map((c) => (
-                          <li key={c.channel}>
-                            {c.channel === "email" ? "Email" : "Push"}:{" "}
-                            {c.status === "sent"
-                              ? "Sent"
-                              : c.status === "not_requested"
-                                ? "Not requested for this reminder"
-                                : c.error === "no_device"
-                                  ? "No registered device"
-                                  : c.error === "quota"
-                                    ? "Sending limit reached"
-                                    : c.status === "retrying"
-                                      ? "Retry scheduled"
-                                      : c.status === "failed"
-                                        ? "Could not send"
-                                        : "Pending"}
-                            {c.channel === "push" &&
-                              c.devices_sent > 0 &&
-                              c.status !== "sent" &&
-                              ` · ${c.devices_sent} device${c.devices_sent === 1 ? "" : "s"} already accepted`}
-                            {c.status === "retrying" &&
-                              (c.error === "no_device" ||
-                                c.error === "quota") &&
-                              " · Retry scheduled"}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  {phase !== "past" && reminder.toggle && (
-                    <small>
-                      To log after the outing, normally 15 minutes after it
-                      ends.
-                    </small>
+                <p className="outing-reminder">
+                  {reminder.text}
+                  {reminder.due && (
+                    <>
+                      {" "}
+                      · {formatDate(reminder.due)}, {formatTime(reminder.due)}
+                    </>
                   )}
-                  {reminder.partial && reminder.snooze && (
-                    <small>
-                      Requesting another reminder sends all your selected
-                      channels again.
-                    </small>
+                  {reminder.sent && (
+                    <>
+                      {" "}
+                      · {formatDate(reminder.sent)}, {formatTime(reminder.sent)}
+                    </>
                   )}
-                  <div className="card-actions">
-                    {o.reminder_state?.channels?.some((c) => c.error) && (
-                      <button className="text-button" onClick={onSettings}>
-                        Reminder settings
-                      </button>
-                    )}
-                    {reminder.toggle &&
-                      (phase !== "past" ||
-                        (reminder.toggle === "skip" && !reminder.sent)) && (
+                </p>
+              )}
+              {more && open && (
+                <div className="card-more" id={`more-${o.id}`}>
+                  {o.kind === "official" &&
+                    phase === "future" &&
+                    bhcConnected && (
+                      <div className="card-actions">
                         <button
                           className="text-button"
                           disabled={busy}
-                          onClick={() => onReminder(o, reminder.toggle!)}
+                          onClick={() => onAttendance(o)}
                         >
-                          {reminder.toggle === "skip"
-                            ? "Turn off logging reminder"
-                            : "Turn on logging reminder"}
+                          {o.attendance_deadline &&
+                          now >= Date.parse(o.attendance_deadline)
+                            ? "Attendance details"
+                            : "Change attendance"}
                         </button>
-                      )}
-                    {reminder.snooze && (
+                      </div>
+                    )}
+                  {o.kind === "independent" && o.owner_id === user && (
+                    <div className="card-actions">
                       <button
                         className="text-button"
                         disabled={busy}
-                        onClick={() => onReminder(o, "snooze")}
+                        onClick={() => onShare(o)}
                       >
-                        {reminder.sent || reminder.partial
-                          ? "Remind me again in 1 hour"
-                          : "Remind me to log in 1 hour"}
+                        Share
                       </button>
-                    )}
-                  </div>
+                    </div>
+                  )}
+                  {report && (
+                    <div className="card-actions">
+                      <button
+                        className="text-button danger"
+                        disabled={busy}
+                        onClick={() => onDelete(report)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                  {reminder && (
+                    <div className="reminder-details">
+                      {o.reminder &&
+                        !o.skipped &&
+                        !!o.reminder_state?.channels?.length && (
+                          <ul className="channel-status">
+                            {o.reminder_state.channels.map((c) => (
+                              <li key={c.channel}>
+                                {c.channel === "email" ? "Email" : "Push"}:{" "}
+                                {c.status === "sent"
+                                  ? "Sent"
+                                  : c.status === "not_requested"
+                                    ? "Not requested for this reminder"
+                                    : c.error === "no_device"
+                                      ? "No registered device"
+                                      : c.error === "quota"
+                                        ? "Sending limit reached"
+                                        : c.status === "retrying"
+                                          ? "Retry scheduled"
+                                          : c.status === "failed"
+                                            ? "Could not send"
+                                            : "Pending"}
+                                {c.channel === "push" &&
+                                  c.devices_sent > 0 &&
+                                  c.status !== "sent" &&
+                                  ` · ${c.devices_sent} device${c.devices_sent === 1 ? "" : "s"} already accepted`}
+                                {c.status === "retrying" &&
+                                  (c.error === "no_device" ||
+                                    c.error === "quota") &&
+                                  " · Retry scheduled"}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      {phase !== "past" && reminder.toggle && (
+                        <small>
+                          To log after the outing, normally 15 minutes after it
+                          ends.
+                        </small>
+                      )}
+                      {reminder.partial && reminder.snooze && (
+                        <small>
+                          Requesting another reminder sends all your selected
+                          channels again.
+                        </small>
+                      )}
+                      <div className="card-actions">
+                        {o.reminder_state?.channels?.some((c) => c.error) && (
+                          <button className="text-button" onClick={onSettings}>
+                            Reminder settings
+                          </button>
+                        )}
+                        {reminder.toggle &&
+                          (phase !== "past" ||
+                            (reminder.toggle === "skip" && !reminder.sent)) && (
+                            <button
+                              className="text-button"
+                              disabled={busy}
+                              onClick={() => onReminder(o, reminder.toggle!)}
+                            >
+                              {reminder.toggle === "skip"
+                                ? "Turn off logging reminder"
+                                : "Turn on logging reminder"}
+                            </button>
+                          )}
+                        {reminder.snooze && (
+                          <button
+                            className="text-button"
+                            disabled={busy}
+                            onClick={() => onReminder(o, "snooze")}
+                          >
+                            {reminder.sent || reminder.partial
+                              ? "Remind me again in 1 hour"
+                              : "Remind me to log in 1 hour"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </article>

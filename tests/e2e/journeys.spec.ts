@@ -475,7 +475,11 @@ test("upcoming, past and saved outing actions follow server reminder state", asy
   await expect(page.getByText(/Logging reminder scheduled/)).toBeVisible();
   await page.getByRole("button", { name: "Past", exact: true }).click();
   await expect(page.getByRole("heading", { name: past.title })).toBeVisible();
-  await page
+  // Reminder controls live behind the card's More disclosure; its state stays
+  // on the face of the card.
+  const pastCard = page.locator(".outing-card").filter({ hasText: past.title });
+  await pastCard.getByRole("button", { name: "More" }).click();
+  await pastCard
     .getByRole("button", { name: "Remind me to log in 1 hour" })
     .click();
   await expect(
@@ -614,6 +618,7 @@ test("partial reminder delivery is visible without implying device registration"
   await expect(
     page.getByText("Logging reminder partially sent", { exact: false }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "More" }).first().click();
   await expect(page.locator(".channel-status")).toContainText("Email: Sent");
   await expect(page.locator(".channel-status")).toContainText(
     "Push: No registered device",
@@ -656,6 +661,7 @@ test("attendance changes persist in BHC, closed windows and uncertain sends stay
   await loggedIn(page);
   await page.getByRole("button", { name: "My rows", exact: true }).click();
   const card = page.locator(".outing-card").filter({ hasText: p.name });
+  await card.getByRole("button", { name: "More" }).click();
   await card
     .getByRole("button", { name: "Change attendance", exact: true })
     .click();
@@ -669,6 +675,8 @@ test("attendance changes persist in BHC, closed windows and uncertain sends stay
   await page.reload();
   await page.getByRole("button", { name: "My rows", exact: true }).click();
   await expect(card.locator(".attendance-badge")).toHaveText("Attending");
+  // A reload closes the disclosure again.
+  await card.getByRole("button", { name: "More" }).click();
   await card
     .getByRole("button", { name: "Change attendance", exact: true })
     .click();
