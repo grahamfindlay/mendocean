@@ -41,6 +41,7 @@ export default function WeatherChart({
   samples,
   domain,
   initialTime,
+  currentTime,
   expired = false,
   title = "Weather over time",
   highlight,
@@ -50,6 +51,8 @@ export default function WeatherChart({
   probabilityHours?: WeatherHour[];
   domain?: [number, number];
   initialTime?: number;
+  /** Live clock marker, independent of the inspected sample. */
+  currentTime?: number;
   expired?: boolean;
   title?: string;
   /** A period to mark, in epoch ms. Drawn behind the series, never inspected. */
@@ -80,7 +83,7 @@ export default function WeatherChart({
     observer.observe(element);
     return () => observer.disconnect();
   }, [samples.length > 0]);
-  if (!samples.length && !frozen)
+  if (!samples.length && !frozen && (!domain || currentTime === undefined))
     return (
       <section className="weather-chart" aria-label={title}>
         <p className="chart-date">{title}</p>
@@ -99,7 +102,17 @@ export default function WeatherChart({
       0,
     ),
   );
-  const h = data[index];
+  const h: WeatherHour = data[index] || {
+    time: new Date(initialTime ?? start).toISOString(),
+    wind: null,
+    gust: null,
+    direction: null,
+    temperature: null,
+    probability: null,
+    precipitation: null,
+    visibility: null,
+    code: null,
+  };
   const plotWidth = Math.max(1, W - left - right);
   const x = (time: string | number) =>
     left +
@@ -153,6 +166,7 @@ export default function WeatherChart({
       );
     });
   const inspect = (clientX: number, rect: DOMRect) => {
+    if (!data.length) return;
     const target = ((clientX - rect.left) / rect.width) * W;
     let nearest = 0;
     data.forEach((point, i) => {
@@ -172,22 +186,24 @@ export default function WeatherChart({
   const vectorScale = Math.min(1, plotWidth / windCount / 26);
   const weatherScale = Math.min(1, plotWidth / weatherCount / 21);
   const annotations = (count: number) =>
-    [
-      ...new Set(
-        Array.from({ length: count }, (_, i) => {
-          const time = start + ((end - start) * (i + 0.5)) / count;
-          return data.reduce((nearest, point) =>
-            Math.abs(Date.parse(point.time) - time) <
-            Math.abs(Date.parse(nearest.time) - time)
-              ? point
-              : nearest,
-          );
-        }),
-      ),
-    ].filter(
-      (point) =>
-        Date.parse(point.time) >= start && Date.parse(point.time) <= end,
-    );
+    !data.length
+      ? []
+      : [
+          ...new Set(
+            Array.from({ length: count }, (_, i) => {
+              const time = start + ((end - start) * (i + 0.5)) / count;
+              return data.reduce((nearest, point) =>
+                Math.abs(Date.parse(point.time) - time) <
+                Math.abs(Date.parse(nearest.time) - time)
+                  ? point
+                  : nearest,
+              );
+            }),
+          ),
+        ].filter(
+          (point) =>
+            Date.parse(point.time) >= start && Date.parse(point.time) <= end,
+        );
   const ticks =
     hours >= 23
       ? dayChartTicks(start, end)
@@ -204,6 +220,7 @@ export default function WeatherChart({
     <section className="weather-chart" aria-label={title}>
       <header className="chart-header">
         <p className="chart-date">{title}</p>
+        {!data.length && <p>Forecast samples unavailable.</p>}
         <div className="chart-reading" aria-live="polite" aria-atomic="true">
           <time dateTime={h.time}>{formatTime(h.time)}</time>
           <span className="chart-primary-reading">
@@ -227,11 +244,13 @@ export default function WeatherChart({
         tabIndex={0}
         aria-label="Forecast time"
         aria-describedby={id}
+        aria-disabled={!data.length}
         aria-valuemin={0}
         aria-valuemax={Math.max(0, data.length - 1)}
         aria-valuenow={index}
         aria-valuetext={`${formatTime(h.time)}, wind ${h.wind ?? "unknown"} mph, gusts ${h.gust ?? "unknown"} mph, ${h.temperature ?? "unknown"} degrees Fahrenheit, ${chance ? chance.probability + "% rain" : "rain chance unknown"}`}
         onKeyDown={(e) => {
+          if (!data.length) return;
           const next =
             e.key === "Home"
               ? 0
@@ -427,13 +446,47 @@ export default function WeatherChart({
             <WindVector hour={point} expired={expired} compact />
           </g>
         ))}
-        <line
-          x1={cursor}
-          x2={cursor}
-          y1="0"
-          y2="405"
-          className="chart-cursor"
-        />
+        {data.length > 0 && (
+          <line
+            x1={cursor}
+            x2={cursor}
+            y1="0"
+            y2="405"
+            className="chart-cursor"
+          />
+        )}
+        {currentTime !== undefined &&
+          currentTime >= start &&
+          currentTime < end && (
+            <g className="chart-now-marker" data-time={currentTime}>
+              <line
+                className="chart-now"
+                x1={x(currentTime)}
+                x2={x(currentTime)}
+                y1="0"
+                y2="405"
+              >
+                <title>
+                  Current time:{" "}
+                  {formatTime(new Date(currentTime).toISOString())}
+                </title>
+              </line>
+              <text
+                className="chart-now-label"
+                x={x(currentTime)}
+                y="438"
+                textAnchor={
+                  x(currentTime) < left + 20
+                    ? "start"
+                    : x(currentTime) > W - right - 20
+                      ? "end"
+                      : "middle"
+                }
+              >
+                Now
+              </text>
+            </g>
+          )}
         {ticks.map((t, i) => (
           <text
             key={t}

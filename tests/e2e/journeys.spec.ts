@@ -562,12 +562,19 @@ test("production timeline offers quarter-hour inspection and selectable daily fo
 }) => {
   await page.goto("/?tab=Today");
   const chart = page.getByRole("region", {
-    name: "Next 4 hours",
+    name: "All day",
     exact: true,
   });
   await expect(chart).toBeVisible();
+  const initialIndex = Number(
+    await chart.getByRole("slider").getAttribute("aria-valuenow"),
+  );
   await chart.getByRole("slider").press("ArrowRight");
-  await expect(chart.getByRole("slider")).toHaveAttribute("aria-valuenow", "1");
+  await expect(chart.getByRole("slider")).toHaveAttribute(
+    "aria-valuenow",
+    String(initialIndex + 1),
+  );
+  await expect(chart.locator(".chart-now-marker")).toHaveCount(1);
   await expect(chart.locator(".chart-reading")).not.toContainText(
     "Precipitation",
   );

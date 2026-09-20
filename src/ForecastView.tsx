@@ -21,7 +21,6 @@ export default function ForecastView({
   weather,
   tab,
   outings,
-  onLog,
   onSchedule,
   now,
   selection,
@@ -32,7 +31,6 @@ export default function ForecastView({
   weather: Forecast;
   tab: string;
   outings: Outing[];
-  onLog: () => void;
   onSchedule: () => void;
   now: number;
   selection?: ForecastSelection;
@@ -41,8 +39,7 @@ export default function ForecastView({
   onAttendanceChange: (values: string[]) => void;
 }) {
   /* Held here rather than in the destination components so the selected row,
-     day and horizon survive moving between Today, Week and Rows. */
-  const [horizon, setHorizon] = useState("4");
+     day survive moving between Today, Week and Rows. */
   const [selectedDay, setSelectedDay] = useState("");
   const [selectedRow, setSelectedRow] = useState(selection?.id || "");
   const handledSelection = useRef(selection);
@@ -62,7 +59,7 @@ export default function ForecastView({
   const today = localDateTime(new Date(now).toISOString()).slice(0, 10);
   return (
     <>
-      {tab !== "Rows" && (
+      {tab === "Week" && (
         <div className="page-heading concise-heading">
           <h1>{tab}</h1>
         </div>
@@ -79,9 +76,9 @@ export default function ForecastView({
           weather={weather}
           expired={expired}
           now={now}
-          onLog={onLog}
-          horizon={horizon}
-          onSelectHorizon={setHorizon}
+          outings={userId ? outings : []}
+          attendance={attendance}
+          onAttendanceChange={onAttendanceChange}
         />
       )}
       {tab === "Week" && (

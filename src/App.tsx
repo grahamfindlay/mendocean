@@ -398,7 +398,6 @@ export default function App() {
               weather={weather}
               tab={tab}
               outings={account?.outings || []}
-              onLog={() => navigate("Log")}
               onSchedule={() => setPlanned(true)}
             />
           ) : (

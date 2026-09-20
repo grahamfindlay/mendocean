@@ -461,13 +461,10 @@ test("wind bearing indicates source direction and a current sample keeps its val
     "rotate(90 40 40)",
   );
   await expect(page.locator(".sample-time time")).toContainText("9:15 AM");
-  await expect(page.locator(".hour-row time")).toHaveText([
-    "10:00 AM",
-    "11:00 AM",
-  ]);
+  await expect(page.locator(".hour-row")).toHaveCount(0);
   await page.clock.fastForward(37 * 60000);
   await expect(page.locator(".sample-time time")).toContainText("10:00 AM");
-  await expect(page.locator(".hour-row time")).toHaveText(["11:00 AM"]);
+  await expect(page.locator(".hour-row")).toHaveCount(0);
 });
 
 test("quarter-hour charts inspect real samples and preserve minute-specific forecasts", async ({
@@ -508,88 +505,39 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
   );
   await page.goto("/?tab=Today");
   await expect(page.locator(".sample-time time")).toContainText("9:15 AM");
-  await expect(page.locator(".hour-row time").first()).toHaveText("9:30 AM");
-  const chart = page.getByRole("region", {
-    name: "Next 4 hours",
-    exact: true,
-  });
+  const chart = page.getByRole("region", { name: "All day", exact: true });
+  await expect(
+    page.getByRole("heading", { name: "Now", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".weather-chart")).toHaveCount(1);
+  await expect(
+    page.locator(
+      ".hour-table, .horizon-picker, .log-callout, .today-scheduled",
+    ),
+  ).toHaveCount(0);
+  await expect(chart.locator(".chart-now-marker")).toHaveAttribute(
+    "data-time",
+    String(now),
+  );
+  const nowX = await chart.locator(".chart-now").getAttribute("x1");
   await chart.getByRole("slider").press("ArrowRight");
   await expect(chart.locator(".chart-reading time")).toContainText("9:30 AM");
   await expect(chart.locator(".chart-reading")).toContainText("Gusts: 38 mph");
-  await expect(chart.locator(".chart-overflow")).toHaveCount(0);
+  await expect(chart.locator(".chart-now")).toHaveAttribute("x1", nowX!);
   await expect(chart.locator(".chart-surface")).toHaveAttribute(
     "data-wind-max",
     "40",
   );
-  await expect(chart.locator(".wind-vector")).toHaveCount(16);
-  await expect(chart.locator(".weather-icon")).toHaveCount(8);
-  const vector = chart.locator(".wind-vector").first();
-  await expect(vector).toHaveAttribute("width", "32");
-  await expect(vector.locator("g")).toHaveAttribute(
-    "transform",
-    "rotate(350 16 16)",
-  );
-  await expect(chart.locator(".chart-reading")).not.toContainText(
-    "Precipitation",
-  );
-  await expect(page.locator(".current-panel .rain-chance")).toContainText(
-    "30%",
-  );
-  await expect(
-    page
-      .getByRole("region", { name: "All day", exact: true })
-      .locator(".chart-reading time"),
-  ).toContainText("9:15 AM");
-  expect(await page.locator(".hour-row time").allTextContents()).toEqual(
-    Array.from({ length: 12 }, (_, i) => {
-      const t = new Date(base + (i + 1) * 1800000);
-      return new Intl.DateTimeFormat("en-US", {
-        timeZone: "America/Chicago",
-        hour: "numeric",
-        minute: "2-digit",
-      }).format(t);
-    }),
-  );
+  await expect(page.locator(".now-panel .rain-chance")).toContainText("30%");
   await expect(chart.locator(".chart-surface")).toHaveAttribute(
     "data-domain-start",
-    String(now),
+    String(Date.parse("2026-09-15T05:00:00Z")),
   );
-  await expect(chart.locator(".chart-surface")).toHaveAttribute(
-    "data-domain-end",
-    String(now + 4 * 3600000),
-  );
-  const readingBox = await chart.locator(".chart-reading").boundingBox();
-  const surfaceBox = await chart.locator(".chart-surface").boundingBox();
-  expect(readingBox!.y + readingBox!.height).toBeLessThanOrEqual(surfaceBox!.y);
-  await page.getByLabel("Hours ahead").selectOption("24");
-  const longChart = page.getByRole("region", {
-    name: "Next 24 hours",
-    exact: true,
-  });
-  await expect(longChart.locator(".chart-surface")).toHaveAttribute(
-    "data-domain-end",
-    String(now + 24 * 3600000),
-  );
-  expect(
-    Number(
-      await longChart
-        .locator(".chart-surface")
-        .getAttribute("data-sample-count"),
-    ),
-  ).toBeGreaterThan(90);
-  expect(
-    await longChart.locator(".chart-annotation").count(),
-  ).toBeGreaterThanOrEqual(12);
-  expect(
-    await longChart.locator(".weather-icon").count(),
-  ).toBeGreaterThanOrEqual(12);
-  await expect(longChart.locator(".wind-vector")).toHaveCount(24);
-  // Narrow screens shrink annotations instead of letting them collide.
   const viewport = page.viewportSize()!;
   await page.setViewportSize({ width: 320, height: viewport.height });
   await expect
     .poll(() =>
-      longChart
+      chart
         .locator(".weather-icon")
         .evaluateAll((icons) =>
           icons
@@ -601,25 +549,27 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
     )
     .toBe(true);
   await page.setViewportSize(viewport);
-  await longChart.scrollIntoViewIfNeeded();
-  const bounds = (await longChart.locator(".chart-surface").boundingBox())!;
+  await chart.scrollIntoViewIfNeeded();
+  const bounds = (await chart.locator(".chart-surface").boundingBox())!;
   await page.mouse.move(bounds.x + 60, bounds.y + 80);
   await page.mouse.down();
   await page.mouse.move(bounds.x + bounds.width - 30, bounds.y + 80, {
     steps: 8,
   });
   expect(
-    Number(await longChart.getByRole("slider").getAttribute("aria-valuenow")),
-  ).toBeGreaterThan(60);
+    Number(await chart.getByRole("slider").getAttribute("aria-valuenow")),
+  ).toBeGreaterThan(30);
+  const inspected = await chart.locator(".chart-reading time").textContent();
   await page.clock.fastForward(60000);
-  await expect(longChart.locator(".chart-surface")).toHaveAttribute(
-    "data-domain-start",
-    String(now),
-  );
-  await page.mouse.up();
-  await expect(longChart.locator(".chart-surface")).toHaveAttribute(
-    "data-domain-start",
+  await expect(chart.locator(".chart-now-marker")).toHaveAttribute(
+    "data-time",
     String(now + 60000),
+  );
+  await expect(chart.locator(".chart-reading time")).toHaveText(inspected!);
+  await page.mouse.up();
+  await expect(chart.locator(".chart-surface")).toHaveAttribute(
+    "data-domain-start",
+    String(Date.parse("2026-09-15T05:00:00Z")),
   );
   await page.getByRole("button", { name: "Week", exact: true }).click();
   const cards = page.locator(".week-grid article");
@@ -677,8 +627,9 @@ test("touch scrubbing preserves vertical scrolling and releases a cancelled gest
     testInfo.project.name !== "phone",
     "Touch input requires the phone project",
   );
+  await page.setViewportSize({ width: 390, height: 600 });
   await page.goto("/?tab=Today");
-  const chart = page.getByRole("region", { name: "Next 4 hours", exact: true });
+  const chart = page.getByRole("region", { name: "All day", exact: true });
   const surface = chart.locator(".chart-surface");
   await surface.scrollIntoViewIfNeeded();
   const bounds = (await surface.boundingBox())!;
@@ -1074,4 +1025,152 @@ test("scheduled filters, card-driven days, and accessible full-day inspection", 
       fullPage: true,
     });
   }
+});
+
+test("Today shows only today's rows and keeps its chart and clock marker without matches or weather", async ({
+  page,
+}, testInfo) => {
+  const now = Date.parse("2026-09-20T15:24:00Z");
+  const start = Date.parse("2026-09-20T05:00:00Z");
+  await page.clock.install({ time: now - 1000 });
+  await page.clock.pauseAt(now);
+  await page.route("**/api/weather", (route) =>
+    route.fulfill({
+      json: {
+        fetched_at: new Date(now).toISOString(),
+        provider: "Fixture",
+        model_version: "hannah-1.0.0",
+        hours: Array.from({ length: 25 }, (_, i) => ({
+          time: new Date(start + i * 3600000).toISOString(),
+          wind: 8,
+          direction: 45,
+          gust: 14,
+          temperature: 54,
+          code: 3,
+          probability: 19,
+          precipitation: 0,
+          visibility: null,
+        })),
+      },
+    }),
+  );
+  await page.addInitScript(() => {
+    const common = {
+      kind: "official",
+      version: 1,
+      owner_id: null,
+      bhc_practice_id: 1,
+      reminder: false,
+      reports: [],
+      planned_boat: null,
+    };
+    localStorage.setItem(
+      "mendocean-explicit-preview-v1",
+      JSON.stringify([
+        {
+          ...common,
+          id: "early",
+          title: "Earlier today",
+          attendance: "attending",
+          starts_at: "2026-09-20T10:30:00Z",
+          ends_at: "2026-09-20T12:00:00Z",
+        },
+        {
+          ...common,
+          id: "late",
+          title: "Later today",
+          attendance: "unknown",
+          starts_at: "2026-09-20T22:00:00Z",
+          ends_at: "2026-09-20T23:00:00Z",
+        },
+        {
+          ...common,
+          id: "tomorrow",
+          title: "Tomorrow only",
+          attendance: "attending",
+          starts_at: "2026-09-21T10:30:00Z",
+          ends_at: "2026-09-21T12:00:00Z",
+        },
+      ]),
+    );
+  });
+  await page.goto("/?preview=1&tab=Today");
+  await expect(
+    page.getByRole("heading", { name: "Now", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".row-card")).toHaveCount(1);
+  await expect(page.locator(".row-card")).toContainText("Earlier today");
+  await expect(page.getByText("Tomorrow only")).toHaveCount(0);
+  await expect(page.locator(".weather-chart")).toHaveCount(1);
+  const surface = page.locator(".chart-surface");
+  const domainStart = await surface.getAttribute("data-domain-start");
+  await expect(page.locator(".chart-highlight")).toHaveCount(1);
+  await page.getByRole("checkbox", { name: "Unknown", exact: true }).check();
+  await page.locator(".row-card").filter({ hasText: "Later today" }).click();
+  await expect(page.locator(".chart-highlight title")).toContainText("5:00 PM");
+  const nowX = await page.locator(".chart-now").getAttribute("x1");
+  await page.getByRole("slider").press("End");
+  await expect(page.locator(".chart-now")).toHaveAttribute("x1", nowX!);
+  await expect(surface).toHaveAttribute("data-domain-start", domainStart!);
+  await page.getByRole("checkbox", { name: "Unknown", exact: true }).uncheck();
+  await page
+    .getByRole("checkbox", { name: "Attending", exact: true })
+    .uncheck();
+  await expect(page.locator(".row-card, .chart-highlight")).toHaveCount(0);
+  await expect(page.getByText(/No rows match|No rows scheduled/)).toHaveCount(
+    0,
+  );
+  await expect(page.locator(".chart-now-marker")).toHaveCount(1);
+  await page.getByRole("checkbox", { name: "Attending", exact: true }).check();
+  for (const width of [390, 1280]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBe(width);
+    expect(
+      (await page.locator(".now-panel").boundingBox())!.height,
+    ).toBeLessThan(190);
+    await page.screenshot({
+      path: `/tmp/mendocean-today-${testInfo.project.name}-${width}.png`,
+      fullPage: true,
+    });
+  }
+  // Clear the preview rows after initialization, without reseeding on reload.
+  await page.evaluate(() =>
+    localStorage.setItem("mendocean-explicit-preview-v1", "[]"),
+  );
+  // Remove the init script by using a fresh page in this context; stored rows remain empty.
+  const emptyPage = await page.context().newPage();
+  await emptyPage.clock.install({ time: now - 1000 });
+  await emptyPage.clock.pauseAt(now);
+  await emptyPage.route("**/api/weather", (route) =>
+    route.fulfill({
+      json: {
+        fetched_at: new Date(now).toISOString(),
+        provider: "Fixture",
+        model_version: "hannah-1.0.0",
+        hours: [],
+      },
+    }),
+  );
+  await emptyPage.goto("/?preview=1&tab=Today");
+  await expect(emptyPage.locator(".today-scheduled")).toHaveCount(0);
+  await expect(emptyPage.locator(".weather-chart")).toHaveCount(1);
+  await expect(emptyPage.locator(".chart-now-marker")).toHaveCount(1);
+  await expect(emptyPage.locator(".weather-chart")).toContainText(
+    "Forecast samples unavailable.",
+  );
+  await expect(emptyPage.locator(".hour-table, .horizon-picker")).toHaveCount(
+    0,
+  );
+  await emptyPage.clock.fastForward(Date.parse("2026-09-21T05:01:00Z") - now);
+  await expect(emptyPage.locator(".chart-surface")).toHaveAttribute(
+    "data-domain-start",
+    String(Date.parse("2026-09-21T05:00:00Z")),
+  );
+  await expect(emptyPage.locator(".chart-now-marker")).toHaveAttribute(
+    "data-time",
+    String(Date.parse("2026-09-21T05:01:00Z")),
+  );
+  await emptyPage.close();
 });
