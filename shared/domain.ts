@@ -43,8 +43,8 @@ export const ROUTES = ["east", "west", "both", "unknown"] as const;
 export const RATINGS = ["Glass", "Good", "Fine", "Poor", "Forced off"] as const;
 /** Default daily periods for Week forecasts, in Madison local time. */
 export const PRACTICE_WINDOWS = [
-  { id: "morning", label: "Early morning", start: "05:30", end: "07:30" },
-  { id: "evening", label: "Evening", start: "18:00", end: "20:00" },
+  { id: "morning", label: "Early morning", start: "05:30", end: "07:00" },
+  { id: "evening", label: "Evening", start: "18:00", end: "19:30" },
 ] as const;
 export type PracticeWindow = (typeof PRACTICE_WINDOWS)[number];
 
