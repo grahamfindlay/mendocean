@@ -119,7 +119,6 @@ export default function ForecastRows({
               <WeatherChart
                 key={row.id + row.starts_at}
                 showTitle={false}
-                showReading={false}
                 samples={samples}
                 probabilityHours={weather.hours}
                 domain={domain}

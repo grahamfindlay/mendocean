@@ -72,7 +72,6 @@ export default function ForecastDayView({
       )}
       <WeatherChart
         showTitle={!embedded}
-        showReading={!embedded}
         showWindowLegend={!embedded}
         probabilityHours={weather.hours}
         key={day}
