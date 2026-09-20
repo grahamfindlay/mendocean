@@ -44,6 +44,7 @@ export default function WeatherChart({
   currentTime,
   expired = false,
   title = "Weather over time",
+  showTitle = true,
   highlight,
   probabilityHours = [],
 }: {
@@ -55,6 +56,7 @@ export default function WeatherChart({
   currentTime?: number;
   expired?: boolean;
   title?: string;
+  showTitle?: boolean;
   /** A period to mark, in epoch ms. Drawn behind the series, never inspected. */
   highlight?: [number, number];
 }) {
@@ -86,7 +88,7 @@ export default function WeatherChart({
   if (!samples.length && !frozen && (!domain || currentTime === undefined))
     return (
       <section className="weather-chart" aria-label={title}>
-        <p className="chart-date">{title}</p>
+        {showTitle && <p className="chart-date">{title}</p>}
         <p>Forecast samples unavailable.</p>
       </section>
     );
@@ -219,7 +221,7 @@ export default function WeatherChart({
   return (
     <section className="weather-chart" aria-label={title}>
       <header className="chart-header">
-        <p className="chart-date">{title}</p>
+        {showTitle && <p className="chart-date">{title}</p>}
         {!data.length && <p>Forecast samples unavailable.</p>}
         <div className="chart-reading" aria-live="polite" aria-atomic="true">
           <time dateTime={h.time}>{formatTime(h.time)}</time>

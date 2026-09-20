@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   directionLabel,
-  formatDate,
-  formatTime,
   localDateTime,
   type Forecast,
   type Outing,
@@ -80,15 +78,6 @@ export default function ForecastToday({
                 </div>
               </div>
             </div>
-            <details className="sample-time">
-              <summary>Weather details</summary>
-              <p>
-                Sample:{" "}
-                <time dateTime={current.time}>
-                  {formatDate(current.time)} · {formatTime(current.time)}
-                </time>
-              </p>
-            </details>
           </>
         ) : (
           <p>A current estimate is unavailable.</p>
@@ -125,6 +114,7 @@ export default function ForecastToday({
         currentTime={now}
         expired={expired}
         title="All day"
+        showTitle={false}
         highlight={
           row ? [Date.parse(row.starts_at), Date.parse(row.ends_at)] : undefined
         }

@@ -185,6 +185,13 @@ The user now requests removal of Today’s short-window forecasts and 30-minute 
 - [x] Add a distinct labeled current-time line, independent of the inspection cursor and selected row. Keep it live during dragging; reset the day domain at local midnight. Render the day axis and clock marker even when weather samples are unavailable.
 - [x] Remove Today’s short-window selector/chart, vertical sample list, and trailing logging callout. Existing top-level Log remains available.
 - [x] Extract shared AttendanceFilters and ScheduledRowCards components to keep Today and Scheduled rows consistent without duplicating card rendering.
-- [ ] Complete final checks and release verification.
+- [x] Complete final checks and release verification.
 
-Validation so far: production build and 75 unit/database tests pass. Existing 34 browser cases pass (2 platform skips); three additional Today cases pass across desktop Chromium, mobile Chromium, and mobile WebKit. Mobile Today layout visually reviewed. Added a local-midnight rollover assertion for the final run. Production release is not yet performed for this follow-up.
+Validation: production build and 75 unit/database tests passed. Existing 34 browser cases passed (2 platform skips); three additional Today cases, including local-midnight rollover, passed across desktop Chromium, mobile Chromium, and mobile WebKit. Mobile Today layout visually reviewed. Physical iPhone testing was not performed.
+
+Released through [PR #40](https://github.com/grahamfindlay/mendocean/pull/40) as `6b6571ed198ac4d097f05fd3969cf5b79e73075a`. Required fast (2m25s) and full-stack (4m28s) checks passed. Exact-commit read-only production smoke and production browser smoke passed. A live 390px browser check confirmed the Now panel is about 133px tall, one full-day chart and one independent current-time marker are present, the row section is absent without rows, and there is no horizontal overflow. Workspace synchronized to main; this final release note is persisted locally.
+
+
+## Today label cleanup — 2026-09-20
+
+User requested removal of the Now card’s Weather details/sample disclosure and the visible All day chart header, followed by merge and deployment. Removed the disclosure and its dedicated styles. Today hides the chart title while retaining its accessible region name; other chart titles remain unchanged. Production build and nine focused browser cases passed across desktop Chromium, mobile Chromium, and mobile WebKit. Release verification pending.
