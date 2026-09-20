@@ -1,10 +1,9 @@
 import { useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { formatDate, type Forecast, type WeatherHour } from "../shared/domain";
-import { dayBounds, summarySamples, windowSamples } from "../shared/timeline";
-import WeatherChart from "./WeatherChart";
-import { HourRow } from "./HourRow";
-/** The day picker, its chart and its expanded list. Week and Rows both show it. */
+import { dayBounds, windowSamples } from "../shared/timeline";
+import WeatherChart, { type ChartWindow } from "./WeatherChart";
+/** Week day navigation and the full-day interactive forecast. */
 export default function ForecastDayView({
   weather,
   days,
@@ -14,7 +13,7 @@ export default function ForecastDayView({
   expired,
   now,
   onSelectDay,
-  highlight,
+  windows,
 }: {
   weather: Forecast;
   days: string[];
@@ -24,7 +23,7 @@ export default function ForecastDayView({
   expired: boolean;
   now: number;
   onSelectDay: (day: string) => void;
-  highlight?: [number, number];
+  windows?: ChartWindow[];
 }) {
   const index = days.indexOf(day);
   const selected = useRef<HTMLButtonElement>(null);
@@ -77,21 +76,8 @@ export default function ForecastDayView({
         initialTime={day === today ? now : undefined}
         expired={expired}
         title={day ? formatDate(day + "T12:00:00Z") : "Daily forecast"}
-        highlight={highlight}
+        windows={windows}
       />
-      <details className="sample-details">
-        <summary>Detailed forecast for this day</summary>
-        <div className="hour-table">
-          {summarySamples(daySamples).map((h) => (
-            <HourRow
-              key={h.time}
-              hour={h}
-              hours={weather.hours}
-              expired={expired}
-            />
-          ))}
-        </div>
-      </details>
     </>
   );
 }

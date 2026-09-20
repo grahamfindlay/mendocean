@@ -145,6 +145,14 @@ export default function ForecastWeek({
         expired={expired}
         now={now}
         onSelectDay={onSelectDay}
+        windows={(
+          summaries.find(({ date }) => date === day)?.windows ?? []
+        ).map((w) => ({
+          id: w.id,
+          label: w.label,
+          start: w.startsAt,
+          end: w.endsAt,
+        }))}
       />
     </>
   );

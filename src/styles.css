@@ -1513,11 +1513,7 @@ button:hover:not(:disabled) {
   background: #235d51;
   color: white;
 }
-.sample-details > summary {
-  cursor: pointer;
-  padding: 1rem 0;
-  font-weight: 600;
-}
+
 .week-grid article { min-width: 0; }
 .week-card { height: 100%; }
 .window-time {
@@ -2045,3 +2041,25 @@ button:hover:not(:disabled) {
 .week-period-form h3 { font-size: 15px; font-weight: 500; margin: 0 0 12px; }
 .week-period-actions button { appearance: none; border: 1px solid var(--line); border-radius: 7px; padding: 8px 12px; min-height: 44px; background: var(--paper); color: var(--ink); }
 .week-period-actions button[type="submit"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+.chart-window-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  padding: 0;
+  margin: 0 0 14px;
+  list-style: none;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.chart-window-key li { overflow-wrap: anywhere; min-width: 0; }
+.chart-window-key li::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border: 1px dashed #235d51;
+  background: #235d511a;
+}
