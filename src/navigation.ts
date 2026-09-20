@@ -11,7 +11,7 @@ export const DESTINATIONS = [
 ] as const;
 export type Destination = (typeof DESTINATIONS)[number]["id"];
 export const FORECASTS = "Forecasts";
-export const DEFAULT_DESTINATION: Destination = "Rows";
+export const DEFAULT_DESTINATION: Destination = "Today";
 export const forecastDestinations = DESTINATIONS.filter(
   (d) => d.group === FORECASTS,
 ).map((d) => d.id);

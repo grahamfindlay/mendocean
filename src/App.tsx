@@ -313,9 +313,14 @@ export default function App() {
     <div className="app-shell">
       <UpdateBanner />
       <header className="site-header">
-        <a className="wordmark" href="/">
-          <img className="wordmark-icon" src="/logo.svg" alt="" width="38" height="38" />
-          <div>mendocean<span>LAKE MENDOTA / MADISON, WI</span></div>
+        <a className="wordmark" href="/" aria-label="Mendocean — Lake Mendota / Madison, WI">
+          <div className="wordmark-name" aria-hidden="true">
+            <svg className="wordmark-icon" viewBox="10 16 44 32" focusable="false">
+              <path d="M10 47 C12 29 18 15 29 17 C25 21 24 28 29 34 C33 21 42 15 52 18 C45 23 46 35 54 47 L43 47 C39 41 37 35 38 29 C34 33 33 39 32 44 L25 44 C20 38 19 33 20 29 C17 35 17 42 17 47 Z" />
+            </svg>
+            endocean
+          </div>
+          <span>LAKE MENDOTA / MADISON, WI</span>
         </a>
         {user ? (
           <button className="button subtle" onClick={() => setSettings(true)}>
