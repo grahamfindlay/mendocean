@@ -218,17 +218,6 @@ export default function WeatherChart({
             · {chance ? `${chance.probability}% rain` : "Rain chance unknown"}
           </span>
         </div>
-        <div className="chart-legend">
-          <span>
-            <i className="wind-key" />
-            Wind
-          </span>
-          <span>
-            <i className="gust-key" />
-            Gusts
-          </span>
-          <span>mph</span>
-        </div>
       </header>
       <svg
         ref={surface}
@@ -341,23 +330,28 @@ export default function WeatherChart({
             y2="405"
           />
         ))}
-        {[0, 0.5, 1].map((f) => (
-          <g key={f}>
-            <line
-              className="chart-grid"
-              x1={left}
-              x2={W - right}
-              y1={225 - f * 150}
-              y2={225 - f * 150}
-            />
-            <text x={W - right + 4} y={229 - f * 150}>
-              {windMax * f}
-            </text>
-          </g>
-        ))}
+        <text x={left} y="75">
+          Wind • mph
+        </text>
+        {Array.from({ length: windMax / 10 + 1 }, (_, i) => i * 10).map(
+          (mph) => (
+            <g key={mph} className="chart-wind-rule" data-mph={mph}>
+              <line
+                className="chart-grid"
+                x1={left}
+                x2={W - right}
+                y1={225 - (mph / windMax) * 140}
+                y2={225 - (mph / windMax) * 140}
+              />
+              <text x={W - right + 4} y={229 - (mph / windMax) * 140}>
+                {mph}
+              </text>
+            </g>
+          ),
+        )}
         <g clipPath={`url(#${id}-plot)`}>
-          {plot((h) => h.gust, 75, 150, 0, windMax, "chart-gust", true)}
-          {plot((h) => h.wind, 75, 150, 0, windMax, "chart-wind", true)}
+          {plot((h) => h.gust, 85, 140, 0, windMax, "chart-gust", true)}
+          {plot((h) => h.wind, 85, 140, 0, windMax, "chart-wind", true)}
           {plot((h) => h.temperature, 260, 55, tempMin, tempMax, "chart-temp")}
           {rainIntervals.map((point) => {
             const from = point.start;
@@ -428,7 +422,7 @@ export default function WeatherChart({
           <g
             key={point.time}
             className="chart-annotation"
-            transform={`translate(${x(point.time) - 16 * vectorScale},${49 - 16 * vectorScale}) scale(${vectorScale})`}
+            transform={`translate(${x(point.time) - 16 * vectorScale},${43 - 16 * vectorScale}) scale(${vectorScale})`}
           >
             <WindVector hour={point} expired={expired} compact />
           </g>

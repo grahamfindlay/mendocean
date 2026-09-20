@@ -1,6 +1,6 @@
 # Scheduled rows and forecast chart implementation plan
 
-Status: implemented and verified; production release in progress.
+Status: implemented, verified, and deployed to https://mendocean.fyi.
 Created: 2026-09-19. Updated: 2026-09-20.
 
 This is the durable, agent-independent checklist for this work. Update checkboxes, decisions, validation evidence, and the change log in this file as implementation proceeds. A completed item needs implementation and relevant verification, not just a code change. No particular assistant, session, or tool is required to continue it.
@@ -123,9 +123,9 @@ Remove assessment controls/results from this tab's rendering and avoid their now
 
 ## Continuation notes
 
-Both clarification questions are resolved. All five implementation and verification milestones are complete. Physical iPhone review and deployment have not been performed. Useful files: `src/navigation.ts`, `src/App.tsx`, `src/ForecastView.tsx`, `src/ForecastRows.tsx`, `src/ForecastDayView.tsx`, `src/WeatherChart.tsx`, `src/WindowReading.tsx`, `src/WindReading.tsx`, `src/styles.css`, `shared/presentation.ts`, `shared/timeline.ts`, `shared/weather.ts`.
+Both clarification questions are resolved. All five implementation and verification milestones are complete. Physical iPhone review has not been performed. Production deployment is complete. Useful files: `src/navigation.ts`, `src/App.tsx`, `src/ForecastView.tsx`, `src/ForecastRows.tsx`, `src/ForecastDayView.tsx`, `src/WeatherChart.tsx`, `src/WindowReading.tsx`, `src/WindReading.tsx`, `src/styles.css`, `shared/presentation.ts`, `shared/timeline.ts`, `shared/weather.ts`.
 
-Implementation is in the working tree. No deployment has been performed. Independent creation already persisted Attending, so no database migration was necessary. The internal Rows destination ID remains compatible while its visible label is Scheduled rows.
+Implementation was merged through PR #37 and deployed as commit `a5cff222c496033ed7568ac1e1f44e3f94f9970c`. Independent creation already persisted Attending, so no database migration was necessary. The internal Rows destination ID remains compatible while its visible label is Scheduled rows.
 
 The chart's SVG is keyboard-accessible with ARIA slider semantics, but there is no visible slider control. Hourly wind arrows use a fixed-length compact variant so their direction remains readable at phone widths. Other wind indicators retain their existing speed-dependent length.
 
@@ -151,3 +151,8 @@ Screenshots are reproducible through the scheduled-filters browser test, which w
 - 2026-09-20: Completed the upgrade-suite rerun successfully. All checklist items are complete. No deployed services were changed.
 
 - 2026-09-20: User requested access to test the changes in the live app. Publishing through the protected main-branch workflow. Updated CI to install WebKit and production smoke to check the new default landing page before verifying public weather.
+
+- 2026-09-20: User explicitly authorized pushing, creating/merging the PR after checks, and deploying to mendocean.fyi. [PR #37](https://github.com/grahamfindlay/mendocean/pull/37) merged after both required checks passed (fast: 1m46s; full-stack: 4m19s). Release `a5cff222c496033ed7568ac1e1f44e3f94f9970c` is live. Exact-commit read-only production API/assets/Auth smoke passed, and the production browser smoke passed, including the Scheduled rows default, public weather navigation, and service-worker control. Workspace synchronized to main; this final release note is persisted locally.
+
+- 2026-09-20 follow-up: User requested tighter inspection-stat spacing and less space above the chart, a Wind • mph panel title instead of the legend, and faint horizontal guides at every 10 mph with the existing adaptive axis. Implementing and deploying through the same approved release workflow.
+- Follow-up validation: production build and six focused chart/browser cases passed across desktop Chromium, mobile Chromium, and mobile WebKit. Reviewed the compact phone layout and 10 mph rules.
