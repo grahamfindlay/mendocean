@@ -61,11 +61,6 @@ export default function ForecastView({
   const today = localDateTime(new Date(now).toISOString()).slice(0, 10);
   return (
     <>
-      {tab === "Week" && (
-        <div className="page-heading concise-heading">
-          <h1>{tab}</h1>
-        </div>
-      )}
       {fresh !== "fresh" && (
         <div className="alert">
           {expired
