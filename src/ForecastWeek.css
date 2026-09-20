@@ -132,3 +132,8 @@
     font-size: 13px;
   }
 }
+
+.week-day-expanded { grid-column: 1 / -1; }
+.week-day-expanded .week-card { height: auto; }
+.week-expand-icon { display: block; margin-bottom: 2px; }
+.week-card[aria-expanded="true"] .week-expand-icon { transform: rotate(180deg); }
