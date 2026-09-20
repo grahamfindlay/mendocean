@@ -543,6 +543,8 @@ test("Scheduled forecasts remain chart-only when model contexts are available", 
     await page
       .getByRole("button", { name: "Scheduled rows", exact: true })
       .click();
+    await expect(page.locator(".weather-chart")).toHaveCount(0);
+    await page.locator(".row-card").filter({ hasText: "Model context row" }).click();
     await expect(page.locator('.row-card[aria-pressed="true"] h3')).toHaveText(
       "Model context row",
     );
