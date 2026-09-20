@@ -267,6 +267,19 @@ test("past rows mark logged, needs log and a report still on this device", async
   // Every mark names its state in words. Color alone would leave the three
   // indistinguishable to anyone who cannot separate them.
   await expect(page.locator(".log-logged svg")).toBeVisible();
+  // R26. One primary action on the face of the card; the rest a tap away,
+  // behind a summary that keeps a full touch target.
+  const logged = page
+    .locator(".outing-card")
+    .filter({ hasText: "Logged practice" });
+  await expect(
+    logged.getByRole("button", { name: "Edit report" }),
+  ).toBeVisible();
+  await expect(logged.getByRole("button", { name: "Delete" })).toBeHidden();
+  const more = logged.getByRole("button", { name: "More" });
+  expect((await more.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await more.click();
+  await expect(logged.getByRole("button", { name: "Delete" })).toBeVisible();
   await page.getByRole("button", { name: "Log this row" }).click();
   await page
     .getByRole("button", { name: "Stayed ashore", exact: true })
