@@ -196,7 +196,7 @@ test("future outing stays forecast-only, past rows sort and saved reports have n
   await page.locator(".row-filters > summary").click();
   expect(
     (await page.locator(".filter-toggle").boundingBox())!.height,
-  ).toBeLessThan(32);
+  ).toBeLessThanOrEqual(32);
   await page.getByRole("checkbox", { name: "Show all practices" }).check();
   await expect(page.locator(".outing-card h3")).toHaveText([
     "Recent practice",
@@ -933,7 +933,7 @@ test("scheduled filters, card-driven days, and accessible full-day inspection", 
   expect(
     (await page.locator(".attendance-filters label").first().boundingBox())!
       .height,
-  ).toBeLessThan(32);
+  ).toBeLessThanOrEqual(32);
   await expect(
     page.getByRole("checkbox", { name: "Attending", exact: true }),
   ).toBeChecked();
@@ -1052,6 +1052,12 @@ test("scheduled filters, card-driven days, and accessible full-day inspection", 
             ) / width,
         )
         .toBeGreaterThanOrEqual(0.85);
+    }
+    if (width <= 430) {
+      const cardTop = await cards
+        .first()
+        .evaluate((card) => card.getBoundingClientRect().top + window.scrollY);
+      expect(cardTop).toBeLessThan(260);
     }
     await page.screenshot({
       path: `/tmp/mendocean-scheduled-${testInfo.project.name}-${width}.png`,

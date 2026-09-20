@@ -59,7 +59,7 @@ button:disabled {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 30px 0 25px;
+  padding: 16px 0;
   border-bottom: 1px solid var(--line);
 }
 .wordmark {
@@ -98,7 +98,7 @@ button:disabled {
   display: flex;
   gap: 28px;
   border-bottom: 1px solid var(--line);
-  padding-top: 6px;
+  padding-top: 0;
 }
 .main-nav button {
   display: flex;
@@ -107,7 +107,8 @@ button:disabled {
   gap: 4px;
   background: transparent;
   color: var(--muted);
-  padding: 17px 0;
+  padding: 10px 0;
+  min-height: 44px;
   border: 0;
   border-bottom: 2px solid transparent;
   font-size: 14px;
@@ -124,7 +125,7 @@ button:disabled {
 .sub-nav {
   display: flex;
   gap: 20px;
-  padding-top: 10px;
+  padding-top: 2px;
 }
 .sub-nav button {
   background: transparent;
@@ -300,7 +301,7 @@ footer {
     padding: 0 20px;
   }
   .site-header {
-    padding: 22px 0;
+    padding: 10px 0;
   }
   .wordmark {
     font-size: 27px;
@@ -314,7 +315,7 @@ footer {
   }
   .main-nav button {
     font-size: 13px;
-    padding: 16px 3px;
+    padding: 10px 3px;
   }
   .page-heading {
     margin: 28px 0 23px;
@@ -610,8 +611,8 @@ input[type="checkbox"] {
 .toolbar {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
-  margin: 20px 0;
+  gap: 8px;
+  margin: 8px 0 10px;
 }
 .text-button {
   display: inline-flex;
@@ -1765,8 +1766,8 @@ button:hover:not(:disabled) {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
-  margin: 20px 0;
+  gap: 8px;
+  margin: 8px 0 10px;
 }
 .attendance-filters {
   display: flex;
@@ -1910,5 +1911,28 @@ button:hover:not(:disabled) {
   }
   .attendance-filters {
     gap: 12px;
+  }
+}
+
+@media (max-width: 650px) {
+  .scheduled-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+  .scheduled-toolbar .button {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+  }
+  .scheduled-add-label {
+    display: none;
+  }
+  .attendance-filters {
+    gap: 6px 10px;
+  }
+  .attendance-filters label {
+    font-size: 13px;
+    gap: 4px;
+    min-height: 32px;
   }
 }
