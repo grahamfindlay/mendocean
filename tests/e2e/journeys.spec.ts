@@ -58,6 +58,9 @@ async function startLog(page: Page) {
   ).toBeVisible();
 }
 async function chooseRow(page: Page) {
+  const boat = page.getByRole("group", { name: "Select your boat class", exact: true });
+  if (!(await boat.getByRole("button", { pressed: true }).count()))
+    await boat.getByRole("button", { name: "1x", exact: true }).click();
   await page.getByRole("button", { name: "2 Good", exact: true }).click();
   await page.getByRole("button", { name: "East", exact: true }).click();
 }
@@ -165,10 +168,9 @@ test("imported practice prefills boat and survives report submission", async ({
     .getByRole("combobox", { name: "Which row?", exact: true })
     .selectOption(o.id);
   await chooseRow(page);
-  await page.locator("details.form-card > summary").click();
   await expect(
-    page.getByRole("combobox", { name: "Your boat", exact: true }),
-  ).toHaveValue("2x");
+    page.getByRole("group", { name: "Select your boat class", exact: true }).getByRole("button", { name: "2x", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Save report", exact: true }).click();
   await expect.poll(async () => (await records())[0]?.boat_class).toBe("2x");
   await api(actor, "bhc/disconnect", {});
@@ -541,6 +543,8 @@ test("Scheduled forecasts remain chart-only when model contexts are available", 
     await page
       .getByRole("button", { name: "Scheduled rows", exact: true })
       .click();
+    await expect(page.locator(".weather-chart")).toHaveCount(0);
+    await page.locator(".row-card").filter({ hasText: "Model context row" }).click();
     await expect(page.locator('.row-card[aria-pressed="true"] h3')).toHaveText(
       "Model context row",
     );
@@ -582,15 +586,13 @@ test("production timeline offers quarter-hour inspection and selectable daily fo
     page.getByRole("region", { name: "All day", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Week", exact: true }).click();
-  await page.locator(".day-picker button").nth(1).click();
-  await expect(page.locator(".day-picker button").nth(1)).toHaveAttribute(
+  await page.locator(".week-card").nth(1).click();
+  await expect(page.locator(".week-card").nth(1)).toHaveAttribute(
     "aria-pressed",
     "true",
   );
-  await page
-    .getByText("Detailed forecast for this day", { exact: true })
-    .click();
-  await expect(page.locator(".hour-row").first()).toBeVisible();
+  await expect(page.getByText("Detailed forecast for this day", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".chart-period-highlight")).toHaveCount(2);
 });
 
 test("partial reminder delivery is visible without implying device registration", async ({

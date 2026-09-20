@@ -1,3 +1,5 @@
+import { type ReactNode, useId } from "react";
+import { ChevronDown } from "lucide-react";
 import {
   formatDate,
   formatTime,
@@ -51,6 +53,7 @@ export function ScheduledRowCards({
   onSelectRow,
   onAttendance,
   expired,
+  expandedContent,
 }: {
   weather: Forecast;
   rows: Outing[];
@@ -58,7 +61,10 @@ export function ScheduledRowCards({
   onSelectRow: (id: string) => void;
   onAttendance: (outing: Outing) => void;
   expired: boolean;
+  expandedContent?: ReactNode;
 }) {
+  const id = useId();
+  const expandable = expandedContent !== undefined;
   return (
     <div className="row-grid scheduled-row-grid">
       {rows.map((o) => {
@@ -71,10 +77,19 @@ export function ScheduledRowCards({
           ([v]) => v === scheduledAttendance(o),
         )![1];
         return (
-          <div className="scheduled-card-container" key={o.id}>
+          <article
+            key={o.id}
+            className={
+              expandable && o.id === selectedRow
+                ? "scheduled-row-entry scheduled-row-expanded"
+                : "scheduled-row-entry"
+            }
+          >
             <button
               className="row-card scheduled-row-card"
               aria-pressed={o.id === selectedRow}
+              aria-expanded={expandable ? o.id === selectedRow : undefined}
+              aria-controls={expandable ? `${id}-${o.id}` : undefined}
               onClick={() => onSelectRow(o.id)}
             >
               <span className="scheduled-card-top">
@@ -88,7 +103,16 @@ export function ScheduledRowCards({
               <span className="row-meta">
                 {formatTime(o.starts_at)} – {formatTime(o.ends_at)}
               </span>
-              <h3 className="row-meta">{o.title}</h3>
+              <span className="scheduled-card-top">
+                <h3 className="row-meta">{o.title}</h3>
+                {expandable && (
+                  <ChevronDown
+                    className="card-expand-icon"
+                    size={18}
+                    aria-hidden="true"
+                  />
+                )}
+              </span>
               <WindowReading summary={summary} expired={expired} />
             </button>
             {o.kind === "official" && (
@@ -102,7 +126,12 @@ export function ScheduledRowCards({
                 {attendanceLabel}
               </button>
             )}
-          </div>
+            {expandable && (
+              <div id={`${id}-${o.id}`} hidden={o.id !== selectedRow}>
+                {o.id === selectedRow && expandedContent}
+              </div>
+            )}
+          </article>
         );
       })}
     </div>

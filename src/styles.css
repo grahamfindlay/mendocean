@@ -63,10 +63,22 @@ button:disabled {
   border-bottom: 1px solid var(--line);
 }
 .wordmark {
+  display: inline-block;
   text-decoration: none;
   font-size: 30px;
   font-weight: 700;
   letter-spacing: -1.5px;
+}
+.wordmark-name {
+  display: flex;
+  align-items: baseline;
+  gap: 1px;
+}
+.wordmark-icon {
+  flex-shrink: 0;
+  width: 0.88em;
+  height: 0.64em;
+  fill: #005b45;
 }
 .wordmark span {
   display: block;
@@ -354,6 +366,15 @@ footer {
   }
   main {
     padding-bottom: 8px;
+  }
+}
+@media (max-width: 380px) {
+  .wordmark {
+    font-size: 24px;
+  }
+  .wordmark span {
+    font-size: 7px;
+    letter-spacing: 0.8px;
   }
 }
 .setup-note {
@@ -1492,18 +1513,9 @@ button:hover:not(:disabled) {
   background: #235d51;
   color: white;
 }
-.sample-details > summary {
-  cursor: pointer;
-  padding: 1rem 0;
-  font-weight: 600;
-}
+
 .week-grid article { min-width: 0; }
 .week-card { height: 100%; }
-.week-card .practice-window { display: block; margin-top: 12px; }
-.week-card .practice-window + .practice-window {
-  border-top: 1px solid var(--line);
-  padding-top: 12px;
-}
 .window-time {
   display: block;
   white-space: nowrap;
@@ -2030,12 +2042,38 @@ button:hover:not(:disabled) {
 .week-period-actions button { appearance: none; border: 1px solid var(--line); border-radius: 7px; padding: 8px 12px; min-height: 44px; background: var(--paper); color: var(--ink); }
 .week-period-actions button[type="submit"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 
-/* Keep attendance and forecast selection as separate native controls. */
-.scheduled-card-container {
-  position: relative;
+.chart-window-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  padding: 0;
+  margin: 0 0 14px;
+  list-style: none;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink);
 }
-.scheduled-card-container > .row-card {
-  height: 100%;
+.chart-window-key li { overflow-wrap: anywhere; min-width: 0; }
+.chart-window-key li::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border: 1px dashed #235d51;
+  background: #235d511a;
+}
+
+.scheduled-row-entry { min-width: 0; }
+.scheduled-row-entry > .row-card { height: 100%; }
+.scheduled-row-grid > .scheduled-row-expanded { grid-column: 1 / -1; }
+.scheduled-row-grid > .scheduled-row-expanded > .row-card { height: auto; }
+.card-expand-icon { flex-shrink: 0; }
+.row-card[aria-expanded="true"] .card-expand-icon { transform: rotate(180deg); }
+
+/* Keep attendance and forecast selection as separate native controls. */
+.scheduled-row-entry {
+  position: relative;
 }
 .attendance-placeholder {
   visibility: hidden;

@@ -10,20 +10,35 @@ const range = (value: { min: number; max: number } | null) =>
       ? String(Math.round(value.min))
       : `${Math.round(value.min)}–${Math.round(value.max)}`;
 
-/** Shared two-line weather summary for scheduled rows and Week cards. */
+/** Full scheduled-row summary, with a compact presentation for Week cards. */
 export function WindowReading({
   summary,
   expired,
+  compact = false,
 }: {
   summary: WindowSummary;
   expired: boolean;
+  compact?: boolean;
 }) {
   const bearing = summary.direction?.variable
     ? null
     : summary.direction?.bearing;
   const code = summary.codes.length ? Math.max(...summary.codes) : null;
+  const windFacts = (
+    <>
+      <span aria-label={`Gusts ${summary.gust?.toFixed(0) ?? "unknown"} mph`}>
+        G{summary.gust?.toFixed(0) ?? "—"}
+      </span>{" "}
+      •{" "}
+      {summary.direction?.variable
+        ? "Variable"
+        : `from ${directionLabel(bearing ?? null)}`}
+    </>
+  );
   return (
-    <span className="scheduled-card-weather">
+    <span
+      className={`scheduled-card-weather${compact ? " compact-window-reading" : ""}`}
+    >
       {!summary.samples ? (
         <span>Forecast not available.</span>
       ) : (
@@ -59,20 +74,24 @@ export function WindowReading({
                 className={`wind-speed ${expired ? "unavailable" : summary.status}`}
               >
                 {range(summary.wind)} mph
-              </span>{" "}
-              • G{summary.gust?.toFixed(0) ?? "—"} •{" "}
-              {summary.direction?.variable
-                ? "Variable"
-                : `from ${directionLabel(bearing ?? null)}`}
+              </span>
+              {!compact && <> • {windFacts}</>}
             </span>
           </span>
+          {compact && <span className="compact-wind-facts">{windFacts}</span>}
           <span className="scheduled-weather-line">
             <WeatherIcon code={code} />
             <span>
-              {range(summary.temperature)}°F • {weatherDescription(code)} •{" "}
-              {summary.probability
-                ? `${range(summary.probability)}% rain`
-                : "Rain chance unknown"}
+              {range(summary.temperature)}°F
+              {!compact && (
+                <>
+                  {" "}
+                  • {weatherDescription(code)} •{" "}
+                  {summary.probability
+                    ? `${range(summary.probability)}% rain`
+                    : "Rain chance unknown"}
+                </>
+              )}
             </span>
           </span>
           {!summary.covered && (

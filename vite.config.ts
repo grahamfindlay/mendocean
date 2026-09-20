@@ -47,6 +47,7 @@ export default defineConfig({
             "index.html",
             "manifest.webmanifest",
             "icon.svg",
+            "logo.svg",
             "icon-180.png",
             "icon-192.png",
             "icon-512.png",

@@ -239,4 +239,9 @@ Validation: production build and 79 unit/database tests pass; nine focused brows
 
 ## Remove Week heading — 2026-09-20
 
-Remove the redundant Week page heading above Times of interest. Production build passed; release pending.
+Removed the redundant Week page heading above Times of interest. Production build passed. PR #49 merged and deployed as `8281874ddfcfb37d4d6703a18365c6b4f09fd5fb` after required fast (2m31s) and full-stack (4m50s) checks passed. Exact-commit production smoke and live mobile heading-removal verification passed. Shared checkout fast-forwarded while preserving concurrent logo edits; final release evidence persisted locally.
+
+
+## Today default landing — 2026-09-20
+
+User requests Forecasts → Today as the default landing page, superseding the initial Scheduled rows default. Change the shared DEFAULT_DESTINATION so both initial navigation and the Forecasts top-level action open Today. Explicit destination links and update-resume state continue to work. Update default-landing checks; Scheduled rows tests navigate explicitly. Validation: production build passed; 43 preview browser checks passed across desktop and mobile browsers (2 existing skips), including the corrected explicit Scheduled rows navigation. Release pending.
