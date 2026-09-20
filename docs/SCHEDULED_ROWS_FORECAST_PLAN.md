@@ -204,4 +204,9 @@ Update the disclosure to “Wind colors: Hannah’s heuristic v1.0.0”, capital
 
 ## Filled wind key — 2026-09-20
 
-Replace the three outline legend symbols with filled circle, triangle, and diamond symbols, preserving labels and colors. Build and release verification pending.
+Replace the three outline legend symbols with filled circle, triangle, and diamond symbols, preserving labels and colors. Production build passed. PR #43 merged and deployed as `2328f4bdb02e0cd43fd4d1a74f607bea45f3cfc6` after required fast (2m20s) and full-stack (4m24s) checks passed. Exact-commit production smoke and live filled-symbol verification passed. Workspace synchronized to main; final release evidence persisted locally.
+
+
+## Week card consistency — 2026-09-20
+
+Week day cards now use the Scheduled rows responsive grid (one full-width card on phones), card surfaces, selected state, metadata typography, and shared two-line wind/weather summaries. Morning and evening windows remain within each day card; the whole card selects the day. Shared WindowReading rendering avoids divergence between Week and Scheduled rows. Production build and six focused browser cases passed across desktop/mobile Chromium and mobile WebKit, including mobile card width and selection. Reviewed a 390px screenshot: card and grid both 350px wide, no page overflow. Release checks pending.

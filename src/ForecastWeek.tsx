@@ -29,27 +29,29 @@ export default function ForecastWeek({
 }) {
   return (
     <>
-      <div className="week-grid">
+      <div className="week-grid row-grid scheduled-row-grid">
         {days.map((d) => (
           <article key={d} aria-current={d === day ? "true" : undefined}>
-            <button className="text-button" onClick={() => onSelectDay(d)}>
-              {formatDate(d + "T12:00:00Z")}
-            </button>
-            {practiceWindows(weather, d).map((w) => (
-              <div className="practice-window" key={w.id}>
-                <span className="eyebrow">
-                  {w.label}{" "}
-                  {/* Its own line, unbreakable: the monospaced, letter-spaced
-                      eyebrow otherwise wraps between "5:30" and "AM". */}
-                  <span className="window-time">
-                    {Number.isFinite(w.startsAt)
-                      ? `${formatTime(new Date(w.startsAt).toISOString())}–${formatTime(new Date(w.endsAt).toISOString())}`
-                      : `${w.start}–${w.end}`}
+            <button
+              className="row-card scheduled-row-card week-card"
+              aria-pressed={d === day}
+              onClick={() => onSelectDay(d)}
+            >
+              <span className="row-meta">{formatDate(d + "T12:00:00Z")}</span>
+              {practiceWindows(weather, d).map((w) => (
+                <span className="practice-window" key={w.id}>
+                  <span className="row-meta">
+                    {w.label}{" "}
+                    <span className="window-time row-meta">
+                      {Number.isFinite(w.startsAt)
+                        ? `${formatTime(new Date(w.startsAt).toISOString())} – ${formatTime(new Date(w.endsAt).toISOString())}`
+                        : `${w.start}–${w.end}`}
+                    </span>
                   </span>
+                  <WindowReading summary={w.summary} expired={expired} />
                 </span>
-                <WindowReading summary={w.summary} expired={expired} />
-              </div>
-            ))}
+              ))}
+            </button>
           </article>
         ))}
       </div>

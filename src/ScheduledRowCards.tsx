@@ -1,28 +1,18 @@
 import {
-  directionLabel,
   formatDate,
   formatTime,
   type Forecast,
   type Outing,
 } from "../shared/domain";
 import { summarizeWindow } from "../shared/timeline";
-import {
-  scheduledAttendance,
-  weatherDescription,
-} from "../shared/presentation";
-import WeatherIcon from "./WeatherIcon";
+import { scheduledAttendance } from "../shared/presentation";
+import { WindowReading } from "./WindowReading";
 
 const choices = [
   ["attending", "Attending"],
   ["unknown", "Unknown"],
   ["declined", "Not attending"],
 ] as const;
-const range = (value: { min: number; max: number } | null) =>
-  !value
-    ? "—"
-    : Math.round(value.min) === Math.round(value.max)
-      ? String(Math.round(value.min))
-      : `${Math.round(value.min)}–${Math.round(value.max)}`;
 
 export function AttendanceFilters({
   attendance,
@@ -75,10 +65,6 @@ export function ScheduledRowCards({
           Date.parse(o.starts_at),
           Date.parse(o.ends_at),
         );
-        const bearing = summary.direction?.variable
-          ? null
-          : summary.direction?.bearing;
-        const code = summary.codes.length ? Math.max(...summary.codes) : null;
         return (
           <button
             className="row-card scheduled-row-card"
@@ -96,67 +82,7 @@ export function ScheduledRowCards({
               {formatTime(o.starts_at)} – {formatTime(o.ends_at)}
             </span>
             <h3 className="row-meta">{o.title}</h3>
-            <span className="scheduled-card-weather">
-              {!summary.samples ? (
-                <span>Forecast not available.</span>
-              ) : (
-                <>
-                  <span className="scheduled-weather-line">
-                    <svg
-                      viewBox="0 0 24 24"
-                      width="20"
-                      height="20"
-                      role="img"
-                      aria-label={
-                        bearing == null
-                          ? "Wind direction unavailable or variable"
-                          : `Wind from ${directionLabel(bearing)}`
-                      }
-                    >
-                      {bearing == null ? (
-                        <text x="12" y="17" textAnchor="middle">
-                          —
-                        </text>
-                      ) : (
-                        <path
-                          d="M12 3V21 M6 15L12 21L18 15"
-                          transform={`rotate(${bearing} 12 12)`}
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        />
-                      )}
-                    </svg>
-                    <span>
-                      <span
-                        className={`wind-speed ${expired ? "unavailable" : summary.status}`}
-                      >
-                        {range(summary.wind)} mph
-                      </span>{" "}
-                      • G{summary.gust?.toFixed(0) ?? "—"} •{" "}
-                      {summary.direction?.variable
-                        ? "Variable"
-                        : `from ${directionLabel(bearing ?? null)}`}
-                    </span>
-                  </span>
-                  <span className="scheduled-weather-line">
-                    <WeatherIcon code={code} />
-                    <span>
-                      {range(summary.temperature)}°F •{" "}
-                      {weatherDescription(code)} •{" "}
-                      {summary.probability
-                        ? `${range(summary.probability)}% rain`
-                        : "Rain chance unknown"}
-                    </span>
-                  </span>
-                  {!summary.covered && (
-                    <span className="window-partial">
-                      Partial forecast coverage
-                    </span>
-                  )}
-                </>
-              )}
-            </span>
+            <WindowReading summary={summary} expired={expired} />
           </button>
         );
       })}
