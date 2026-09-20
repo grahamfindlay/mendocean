@@ -443,7 +443,6 @@ export default function App() {
             }
             user={user.id}
             outings={account?.outings || []}
-            coaches={account?.coaches || []}
             editing={editing}
             initialOuting={
               account?.outings.some(
