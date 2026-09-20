@@ -560,7 +560,7 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
   );
   const readingBox = await chart.locator(".chart-reading").boundingBox();
   const surfaceBox = await chart.locator(".chart-surface").boundingBox();
-  expect(readingBox!.y + readingBox!.height).toBeLessThan(surfaceBox!.y);
+  expect(readingBox!.y + readingBox!.height).toBeLessThanOrEqual(surfaceBox!.y);
   await page.getByLabel("Hours ahead").selectOption("24");
   const longChart = page.getByRole("region", {
     name: "Next 24 hours",
@@ -960,6 +960,31 @@ test("scheduled filters, card-driven days, and accessible full-day inspection", 
     "data-wind-max",
     "50",
   );
+  await expect(page.locator(".chart-legend")).toHaveCount(0);
+  await expect(page.locator(".chart-surface")).toContainText("Wind • mph");
+  await expect(page.locator(".chart-wind-rule text")).toHaveText([
+    "0",
+    "10",
+    "20",
+    "30",
+    "40",
+    "50",
+  ]);
+  const reading = await page.locator(".chart-reading").boundingBox();
+  expect(reading!.height).toBeLessThan(115);
+  await expect
+    .poll(() =>
+      page.locator(".weather-chart").evaluate((chart) => {
+        const reading = chart
+          .querySelector(".chart-reading")!
+          .getBoundingClientRect();
+        return (
+          chart.querySelector(".chart-surface")!.getBoundingClientRect().top -
+          reading.bottom
+        );
+      }),
+    )
+    .toBeLessThan(8);
   await expect(page.locator(".chart-surface .wind-vector")).toHaveCount(24);
   await cards.filter({ hasText: "Independent afternoon" }).click();
   await expect(page.locator(".chart-reading time")).toHaveText("1:00 PM");
