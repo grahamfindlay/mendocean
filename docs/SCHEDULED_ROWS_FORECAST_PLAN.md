@@ -199,4 +199,9 @@ User requested removal of the Now card’s Weather details/sample disclosure and
 
 ## Wind-color explanation — 2026-09-20
 
-Update the disclosure to “Wind colors: Hannah’s heuristic v1.0.0”, capitalize Bussin’, Sus, and Chopped, and use the user’s requested speed/direction and future-model explanation. Include a compact wind rose inspired by Hannah’s public dashboard, using the existing windStatus rule and exact sector boundaries, with accessible threshold descriptions and a source link. Render locally as SVG without a charting dependency or runtime fetch. Production build and three existing public-forecast browser checks passed across Chromium and WebKit. Expanded 390px layout visually reviewed with no horizontal overflow; exact disclosure and key labels verified. Release checks pending.
+Update the disclosure to “Wind colors: Hannah’s heuristic v1.0.0”, capitalize Bussin’, Sus, and Chopped, and use the user’s requested speed/direction and future-model explanation. Include a compact wind rose inspired by Hannah’s public dashboard, using the existing windStatus rule and exact sector boundaries, with accessible threshold descriptions and a source link. Render locally as SVG without a charting dependency or runtime fetch. Production build and three existing public-forecast browser checks passed across Chromium and WebKit. Expanded 390px layout visually reviewed with no horizontal overflow; exact disclosure and key labels verified. Released through PR #42 as `ce9e2be53538b5a39b41d4fc521196bac42377d4`. Fast passed (2m9s). Initial full-stack run failed in an unrelated push-notification browser assertion; rerun passed (4m52s) without code or test changes. Exact-commit production smoke passed, and the live 390px disclosure, labels, paragraph, and wind rose were verified. Workspace synchronized to main; final release evidence persisted locally.
+
+
+## Filled wind key — 2026-09-20
+
+Replace the three outline legend symbols with filled circle, triangle, and diamond symbols, preserving labels and colors. Build and release verification pending.

@@ -121,9 +121,9 @@ export default function ForecastView({
             {HEURISTIC_VERSION.replace("hannah-", "")}
           </summary>
           <p className="wind-key">
-            <span className="favorable">○ Bussin’</span>
-            <span className="caution">△ Sus</span>
-            <span className="unfavorable">◇ Chopped</span>
+            <span className="favorable">● Bussin’</span>
+            <span className="caution">▲ Sus</span>
+            <span className="unfavorable">◆ Chopped</span>
           </p>
           <p>
             Wind colors are a function of speed and direction. As you log more
