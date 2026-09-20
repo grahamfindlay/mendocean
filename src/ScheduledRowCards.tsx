@@ -51,6 +51,7 @@ export function ScheduledRowCards({
   rows,
   selectedRow,
   onSelectRow,
+  onAttendance,
   expired,
   expandedContent,
 }: {
@@ -58,6 +59,7 @@ export function ScheduledRowCards({
   rows: Outing[];
   selectedRow?: string;
   onSelectRow: (id: string) => void;
+  onAttendance: (outing: Outing) => void;
   expired: boolean;
   expandedContent?: ReactNode;
 }) {
@@ -71,6 +73,9 @@ export function ScheduledRowCards({
           Date.parse(o.starts_at),
           Date.parse(o.ends_at),
         );
+        const attendanceLabel = choices.find(
+          ([v]) => v === scheduledAttendance(o),
+        )![1];
         return (
           <article
             key={o.id}
@@ -89,8 +94,10 @@ export function ScheduledRowCards({
             >
               <span className="scheduled-card-top">
                 <span className="row-meta">{formatDate(o.starts_at)}</span>
-                <span className="attendance-badge">
-                  {choices.find(([v]) => v === scheduledAttendance(o))![1]}
+                <span
+                  className={`attendance-badge${o.kind === "official" ? " attendance-placeholder" : ""}`}
+                >
+                  {attendanceLabel}
                 </span>
               </span>
               <span className="row-meta">
@@ -108,6 +115,17 @@ export function ScheduledRowCards({
               </span>
               <WindowReading summary={summary} expired={expired} />
             </button>
+            {o.kind === "official" && (
+              <button
+                type="button"
+                className="attendance-badge scheduled-attendance-button"
+                aria-label={`Practice attendance: ${attendanceLabel}`}
+                aria-haspopup="dialog"
+                onClick={() => onAttendance(o)}
+              >
+                {attendanceLabel}
+              </button>
+            )}
             {expandable && (
               <div id={`${id}-${o.id}`} hidden={o.id !== selectedRow}>
                 {o.id === selectedRow && expandedContent}

@@ -1296,3 +1296,101 @@ test("weekday controls filter each local day, preserve legacy periods, and keep 
   await editor.getByRole('button',{name:'Save period',exact:true}).click();
   await expect(cards.locator('.practice-window')).toHaveCount(7);
 });
+
+test("practice attendance badges open the matching modal without selecting the forecast", async ({
+  page,
+}) => {
+  await page.clock.install({ time: Date.parse("2026-09-20T12:00:00Z") });
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "mendocean-explicit-preview-v1",
+      JSON.stringify(
+        ["attending", "unknown", "declined"]
+          .map((attendance, i) => ({
+            id: `practice-${i}`,
+            kind: "official",
+            version: 1,
+            owner_id: null,
+            bhc_practice_id: i + 1,
+            reminder: false,
+            reports: [],
+            planned_boat: null,
+            title: `Practice ${i + 1}`,
+            attendance,
+            starts_at: "2026-09-20T22:00:00Z",
+            ends_at: "2026-09-20T23:00:00Z",
+          }))
+          .concat([
+            {
+              id: "independent",
+              kind: "independent",
+              version: 1,
+              owner_id: null,
+              bhc_practice_id: 0,
+              reminder: false,
+              reports: [],
+              planned_boat: null,
+              title: "Independent row",
+              attendance: "attending",
+              starts_at: "2026-09-20T22:00:00Z",
+              ends_at: "2026-09-20T23:00:00Z",
+            },
+          ]),
+      ),
+    );
+  });
+  await page.goto("/?preview=1&tab=Today");
+  for (const surface of ["Today", "Scheduled rows", "My rows"]) {
+    if (surface !== "Today") {
+      await page.getByRole("button", { name: surface, exact: true }).click();
+    }
+    if (surface !== "My rows") {
+      await page
+        .getByRole("checkbox", { name: "Unknown", exact: true })
+        .check();
+      await page
+        .getByRole("checkbox", { name: "Not attending", exact: true })
+        .check();
+    }
+    const badges = page.getByRole("button", { name: /^Practice attendance:/ });
+    await expect(badges).toHaveCount(3);
+    if (surface === "Scheduled rows") {
+      await page.locator(".row-card").filter({ hasText: "Practice 1" }).click();
+      await expect(page.locator('.row-card[aria-expanded="true"]')).toHaveCount(1);
+    }
+    for (const [i, status] of [
+      "Attending",
+      "Unknown",
+      "Not attending",
+    ].entries()) {
+      const selected =
+        surface === "My rows"
+          ? null
+          : await page.locator('.row-card[aria-pressed="true"]').textContent();
+      const badge = page.getByRole("button", {
+        name: `Practice attendance: ${status}`,
+        exact: true,
+      });
+      if (status === "Unknown") {
+        await badge.focus();
+        await page.keyboard.press("Enter");
+      } else {
+        await badge.click();
+      }
+      const modal = page.getByRole("dialog");
+      await expect(
+        modal.getByRole("heading", { name: "Practice attendance" }),
+      ).toBeVisible();
+      await expect(modal.locator("strong").first()).toHaveText(
+        `Practice ${i + 1}`,
+      );
+      await modal.getByRole("button", { name: "Close", exact: true }).click();
+      await expect(modal).toHaveCount(0);
+      if (selected !== null) {
+        await expect(page.locator('.row-card[aria-pressed="true"]')).toHaveText(
+          selected,
+        );
+      }
+    }
+  }
+});

@@ -400,6 +400,7 @@ export default function App() {
               selection={forecastSelection}
               attendance={forecastAttendance}
               onAttendanceChange={setForecastAttendance}
+              onAttendance={setAttendanceOuting}
               userId={user?.id}
               weather={weather}
               tab={tab}

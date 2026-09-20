@@ -2070,3 +2070,17 @@ button:hover:not(:disabled) {
 .scheduled-row-grid > .scheduled-row-expanded > .row-card { height: auto; }
 .card-expand-icon { flex-shrink: 0; }
 .row-card[aria-expanded="true"] .card-expand-icon { transform: rotate(180deg); }
+
+/* Keep attendance and forecast selection as separate native controls. */
+.scheduled-row-entry {
+  position: relative;
+}
+.attendance-placeholder {
+  visibility: hidden;
+}
+.scheduled-attendance-button {
+  position: absolute;
+  top: calc(0.8rem + 1px);
+  right: calc(0.8rem + 1px);
+  font-size: 11px;
+}

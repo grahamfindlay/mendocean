@@ -260,7 +260,11 @@ export default function OutingsView({
                   {o.kind === "official" ? "PRACTICE" : "INDEPENDENT"}
                 </span>
                 {o.kind === "official" && (
-                  <span
+                  <button
+                    type="button"
+                    aria-label={`Practice attendance: ${o.attendance === "attending" ? "Attending" : o.attendance === "declined" ? "Not attending" : "Unknown"}`}
+                    aria-haspopup="dialog"
+                    onClick={() => onAttendance(o)}
                     className={`attendance-badge attendance-${o.attendance || "unknown"}`}
                   >
                     {o.attendance === "attending"
@@ -268,7 +272,7 @@ export default function OutingsView({
                       : o.attendance === "declined"
                         ? "Not attending"
                         : "Unknown"}
-                  </span>
+                  </button>
                 )}
               </div>
               <h3>{o.title}</h3>
