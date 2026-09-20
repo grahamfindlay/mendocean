@@ -7,7 +7,7 @@ const load = (): Outing[] => JSON.parse(localStorage.getItem(KEY) || "[]");
 const save = (o: Outing[]) => localStorage.setItem(KEY, JSON.stringify(o));
 export async function previewAPI(path: string, body: any) {
   const outings = load();
-  if (path === "week-periods") {
+  if (path === "week-periods" || path === "week-periods/v2") {
     const key = "mendocean-preview-week-periods";
     if (body) localStorage.setItem(key, JSON.stringify(weekPeriodsSchema.parse(body.periods)));
     return { periods: JSON.parse(localStorage.getItem(key) || "null") ?? DEFAULT_WEEK_PERIODS };

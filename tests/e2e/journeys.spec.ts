@@ -733,32 +733,38 @@ test.describe("Week preference persistence", () => {
   test.use({serviceWorkers: "block"});
 test("Week periods save to the account, survive a new device, and retain choices on failure", async ({page, browser}) => {
   await loggedIn(page);
-  await page.route('**/api/week-periods', route => route.fulfill({status:503,json:{error:'Unavailable'}}));
+  await page.route('**/api/week-periods/v2', route => route.fulfill({status:503,json:{error:'Unavailable'}}));
   await page.getByRole('button',{name:'Week',exact:true}).click();
   await page.getByText('Times of interest',{exact:true}).click();
   const editor = page.locator('.week-periods');
   await expect(editor.getByRole('alert')).toContainText('Could not load');
   await expect(editor.getByRole('button',{name:'Add period',exact:true})).toBeDisabled();
-  await page.unroute('**/api/week-periods');
+  await page.unroute('**/api/week-periods/v2');
   await editor.getByRole('button',{name:'Retry',exact:true}).click();
   await editor.getByRole('button',{name:'Add period',exact:true}).click();
   await editor.getByLabel('Period name').fill('Mid morning');
   await editor.getByLabel('Start time').fill('09:00');
   await editor.getByLabel('End time').fill('11:00');
-  await page.route('**/api/week-periods', route => route.fulfill({status:503,json:{error:'Unavailable'}}));
+  await page.route('**/api/week-periods/v2', route => route.fulfill({status:503,json:{error:'Unavailable'}}));
   await editor.getByRole('button',{name:'Save period',exact:true}).click();
   await expect(editor.getByRole('alert')).toContainText('Could not save');
   await expect(page.locator('.week-card').first()).not.toContainText('Mid morning');
-  await page.unroute('**/api/week-periods');
+  await page.unroute('**/api/week-periods/v2');
   await editor.getByRole('button',{name:'Save period',exact:true}).click();
   await expect(page.locator('.week-card').first()).toContainText('Mid morning');
   expect((await api(actor,'week-periods')).data.periods).toHaveLength(3);
+  await editor.getByRole('button',{name:'Edit Mid morning',exact:true}).click();
+  await editor.getByRole('button',{name:'Weekends',exact:true}).click();
+  await editor.getByRole('button',{name:'Save period',exact:true}).click();
+  await expect(editor.locator('.week-period-choice').filter({hasText:'Mid morning'})).toContainText('Weekends');
+  expect((await api(actor,'week-periods/v2')).data.periods.find((p:any)=>p.label==='Mid morning').days).toEqual([5,6]);
   const device = await browser.newContext({baseURL: new URL(page.url()).origin});
   try {
     const other = await device.newPage();
     await loggedIn(other);
     await other.getByRole('button',{name:'Week',exact:true}).click();
-    await expect(other.locator('.week-card').first()).toContainText('Mid morning');
+    await other.getByText('Times of interest',{exact:true}).click();
+    await expect(other.locator('.week-period-choice').filter({hasText:'Mid morning'})).toContainText('Weekends');
   } finally { await device.close(); }
 });
 

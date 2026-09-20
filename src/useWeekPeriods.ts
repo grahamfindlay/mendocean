@@ -5,10 +5,10 @@ import {
   type WeekPeriod,
 } from "../shared/weekPeriods";
 import { api } from "./client";
-const KEY = "mendocean-week-periods-v1";
+const KEY = "mendocean-week-periods-v2";
 function localPeriods() {
   try {
-    const saved = localStorage.getItem(KEY);
+    const saved = localStorage.getItem(KEY) ?? localStorage.getItem("mendocean-week-periods-v1");
     return saved
       ? weekPeriodsSchema.parse(JSON.parse(saved))
       : DEFAULT_WEEK_PERIODS;
@@ -32,7 +32,7 @@ export function useWeekPeriods(userId?: string) {
     let active = true;
     setLoading(true);
     setError("");
-    api<{ periods: WeekPeriod[] }>("week-periods", undefined, userId)
+    api<{ periods: WeekPeriod[] }>("week-periods/v2", undefined, userId)
       .then((data) => {
         const parsed = weekPeriodsSchema.parse(data.periods);
         if (active) {
@@ -58,7 +58,7 @@ export function useWeekPeriods(userId?: string) {
     setError("");
     try {
       const parsed = weekPeriodsSchema.parse(next);
-      if (userId) await api("week-periods", { periods: parsed }, userId);
+      if (userId) await api("week-periods/v2", { periods: parsed }, userId);
       else localStorage.setItem(KEY, JSON.stringify(parsed));
       setPeriods(parsed);
       return true;

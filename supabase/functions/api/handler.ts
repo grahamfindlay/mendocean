@@ -1,4 +1,4 @@
-import { DEFAULT_WEEK_PERIODS, weekPeriodsSchema } from "../../../shared/weekPeriods.ts";
+import { DEFAULT_WEEK_PERIODS, legacyPeriods, weekPeriodsSchema } from "../../../shared/weekPeriods.ts";
 import { liveProviders, type Providers } from "../_shared/providers.ts";
 import { z } from "zod";
 import { sendTestPush } from "../_shared/notifications.ts";
@@ -168,8 +168,10 @@ export function createApiHandler(providers: Providers = liveProviders) {
           };
         });
       };
-      if (path === "week-periods" && req.method === "GET")
-        return json(req, { periods: profile.week_periods ?? DEFAULT_WEEK_PERIODS });
+      if ((path === "week-periods" || path === "week-periods/v2") && req.method === "GET") {
+        const periods = weekPeriodsSchema.parse(profile.week_periods ?? DEFAULT_WEEK_PERIODS);
+        return json(req, { periods: path === "week-periods" ? legacyPeriods(periods) : periods });
+      }
       if (path === "account" && req.method === "GET") {
         const connection = await query("connection_get", { user_id: uid });
         if (
@@ -317,10 +319,15 @@ export function createApiHandler(providers: Providers = liveProviders) {
           );
         return json(req, { deleted: true });
       }
-      if (path === "week-periods") {
-        const { periods } = z.object({ periods: weekPeriodsSchema }).strict().parse(input);
+      if (path === "week-periods" || path === "week-periods/v2") {
+        let { periods } = z.object({ periods: weekPeriodsSchema }).strict().parse(input);
+        if (path === "week-periods") {
+          // Old clients do not know weekday restrictions; their edits must retain them.
+          const previous = weekPeriodsSchema.parse(profile.week_periods ?? DEFAULT_WEEK_PERIODS);
+          periods = periods.map(period => ({...period, days: previous.find(p => p.id === period.id)?.days ?? period.days}));
+        }
         check(await db.from("profiles").update({ week_periods: periods }).eq("id", uid));
-        return json(req, { periods });
+        return json(req, { periods: path === "week-periods" ? legacyPeriods(periods) : periods });
       }
       if (path === "settings") {
         const settings = z
