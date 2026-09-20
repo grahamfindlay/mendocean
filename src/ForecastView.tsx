@@ -29,6 +29,7 @@ export default function ForecastView({
   userId,
   attendance,
   onAttendanceChange,
+  onAttendance,
 }: {
   weather: Forecast;
   tab: string;
@@ -39,6 +40,7 @@ export default function ForecastView({
   userId?: string;
   attendance: string[];
   onAttendanceChange: (values: string[]) => void;
+  onAttendance: (outing: Outing) => void;
 }) {
   /* Held here rather than in the destination components so the selected row,
      day survive moving between Today, Week and Rows. */
@@ -76,6 +78,7 @@ export default function ForecastView({
           outings={userId ? outings : []}
           attendance={attendance}
           onAttendanceChange={onAttendanceChange}
+          onAttendance={onAttendance}
         />
       )}
       {tab === "Week" && (
@@ -103,6 +106,7 @@ export default function ForecastView({
           onSchedule={onSchedule}
           attendance={attendance}
           onAttendanceChange={onAttendanceChange}
+          onAttendance={onAttendance}
           userId={userId}
         />
       )}

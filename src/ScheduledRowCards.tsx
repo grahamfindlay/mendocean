@@ -49,12 +49,14 @@ export function ScheduledRowCards({
   rows,
   selectedRow,
   onSelectRow,
+  onAttendance,
   expired,
 }: {
   weather: Forecast;
   rows: Outing[];
   selectedRow?: string;
   onSelectRow: (id: string) => void;
+  onAttendance: (outing: Outing) => void;
   expired: boolean;
 }) {
   return (
@@ -65,25 +67,42 @@ export function ScheduledRowCards({
           Date.parse(o.starts_at),
           Date.parse(o.ends_at),
         );
+        const attendanceLabel = choices.find(
+          ([v]) => v === scheduledAttendance(o),
+        )![1];
         return (
-          <button
-            className="row-card scheduled-row-card"
-            key={o.id}
-            aria-pressed={o.id === selectedRow}
-            onClick={() => onSelectRow(o.id)}
-          >
-            <span className="scheduled-card-top">
-              <span className="row-meta">{formatDate(o.starts_at)}</span>
-              <span className="attendance-badge">
-                {choices.find(([v]) => v === scheduledAttendance(o))![1]}
+          <div className="scheduled-card-container" key={o.id}>
+            <button
+              className="row-card scheduled-row-card"
+              aria-pressed={o.id === selectedRow}
+              onClick={() => onSelectRow(o.id)}
+            >
+              <span className="scheduled-card-top">
+                <span className="row-meta">{formatDate(o.starts_at)}</span>
+                <span
+                  className={`attendance-badge${o.kind === "official" ? " attendance-placeholder" : ""}`}
+                >
+                  {attendanceLabel}
+                </span>
               </span>
-            </span>
-            <span className="row-meta">
-              {formatTime(o.starts_at)} – {formatTime(o.ends_at)}
-            </span>
-            <h3 className="row-meta">{o.title}</h3>
-            <WindowReading summary={summary} expired={expired} />
-          </button>
+              <span className="row-meta">
+                {formatTime(o.starts_at)} – {formatTime(o.ends_at)}
+              </span>
+              <h3 className="row-meta">{o.title}</h3>
+              <WindowReading summary={summary} expired={expired} />
+            </button>
+            {o.kind === "official" && (
+              <button
+                type="button"
+                className="attendance-badge scheduled-attendance-button"
+                aria-label={`Practice attendance: ${attendanceLabel}`}
+                aria-haspopup="dialog"
+                onClick={() => onAttendance(o)}
+              >
+                {attendanceLabel}
+              </button>
+            )}
+          </div>
         );
       })}
     </div>

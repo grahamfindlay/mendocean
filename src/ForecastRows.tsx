@@ -22,6 +22,7 @@ export default function ForecastRows({
   userId,
   attendance,
   onAttendanceChange,
+  onAttendance,
 }: {
   weather: Forecast;
   outings: Outing[];
@@ -33,6 +34,7 @@ export default function ForecastRows({
   userId?: string;
   attendance: string[];
   onAttendanceChange: (values: string[]) => void;
+  onAttendance: (outing: Outing) => void;
 }) {
   const upcoming = visibleOutings(outings, "Upcoming", now);
   const matching = upcoming.filter((o) =>
@@ -95,6 +97,7 @@ export default function ForecastRows({
       ) : (
         <ScheduledRowCards
           weather={weather}
+          onAttendance={onAttendance}
           rows={matching}
           selectedRow={row?.id}
           onSelectRow={onSelectRow}

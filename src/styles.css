@@ -2029,3 +2029,20 @@ button:hover:not(:disabled) {
 .week-period-form h3 { font-size: 15px; font-weight: 500; margin: 0 0 12px; }
 .week-period-actions button { appearance: none; border: 1px solid var(--line); border-radius: 7px; padding: 8px 12px; min-height: 44px; background: var(--paper); color: var(--ink); }
 .week-period-actions button[type="submit"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+/* Keep attendance and forecast selection as separate native controls. */
+.scheduled-card-container {
+  position: relative;
+}
+.scheduled-card-container > .row-card {
+  height: 100%;
+}
+.attendance-placeholder {
+  visibility: hidden;
+}
+.scheduled-attendance-button {
+  position: absolute;
+  top: calc(0.8rem + 1px);
+  right: calc(0.8rem + 1px);
+  font-size: 11px;
+}
