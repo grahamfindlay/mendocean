@@ -54,13 +54,19 @@ test("independent report requires a boat, allows optional classes, and hides coa
   await page.getByRole("button", { name: "East", exact: true }).click();
   await expect(page.getByText("Your reports help build better wind-wave models and rowing forecasts.")).toBeVisible();
   await expect(page.getByText("A SMALL EFFORT. A BETTER FORECAST.")).toHaveCount(0);
-  const boat = page.getByRole("combobox", { name: "Your boat", exact: true });
+  const boat = page.getByRole("group", { name: "Select your boat class", exact: true });
   await expect(boat).toBeVisible();
-  await expect(boat).toHaveAttribute("required", "");
   await page.getByRole("button", { name: "Save report", exact: true }).click();
-  await expect(boat).toBeFocused();
-  await boat.selectOption("1x");
-  await expect(page.getByRole("group", { name: "Boat classes that actually went out (optional)", exact: true })).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveText("Choose your boat class.");
+  await boat.getByRole("button", { name: "1x", exact: true }).click();
+  await boat.getByRole("button", { name: "2x", exact: true }).click();
+  await expect(boat.getByRole("button", { pressed: true })).toHaveText("2x");
+  await boat.getByRole("button", { name: "1x", exact: true }).click();
+  await expect(page.getByText("More details", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("Anything else?")).toHaveCount(0);
+  await expect(page.getByLabel("Smallest boat")).toHaveCount(0);
+  await expect(page.getByLabel("Biggest boat")).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "All boat classes that launched (optional)", exact: true })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Coaching", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Save report", exact: true }).click();
   await expect(page.getByText("2 · Good · east")).toBeVisible();
@@ -81,14 +87,14 @@ test("independent report requires a boat, allows optional classes, and hides coa
   await page.getByRole("button", { name: "Past", exact: true }).click();
   await page.getByRole("button", { name: "Edit report", exact: true }).click();
   await page.getByRole("button", { name: "5 Forced off", exact: true }).click();
-  await page
-    .getByRole("combobox", { name: "Your boat", exact: true })
-    .selectOption("2x");
-  await page.getByRole("button", { name: "4x", exact: true }).click();
+  await boat.getByRole("button", { name: "2x", exact: true }).click();
+  const launched = page.getByRole("group", { name: "All boat classes that launched (optional)", exact: true });
+  await launched.getByRole("button", { name: "4x", exact: true }).click();
+  await launched.getByRole("button", { name: "8+", exact: true }).click();
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect(page.getByText("5 · Forced off · east")).toBeVisible();
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("mendocean-explicit-preview-v1")!)[0]);
-  expect(saved.reports[0]).toMatchObject({ boat_class: "2x", launched_boats: ["4x"], coach_state: "known", coach_ids: ["30000000-0000-4000-8000-000000000001"], coach_count: 1 });
+  expect(saved.reports[0]).toMatchObject({ boat_class: "2x", launched_boats: ["4x", "8+"], smallest_boat: 4, largest_boat: 8, coach_state: "known", coach_ids: ["30000000-0000-4000-8000-000000000001"], coach_count: 1 });
   expect(saved.planned_coaches).toEqual(["Charlie"]);
 });
 test("offline report is staged and uploaded after reconnecting", async ({

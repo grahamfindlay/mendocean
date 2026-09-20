@@ -347,8 +347,7 @@ test("an update applied mid-draft is never blocked, and the draft comes back", a
   await expect(banner(page)).toContainText("Update available");
   await closeAccount(page);
   await log(page);
-  await page.locator("details.form-card > summary").click();
-  await page.getByLabel("Anything else?").fill("Half-written note");
+  await page.getByRole("group", { name: "Select your boat class", exact: true }).getByRole("button", { name: "2x", exact: true }).click();
   // Autosave debounces at 350ms; the update must not wait for anything.
   await page.waitForTimeout(500);
   const update = banner(page).getByRole("button", { name: "Update now" });
@@ -360,8 +359,5 @@ test("an update applied mid-draft is never blocked, and the draft comes back", a
   await expect(
     page.getByText("Your unfinished draft was restored from this device."),
   ).toBeVisible();
-  await page.locator("details.form-card > summary").click();
-  await expect(page.getByLabel("Anything else?")).toHaveValue(
-    "Half-written note",
-  );
+  await expect(page.getByRole("group", { name: "Select your boat class", exact: true }).getByRole("button", { name: "2x", exact: true })).toHaveAttribute("aria-pressed", "true");
 });

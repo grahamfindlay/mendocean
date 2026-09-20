@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, Save } from "lucide-react";
+import { Check, Save } from "lucide-react";
 import {
   BOAT_CLASSES,
   RATINGS,
@@ -91,12 +91,6 @@ export default function Logger({
   const [launched, setLaunched] = useState<ReportInput["launched_boats"]>(
     editing?.report.launched_boats || [],
   );
-  const [smallest, setSmallest] = useState<number | null>(
-    editing?.report.smallest_boat ?? null,
-  );
-  const [largest, setLargest] = useState<number | null>(
-    editing?.report.largest_boat ?? null,
-  );
   const [notes, setNotes] = useState(editing?.report.notes || "");
   const [segments, setSegments] = useState<ReportInput["segments"]>(
     editing?.report.segments || [],
@@ -130,8 +124,6 @@ export default function Logger({
           setCoachIds(v.coachIds);
           setCoachCount(v.coachCount);
           setLaunched(v.launched);
-          setSmallest(v.smallest);
-          setLargest(v.largest);
           setNotes(v.notes);
           setSegments(v.segments);
           setRestored(true);
@@ -166,8 +158,6 @@ export default function Logger({
       coachIds,
       coachCount,
       launched,
-      smallest,
-      largest,
       notes,
       segments,
     };
@@ -193,8 +183,6 @@ export default function Logger({
     coachIds,
     coachCount,
     launched,
-    smallest,
-    largest,
     notes,
     segments,
   ]);
@@ -241,9 +229,7 @@ export default function Logger({
         throw new Error(
           "This row has not started yet. Use “Schedule independent row” to schedule it.",
         );
-      const extremes = launched.length
-        ? boatExtremes(launched)
-        : { smallest, largest };
+      const extremes = boatExtremes(launched);
       const report = reportSchema.parse({
         submission_id: crypto.randomUUID(),
         expected_version: editing?.report.version || 0,
@@ -412,27 +398,25 @@ export default function Logger({
           )}
           {outcome === "rowed" && (
             <>
-              <label>
-                Your boat
-                <select
-                  required
-                  aria-describedby="boat-required"
-                  value={boat ?? ""}
-                  onChange={(e) =>
-                    setBoat(
-                      (e.target.value as ReportInput["boat_class"]) || null,
-                    )
-                  }
-                >
-                  <option value="">Select your boat class</option>
+              <fieldset aria-describedby="boat-required">
+                <legend>Select your boat class</legend>
+                <p className="help" id="boat-required">
+                  Required when you row. Select one.
+                </p>
+                <div className="choices wrap">
                   {BOAT_CLASSES.map((b) => (
-                    <option key={b}>{b}</option>
+                    <button
+                      type="button"
+                      key={b}
+                      aria-pressed={boat === b}
+                      className={boat === b ? "active" : ""}
+                      onClick={() => setBoat(b)}
+                    >
+                      {b}
+                    </button>
                   ))}
-                </select>
-              </label>
-              <p className="help" id="boat-required">
-                Required when you row.
-              </p>
+                </div>
+              </fieldset>
               <fieldset>
                 <legend>How was the water?</legend>
                 <div className="rating-choices">
@@ -474,7 +458,7 @@ export default function Logger({
         {outcome === "rowed" && (
           <section className="form-card">
             <fieldset>
-              <legend>Boat classes that actually went out (optional)</legend>
+              <legend>All boat classes that launched (optional)</legend>
               <p className="help">Select any you noticed, if you remember.</p>
               <div className="choices wrap">
                 {BOAT_CLASSES.map((b) => (
@@ -498,91 +482,34 @@ export default function Logger({
             </fieldset>
           </section>
         )}
-        <details className="form-card" open={!!editing}>
-          <summary>
-            More details <ChevronDown size={18} />
-          </summary>
-          <p className="help">
-            Optional notes and extra detail about your row.
-          </p>
-          {outcome === "rowed" && (
-            <>
-              {!launched.length && (
-                <div className="field-grid">
-                  <label>
-                    Smallest boat
-                    <select
-                      value={smallest ?? ""}
-                      onChange={(e) =>
-                        setSmallest(Number(e.target.value) || null)
-                      }
-                    >
-                      <option value="">Unknown</option>
-                      {[1, 2, 4, 8].map((n) => (
-                        <option key={n} value={n}>
-                          {n} rower{n > 1 ? "s" : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Biggest boat
-                    <select
-                      value={largest ?? ""}
-                      onChange={(e) =>
-                        setLargest(Number(e.target.value) || null)
-                      }
-                    >
-                      <option value="">Unknown</option>
-                      {[1, 2, 4, 8].map((n) => (
-                        <option key={n} value={n}>
-                          {n} rower{n > 1 ? "s" : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              )}
-            </>
-          )}
-          {route === "both" && outcome === "rowed" && (
-            <div className="field-grid">
-              {(["east", "west"] as const).map((r) => (
-                <label key={r}>
-                  {r === "east" ? "East" : "West"} water (optional)
-                  <select
-                    value={segments.find((s) => s.route === r)?.rating ?? ""}
-                    onChange={(e) =>
-                      setSegments([
-                        ...segments.filter((s) => s.route !== r),
-                        ...(e.target.value
-                          ? [{ route: r, rating: Number(e.target.value) }]
-                          : []),
-                      ])
-                    }
-                  >
-                    <option value="">Not rated separately</option>
-                    {RATINGS.map((s, i) => (
-                      <option key={s} value={i + 1}>
-                        {i + 1} · {s}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ))}
-            </div>
-          )}
-          <label>
-            Anything else?
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              maxLength={2000}
-              placeholder="Different water on the return, a shortened row…"
-            />
-          </label>
-        </details>
+        {route === "both" && outcome === "rowed" && (
+          <section className="form-card field-grid">
+            {(["east", "west"] as const).map((r) => (
+              <label key={r}>
+                {r === "east" ? "East" : "West"} water (optional)
+                <select
+                  value={segments.find((s) => s.route === r)?.rating ?? ""}
+                  onChange={(e) =>
+                    setSegments([
+                      ...segments.filter((s) => s.route !== r),
+                      ...(e.target.value
+                        ? [{ route: r, rating: Number(e.target.value) }]
+                        : []),
+                    ])
+                  }
+                >
+                  <option value="">Not rated separately</option>
+                  {RATINGS.map((s, i) => (
+                    <option key={s} value={i + 1}>
+                      {i + 1} · {s}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </section>
+        )}
+
         {error && (
           <div role="alert" className="alert">
             {error}

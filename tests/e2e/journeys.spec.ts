@@ -58,8 +58,9 @@ async function startLog(page: Page) {
   ).toBeVisible();
 }
 async function chooseRow(page: Page) {
-  const boat = page.getByRole("combobox", { name: "Your boat", exact: true });
-  if (!(await boat.inputValue())) await boat.selectOption("1x");
+  const boat = page.getByRole("group", { name: "Select your boat class", exact: true });
+  if (!(await boat.getByRole("button", { pressed: true }).count()))
+    await boat.getByRole("button", { name: "1x", exact: true }).click();
   await page.getByRole("button", { name: "2 Good", exact: true }).click();
   await page.getByRole("button", { name: "East", exact: true }).click();
 }
@@ -167,10 +168,9 @@ test("imported practice prefills boat and survives report submission", async ({
     .getByRole("combobox", { name: "Which row?", exact: true })
     .selectOption(o.id);
   await chooseRow(page);
-  await page.locator("details.form-card > summary").click();
   await expect(
-    page.getByRole("combobox", { name: "Your boat", exact: true }),
-  ).toHaveValue("2x");
+    page.getByRole("group", { name: "Select your boat class", exact: true }).getByRole("button", { name: "2x", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Save report", exact: true }).click();
   await expect.poll(async () => (await records())[0]?.boat_class).toBe("2x");
   await api(actor, "bhc/disconnect", {});
