@@ -1988,13 +1988,6 @@ button:hover:not(:disabled) {
   width: 18px;
   height: 18px;
 }
-.now-panel .sample-time {
-  margin-top: 7px;
-  font-size: 11px;
-}
-.now-panel .sample-time p {
-  margin: 4px 0 0;
-}
 .today-attendance {
   margin: 10px 0;
 }

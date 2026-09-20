@@ -416,7 +416,7 @@ test("uninstalled iOS explains Home Screen setup before requesting permission", 
   ).toBeDisabled();
 });
 
-test("wind bearing indicates source direction and a current sample keeps its valid time", async ({
+test("wind bearing indicates source direction and Now updates with the current sample", async ({
   page,
 }) => {
   await page.clock.install({ time: new Date("2026-09-15T14:24:00Z") });
@@ -440,7 +440,7 @@ test("wind bearing indicates source direction and a current sample keeps its val
         },
         hours: [14, 15, 16].map((h) => ({
           time: `2026-09-15T${h}:00:00Z`,
-          wind: 7,
+          wind: h === 15 ? 9 : 7,
           direction: 90,
           gust: 12,
           temperature: 65,
@@ -460,10 +460,11 @@ test("wind bearing indicates source direction and a current sample keeps its val
     "transform",
     "rotate(90 40 40)",
   );
-  await expect(page.locator(".sample-time time")).toContainText("9:15 AM");
+  await expect(page.locator(".now-panel details")).toHaveCount(0);
+  await expect(page.locator(".weather-chart .chart-date")).toHaveCount(0);
   await expect(page.locator(".hour-row")).toHaveCount(0);
   await page.clock.fastForward(37 * 60000);
-  await expect(page.locator(".sample-time time")).toContainText("10:00 AM");
+  await expect(page.locator(".now-wind")).toContainText("9.0 mph");
   await expect(page.locator(".hour-row")).toHaveCount(0);
 });
 
@@ -504,7 +505,8 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
     }),
   );
   await page.goto("/?tab=Today");
-  await expect(page.locator(".sample-time time")).toContainText("9:15 AM");
+  await expect(page.locator(".now-panel details")).toHaveCount(0);
+  await expect(page.locator(".weather-chart .chart-date")).toHaveCount(0);
   const chart = page.getByRole("region", { name: "All day", exact: true });
   await expect(
     page.getByRole("heading", { name: "Now", exact: true }),
