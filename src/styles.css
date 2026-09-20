@@ -2004,3 +2004,22 @@ button:hover:not(:disabled) {
   font-size: 10px;
   font-weight: 600;
 }
+
+.wind-rose {
+  width: min(100%, 280px);
+  margin: 14px 0 0;
+}
+.wind-rose svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.wind-rose text {
+  fill: var(--ink);
+  text-anchor: middle;
+  font-family: "Space Mono", monospace;
+}
+.wind-rose-speed { font-size: 8px; }
+.wind-rose-direction { font-size: 12px; font-weight: 700; }
+.wind-rose-rule { fill: none; stroke: var(--ink); stroke-opacity: .2; }
+.wind-rose figcaption { text-align: center; font-size: 11px; }

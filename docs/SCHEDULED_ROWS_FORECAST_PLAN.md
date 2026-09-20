@@ -194,4 +194,9 @@ Released through [PR #40](https://github.com/grahamfindlay/mendocean/pull/40) as
 
 ## Today label cleanup — 2026-09-20
 
-User requested removal of the Now card’s Weather details/sample disclosure and the visible All day chart header, followed by merge and deployment. Removed the disclosure and its dedicated styles. Today hides the chart title while retaining its accessible region name; other chart titles remain unchanged. Production build and nine focused browser cases passed across desktop Chromium, mobile Chromium, and mobile WebKit. Release verification pending.
+User requested removal of the Now card’s Weather details/sample disclosure and the visible All day chart header, followed by merge and deployment. Removed the disclosure and its dedicated styles. Today hides the chart title while retaining its accessible region name; other chart titles remain unchanged. Production build and nine focused browser cases passed across desktop Chromium, mobile Chromium, and mobile WebKit. Released through PR #41 as `22ad4f7f05e214f57016009bc57e44a81bd41335`. Required fast (2m26s) and full-stack (4m41s) checks passed. Exact-commit production smoke passed; a live 390px browser check confirmed both requested elements are absent and the current-time chart remains visible. Workspace synchronized to main; final release evidence persisted locally.
+
+
+## Wind-color explanation — 2026-09-20
+
+Update the disclosure to “Wind colors: Hannah’s heuristic v1.0.0”, capitalize Bussin’, Sus, and Chopped, and use the user’s requested speed/direction and future-model explanation. Include a compact wind rose inspired by Hannah’s public dashboard, using the existing windStatus rule and exact sector boundaries, with accessible threshold descriptions and a source link. Render locally as SVG without a charting dependency or runtime fetch. Production build and three existing public-forecast browser checks passed across Chromium and WebKit. Expanded 390px layout visually reviewed with no horizontal overflow; exact disclosure and key labels verified. Release checks pending.

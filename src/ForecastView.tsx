@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import {
+  HEURISTIC_VERSION,
   formatDate,
   formatTime,
   localDateTime,
@@ -7,6 +8,7 @@ import {
   type Forecast,
   type Outing,
 } from "../shared/domain";
+import WindRose from "./WindRose";
 import ForecastToday from "./ForecastToday";
 import ForecastRows from "./ForecastRows";
 import ForecastWeek from "./ForecastWeek";
@@ -114,17 +116,20 @@ export default function ForecastView({
           {formatTime(weather.fetched_at)}
         </span>
         <details>
-          <summary>Wind colors: Hannah’s heuristic</summary>
-          <p>Version: {weather.model_version}</p>
+          <summary>
+            Wind colors: Hannah’s heuristic v
+            {HEURISTIC_VERSION.replace("hannah-", "")}
+          </summary>
           <p className="wind-key">
-            <span className="favorable">○ bussin’</span>
-            <span className="caution">△ sus</span>
-            <span className="unfavorable">◇ chopped</span>
+            <span className="favorable">○ Bussin’</span>
+            <span className="caution">△ Sus</span>
+            <span className="unfavorable">◇ Chopped</span>
           </p>
           <p>
-            Thresholds depend on wind direction. Wind colors describe the
-            heuristic, not measured water conditions.
+            Wind colors are a function of speed and direction. As you log more
+            rows, we will build more sophisticated forecast models.
           </p>
+          <WindRose />
         </details>
       </aside>
     </>
