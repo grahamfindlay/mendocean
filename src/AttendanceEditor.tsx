@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { type AttendanceChoice, type AttendanceState } from "../shared/bhc";
-import { formatDate, formatTime, type Outing } from "../shared/domain";
+import {
+  BHC_LOGIN_URL,
+  COACHES_EMAIL,
+  formatDate,
+  formatTime,
+  type Outing,
+} from "../shared/domain";
 import { Modal } from "./Account";
 import { api } from "./client";
 type Result = {
@@ -110,9 +116,22 @@ export default function AttendanceEditor({
           )}
           {!state.allowed && <p>{state.reason}</p>}
           {closed && state.allowed && (
-            <p>
-              The attendance deadline has passed. Request changes in Boathouse
-              Connect.
+            <p>The attendance deadline has passed.</p>
+          )}
+          {/* Both routes out, wherever this screen cannot make the change
+              itself. The mailto opens a draft; the app never sends mail on
+              anyone's behalf. */}
+          {!allowed && (
+            <p className="help">
+              Request a change in Boathouse Connect, or email the coaches at{" "}
+              <a
+                href={`mailto:${COACHES_EMAIL}?subject=${encodeURIComponent(
+                  `Attendance: ${outing.title}, ${formatDate(outing.starts_at)}`,
+                )}`}
+              >
+                {COACHES_EMAIL}
+              </a>
+              . Nothing is sent until you send it.
             </p>
           )}
         </>
@@ -161,11 +180,7 @@ export default function AttendanceEditor({
         >
           Check BHC status
         </button>
-        <a
-          href="https://app.boathouseconnect.com"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <a href={BHC_LOGIN_URL} target="_blank" rel="noopener noreferrer">
           Open Boathouse Connect
         </a>
       </div>

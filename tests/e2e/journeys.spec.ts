@@ -713,6 +713,17 @@ test("attendance changes persist in BHC, closed windows and uncertain sends stay
   await expect(
     dialog.getByRole("button", { name: "Save attendance in BHC" }),
   ).toHaveCount(0);
+  // R27. Both routes out of a change this screen cannot make, and a mailto
+  // that drafts rather than sends.
+  const coaches = dialog.getByRole("link", {
+    name: "coaches@mendotarowingclub.com",
+  });
+  expect(await coaches.getAttribute("href")).toMatch(
+    /^mailto:coaches@mendotarowingclub\.com\?subject=Attendance/,
+  );
+  await expect(
+    dialog.getByRole("link", { name: "Open Boathouse Connect" }),
+  ).toHaveAttribute("href", "https://app.boathouseconnect.com/home/login");
   await page.context().setOffline(true);
   await dialog.getByRole("button", { name: "Check BHC status" }).click();
   await expect(dialog.getByRole("alert")).toContainText("not saved offline");

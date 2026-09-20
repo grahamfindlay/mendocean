@@ -15,6 +15,9 @@ export const STATUS_LABELS: Record<WindStatus, string> = {
   unfavorable: "Unfavorable wind",
   unavailable: "Assessment unavailable",
 };
+/** Where a member asks for an attendance change the app cannot make itself. */
+export const BHC_LOGIN_URL = "https://app.boathouseconnect.com/home/login";
+export const COACHES_EMAIL = "coaches@mendotarowingclub.com";
 export const COACH_NAMES = [
   "Charlie",
   "Rose",
