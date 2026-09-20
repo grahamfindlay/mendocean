@@ -2086,3 +2086,6 @@ button:hover:not(:disabled) {
 .outing-card .report-summary { margin-top: 12px; padding: 12px 0 0; font-size: 13px; gap: 7px; flex-direction: column; }
 .outing-card-actions { margin-top: auto; padding-top: 12px; align-items: center; justify-content: space-between; gap: 0 12px; }
 .outing-card-actions .subtle-action { margin-left: auto; }
+
+.card-expand-icon { flex-shrink: 0; }
+.outing-card-actions [aria-expanded="true"] .card-expand-icon { transform: rotate(180deg); }
