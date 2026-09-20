@@ -1,13 +1,9 @@
 import { type ReactNode, useId } from "react";
 import { ChevronDown } from "lucide-react";
-import {
-  formatDate,
-  formatTime,
-  type Forecast,
-  type Outing,
-} from "../shared/domain";
+import { type Forecast, type Outing } from "../shared/domain";
 import { summarizeWindow } from "../shared/timeline";
 import { scheduledAttendance } from "../shared/presentation";
+import { RowCardHeader } from "./RowCardHeader";
 import { WindowReading } from "./WindowReading";
 
 const choices = [
@@ -92,27 +88,25 @@ export function ScheduledRowCards({
               aria-controls={expandable ? `${id}-${o.id}` : undefined}
               onClick={() => onSelectRow(o.id)}
             >
-              <span className="scheduled-card-top">
-                <span className="row-meta">{formatDate(o.starts_at)}</span>
-                <span
-                  className={`attendance-badge${o.kind === "official" ? " attendance-placeholder" : ""}`}
-                >
-                  {attendanceLabel}
-                </span>
-              </span>
-              <span className="row-meta">
-                {formatTime(o.starts_at)} – {formatTime(o.ends_at)}
-              </span>
-              <span className="scheduled-card-top">
-                <h3 className="row-meta">{o.title}</h3>
-                {expandable && (
-                  <ChevronDown
-                    className="card-expand-icon"
-                    size={18}
-                    aria-hidden="true"
-                  />
-                )}
-              </span>
+              <RowCardHeader
+                outing={o}
+                attendance={
+                  <span
+                    className={`attendance-badge${o.kind === "official" ? " attendance-placeholder" : ""}`}
+                  >
+                    {attendanceLabel}
+                  </span>
+                }
+                trailing={
+                  expandable ? (
+                    <ChevronDown
+                      className="card-expand-icon"
+                      size={18}
+                      aria-hidden="true"
+                    />
+                  ) : undefined
+                }
+              />
               <WindowReading summary={summary} expired={expired} />
             </button>
             {o.kind === "official" && (
