@@ -358,3 +358,20 @@ test("day rulers stay at local midnight, six, noon and eighteen across DST", () 
     ),
   ).toBe(true);
 });
+
+ test("custom daily periods preserve local times and reject ambiguous DST bounds", () => {
+  const custom = [{id: "mid", label: "Mid morning", start: "09:15", end: "11:45"}];
+  for (const day of ["2026-09-16", "2026-09-17"]) {
+    const [w] = practiceWindows(weather, day, custom);
+    expect(localDateTime(new Date(w.startsAt).toISOString())).toBe(day + "T09:15");
+    expect(localDateTime(new Date(w.endsAt).toISOString())).toBe(day + "T11:45");
+    expect(w.summary.covered).toBe(true);
+  }
+  for (const [day, start, end] of [["2026-03-08", "01:30", "02:30"], ["2026-11-01", "01:15", "02:30"]]) {
+    const [w] = practiceWindows(weather, day, [{...custom[0], start, end}]);
+    expect(Number.isNaN(w.startsAt)).toBe(true);
+    expect(Number.isNaN(w.endsAt)).toBe(true);
+    expect(w.summary.samples).toBe(0);
+  }
+  expect(practiceWindows(weather, "2026-09-16", [])).toEqual([]);
+ });

@@ -1,3 +1,6 @@
+import WeekPeriodsEditor from "./WeekPeriodsEditor";
+import { useWeekPeriods } from "./useWeekPeriods";
+import { sortPeriods } from "../shared/weekPeriods";
 import {
   formatDate,
   formatTime,
@@ -10,6 +13,7 @@ import { WindowReading } from "./WindowReading";
 
 export default function ForecastWeek({
   weather,
+  userId,
   days,
   day,
   today,
@@ -19,6 +23,7 @@ export default function ForecastWeek({
   onSelectDay,
 }: {
   weather: Forecast;
+  userId?: string;
   days: string[];
   day: string;
   today: string;
@@ -27,8 +32,11 @@ export default function ForecastWeek({
   now: number;
   onSelectDay: (day: string) => void;
 }) {
+  const preferences = useWeekPeriods(userId);
+  const periods = sortPeriods(preferences.periods.filter((p) => p.enabled));
   return (
     <>
+      <WeekPeriodsEditor preferences={preferences} />
       <div className="week-grid row-grid scheduled-row-grid">
         {days.map((d) => (
           <article key={d} aria-current={d === day ? "true" : undefined}>
@@ -38,7 +46,7 @@ export default function ForecastWeek({
               onClick={() => onSelectDay(d)}
             >
               <span className="row-meta">{formatDate(d + "T12:00:00Z")}</span>
-              {practiceWindows(weather, d).map((w) => (
+              {practiceWindows(weather, d, periods).map((w) => (
                 <span className="practice-window" key={w.id}>
                   <span className="row-meta">
                     {w.label}{" "}

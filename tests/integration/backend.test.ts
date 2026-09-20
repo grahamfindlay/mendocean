@@ -1153,3 +1153,20 @@ test("BHC sync lock serializes attendance writes and service RPCs reject ordinar
   ).toBeTruthy();
   await api(a, "bhc/disconnect", {});
 });
+
+test("Week periods persist per account with validated authenticated writes", async () => {
+  const initial = await api(a, "week-periods");
+  expect(initial.status).toBe(200);
+  expect(initial.data.periods.map((p: any) => p.label)).toEqual(["Early morning", "Evening"]);
+  const periods = [{id: "mid", label: "Mid morning", start: "09:00", end: "11:00", enabled: true}];
+  expect((await api(a, "week-periods", {periods})).status).toBe(200);
+  expect((await api(a, "week-periods")).data.periods).toEqual(periods);
+  expect((await api(b, "week-periods")).data.periods).toHaveLength(2);
+  expect((await api(null, "week-periods", {periods})).status).toBe(401);
+  expect((await api(unapproved, "week-periods", {periods})).status).toBe(403);
+  expect((await api(a, "week-periods", {periods: [{...periods[0], end: "08:00"}]})).status).toBe(400);
+  expect((await api(a, "week-periods", {periods, user_id: b.id})).status).toBe(400);
+  expect((await api(a, "week-periods")).data.periods).toEqual(periods);
+  expect((await api(a, "week-periods", {periods: []})).status).toBe(200);
+  expect((await api(a, "week-periods")).data.periods).toEqual([]);
+});

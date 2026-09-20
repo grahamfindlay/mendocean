@@ -1,3 +1,4 @@
+import { DEFAULT_WEEK_PERIODS, weekPeriodsSchema } from "../../../shared/weekPeriods.ts";
 import { liveProviders, type Providers } from "../_shared/providers.ts";
 import { z } from "zod";
 import { sendTestPush } from "../_shared/notifications.ts";
@@ -167,6 +168,8 @@ export function createApiHandler(providers: Providers = liveProviders) {
           };
         });
       };
+      if (path === "week-periods" && req.method === "GET")
+        return json(req, { periods: profile.week_periods ?? DEFAULT_WEEK_PERIODS });
       if (path === "account" && req.method === "GET") {
         const connection = await query("connection_get", { user_id: uid });
         if (
@@ -313,6 +316,11 @@ export function createApiHandler(providers: Providers = liveProviders) {
             "Report unavailable or changed. Reload before deleting.",
           );
         return json(req, { deleted: true });
+      }
+      if (path === "week-periods") {
+        const { periods } = z.object({ periods: weekPeriodsSchema }).strict().parse(input);
+        check(await db.from("profiles").update({ week_periods: periods }).eq("id", uid));
+        return json(req, { periods });
       }
       if (path === "settings") {
         const settings = z
