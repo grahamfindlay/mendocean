@@ -41,6 +41,8 @@ test("camera is opt-in, rate limited, pauses and cleans up", async ({
     page.getByRole("button", { name: "Show lake camera" }),
   ).toBeVisible();
   expect(starts).toHaveLength(0);
+  await expect(page.getByRole("link", { name: "Open webcam" })).toHaveCount(0);
+  await expect(page.locator(".lake-camera-caption")).toHaveCount(0);
   await page.getByRole("button", { name: "Show lake camera" }).click();
   await expect(
     page.getByAltText("Lake Mendota from the UW–Madison Center for Limnology"),
@@ -110,6 +112,6 @@ test("slow requests do not overlap and failures back off", async ({ page }) => {
   ).toBeVisible();
   await expect.poll(() => starts.length).toBeGreaterThanOrEqual(2);
   expect(starts[1] - starts[0]).toBeGreaterThanOrEqual(3300);
-  await expect(page.getByRole("link", { name: "Open webcam" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open webcam" })).toHaveCount(0);
   await page.getByRole("button", { name: "Hide camera" }).click();
 });
