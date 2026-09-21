@@ -1,6 +1,6 @@
 # Lake camera
 
-Today’s Now card offers an opt-in JPEG viewer. It requests no frames while closed, pauses offscreen or in a background tab, aborts requests on cleanup, and targets at most one request start per second with no overlapping requests. Failed requests back off from 2 to 30 seconds. The last decoded image stays visible during refresh and is labeled with its relay fetch time, not a claimed camera capture time.
+Today’s Now card offers an opt-in JPEG viewer. It requests no frames while closed, pauses offscreen or in a background tab, aborts requests on cleanup, and targets at most one request start per second with no overlapping requests. Failed requests back off from 2 to 30 seconds. The last decoded image stays visible during refresh. A compact camera toggle shares the Now heading; the expanded view contains only the image (plus a message if retrieval fails).
 
 ## Deployment prerequisite
 

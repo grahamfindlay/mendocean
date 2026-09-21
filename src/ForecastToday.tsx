@@ -11,6 +11,7 @@ import {
   weatherDescription,
 } from "../shared/presentation";
 import { hourlyRainChance, windowSamples, dayBounds } from "../shared/timeline";
+import { Camera } from "lucide-react";
 import LakeCamera from "./LakeCamera";
 import WeatherChart from "./WeatherChart";
 import { WindCompass, WindSpeed } from "./WindReading";
@@ -45,6 +46,7 @@ export default function ForecastToday({
   const matching = rows.filter((o) =>
     attendance.includes(scheduledAttendance(o)),
   );
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [selected, setSelected] = useState("");
   const row = matching.find((o) => o.id === selected) || matching[0];
   useEffect(() => {
@@ -54,7 +56,20 @@ export default function ForecastToday({
   return (
     <>
       <section className="current-panel now-panel" aria-label="Now">
-        <h1>Now</h1>
+        <div className="now-heading">
+          <h1>Now</h1>
+          <button
+            className="lake-camera-toggle"
+            type="button"
+            aria-label={cameraOpen ? "Hide camera" : "Show lake camera"}
+            aria-expanded={cameraOpen}
+            aria-controls={cameraOpen ? "lake-camera-view" : undefined}
+            onClick={() => setCameraOpen(!cameraOpen)}
+          >
+            <Camera size={15} aria-hidden="true" />
+            <span>{cameraOpen ? "Hide" : "Camera"}</span>
+          </button>
+        </div>
         {current ? (
           <>
             <div className="now-conditions">
@@ -85,7 +100,7 @@ export default function ForecastToday({
         ) : (
           <p>A current estimate is unavailable.</p>
         )}
-        <LakeCamera />
+        {cameraOpen && <LakeCamera />}
       </section>
       {!!rows.length && (
         <section
