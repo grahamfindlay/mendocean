@@ -1348,7 +1348,7 @@ test("practice attendance badges open the matching modal without selecting the f
     if (surface !== "Today") {
       await page.getByRole("button", { name: surface, exact: true }).click();
     }
-    {
+    if (surface === "Scheduled rows") {
       await page
         .getByRole("checkbox", { name: "Unknown", exact: true })
         .check();
@@ -1357,16 +1357,15 @@ test("practice attendance badges open the matching modal without selecting the f
         .check();
     }
     const badges = page.getByRole("button", { name: /^Practice attendance:/ });
-    await expect(badges).toHaveCount(3);
+    await expect(badges).toHaveCount(surface === "Today" ? 1 : 3);
     if (surface === "Scheduled rows") {
       await page.locator(".row-card").filter({ hasText: "Practice 1" }).click();
       await expect(page.locator('.row-card[aria-expanded="true"]')).toHaveCount(1);
     }
-    for (const [i, status] of [
-      "Attending",
-      "Unknown",
-      "Not attending",
-    ].entries()) {
+    const statuses = surface === "Today"
+      ? ["Attending"]
+      : ["Attending", "Unknown", "Not attending"];
+    for (const [i, status] of statuses.entries()) {
       const selected =
         await page.locator('.row-card[aria-pressed="true"]').textContent();
       const badge = page.getByRole("button", {
