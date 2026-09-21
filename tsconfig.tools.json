@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "types": ["node", "vite/client"] },
-  "include": ["*.config.ts", "tests/**/*.ts"],
+  "include": ["*.config.ts", "tests/**/*.ts", "functions/**/*.ts"],
   "exclude": ["tests/support/fixture-provider.ts"]
 }
