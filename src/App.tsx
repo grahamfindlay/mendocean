@@ -3,9 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
   Check,
-  Download,
   Plus,
-  CalendarPlus,
   RefreshCw,
   Settings,
   Share,
@@ -20,10 +18,10 @@ import {
   type Report,
 } from "../shared/domain";
 import ForecastView, { type ForecastSelection } from "./ForecastView";
-import OutingsView from "./OutingsView";
+import HistoryView from "./HistoryView";
 import AttendanceEditor from "./AttendanceEditor";
 import { useClock } from "./useClock";
-import { canLog, outingPhase, type RowFilters } from "../shared/presentation";
+import { canLog, type RowFilters } from "../shared/presentation";
 import Logger from "./Logger";
 import { Auth, Modal, SettingsForm, PlanForm } from "./Account";
 import { discard, flush, pending, type PendingReport } from "./outbox";
@@ -32,7 +30,7 @@ import { UpdateBanner } from "./UpdateControls";
 import {
   DEFAULT_DESTINATION,
   FORECASTS,
-  isDestination,
+  resolveDestination,
   isForecast,
   topLevel,
   forecastDestinations,
@@ -68,8 +66,9 @@ function readUpdatePosition() {
       sessionStorage.getItem("mendocean-update-position") || "null",
     );
     sessionStorage.removeItem("mendocean-update-position");
-    return saved && Date.now() - saved.at < 300000 && isDestination(saved.tab)
-      ? saved
+    const tab = resolveDestination(saved?.tab);
+    return saved && Date.now() - saved.at < 300000 && tab
+      ? { ...saved, tab }
       : null;
   } catch {
     return null;
@@ -95,7 +94,6 @@ export interface AccountData {
 export default function App() {
   const now = useClock();
   const [resume] = useState(readUpdatePosition);
-  const [outingView, setOutingView] = useState<"Upcoming" | "Past">("Upcoming");
   const [forecastAttendance, setForecastAttendance] = useState<string[]>([
     "attending",
   ]);
@@ -108,9 +106,8 @@ export default function App() {
     resume?.tab ||
       (new URLSearchParams(location.search).has("log")
         ? "Log"
-        : isDestination(new URLSearchParams(location.search).get("tab"))
-          ? new URLSearchParams(location.search).get("tab")!
-          : DEFAULT_DESTINATION),
+        : resolveDestination(new URLSearchParams(location.search).get("tab")) ||
+          DEFAULT_DESTINATION),
   );
   const [weather, setWeather] = useState<Forecast | null>(null);
   const [weatherError, setWeatherError] = useState("");
@@ -155,7 +152,6 @@ export default function App() {
   const updatePosition = useRef({});
   updatePosition.current = {
     tab,
-    outingView,
     rowFilters,
     forecastSelection,
     selectedOuting,
@@ -239,7 +235,6 @@ export default function App() {
         );
         setPlanned(false);
         setForecastSelection(undefined);
-        setOutingView("Upcoming");
         setRowFilters(NO_FILTERS);
         setForecastAttendance(["attending"]);
         if (
@@ -248,7 +243,6 @@ export default function App() {
           !currentUser.current &&
           resume.userId === next.id
         ) {
-          setOutingView(resume.outingView === "Past" ? "Past" : "Upcoming");
           setRowFilters(savedFilters(resume.rowFilters));
           setForecastSelection(resume.forecastSelection);
           setSelectedOuting(resume.selectedOuting);
@@ -288,7 +282,7 @@ export default function App() {
       .then(() => {
         history.replaceState({}, "", location.pathname);
         setMessage("You joined the shared row.");
-        setTab("My rows");
+        setTab("Rows");
         void refresh();
       })
       .catch((e) => setError(e.message));
@@ -468,49 +462,28 @@ export default function App() {
               setMessage(
                 previewMode ? "Sample report saved only on this device." : m,
               );
-              if (!editing) {
-                const saved = account?.outings.find(
-                  (o) => o.id === selectedOuting,
-                );
-                setOutingView(
-                  saved && outingPhase(saved, Date.now()) !== "past"
-                    ? "Upcoming"
-                    : "Past",
-                );
-                setRowFilters(NO_FILTERS);
-              }
+              if (!editing) setRowFilters(NO_FILTERS);
               setEditing(undefined);
               setSelectedOuting(undefined);
-              setTab("My rows");
+              setTab("History");
               void refresh();
             }}
           />
         ) : (
           <>
-            <div className="page-heading">
-              {/* Both entries are explicit: "Log" alone reads as recording
-                  something that already happened, which left scheduling
-                  discoverable only by accident. */}
-              <div className="heading-actions">
-                <button
-                  className="button subtle"
-                  onClick={() => setPlanned(true)}
-                >
-                  <CalendarPlus size={16} />
-                  Schedule independent row
-                </button>
-                <button
-                  className="button subtle"
-                  onClick={() => {
-                    setEditing(undefined);
-                    setSelectedOuting(undefined);
-                    setTab("Log");
-                  }}
-                >
-                  <Plus size={16} />
-                  Log independent row
-                </button>
-              </div>
+            <div className="toolbar">
+              <button className="button subtle" onClick={() => {
+                setEditing(undefined);
+                setSelectedOuting(undefined);
+                setTab("Log");
+              }}>
+                <Plus size={16} />
+                Log independent row
+              </button>
+              <button className="text-button" disabled={busy} onClick={() => void act(refresh)}>
+                <RefreshCw size={15} />
+                Refresh
+              </button>
             </div>
             {!!queue.length && (
               <section className="form-card">
@@ -555,44 +528,15 @@ export default function App() {
                 </button>
               </section>
             )}
-            <div className="toolbar">
-              <button
-                className="text-button"
-                disabled={busy}
-                onClick={() =>
-                  void act(async () => {
-                    download(
-                      "mendocean-my-data.json",
-                      JSON.stringify(await api("export"), null, 2),
-                    );
-                  })
-                }
-              >
-                <Download size={16} />
-                Export my data
-              </button>
-              <button
-                className="text-button"
-                disabled={busy}
-                onClick={() => void act(refresh)}
-              >
-                <RefreshCw size={15} />
-                Refresh
-              </button>
-            </div>
             {account ? (
-              <OutingsView
+              <HistoryView
                 outings={account.outings}
                 queued={queue.map((q) => q.outing.id)}
                 profile={account.profile}
-                bhcConnected={account.bhc.connected}
                 onAttendance={setAttendanceOuting}
                 now={now}
                 user={user.id}
-                weather={weather}
-                view={outingView}
                 filters={rowFilters}
-                onView={setOutingView}
                 onFilters={setRowFilters}
                 busy={busy}
                 onSettings={() => setSettings(true)}
@@ -603,18 +547,6 @@ export default function App() {
                 onEdit={(outing, report) => {
                   setEditing({ outing, report });
                   setTab("Log");
-                }}
-                onForecast={(o) => {
-                  const category = scheduledAttendance(o);
-                  setForecastAttendance((values) =>
-                    values.includes(category) ? values : [...values, category],
-                  );
-                  setForecastSelection({
-                    id: o.id,
-                    starts_at: o.starts_at,
-                    ends_at: o.ends_at,
-                  });
-                  setTab("Rows");
                 }}
                 onDelete={(report) =>
                   void act(async () => {
@@ -634,7 +566,7 @@ export default function App() {
                 onShare={shareRow}
               />
             ) : (
-              <p role="status">Loading your rows…</p>
+              <p role="status">Loading your history…</p>
             )}
           </>
         )}
@@ -672,6 +604,7 @@ export default function App() {
         <Modal title="Your account" onClose={() => setSettings(false)}>
           <SettingsForm
             account={account}
+            onExport={async () => download("mendocean-my-data.json", JSON.stringify(await api("export"), null, 2))}
             onUpdated={() => void refresh()}
             onSignOut={() =>
               void act(async () => {
@@ -691,7 +624,7 @@ export default function App() {
             onSave={async (body) => {
               await api("outing", body);
               setPlanned(false);
-              setOutingView("Upcoming");
+              setTab("Rows");
               setMessage("Independent row added.");
               await refresh();
             }}

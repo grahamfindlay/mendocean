@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test("My rows shares the scheduled summary and keeps past results and actions", async ({
+test("History shows only past rows, preserves logging actions, and resolves old links", async ({
   page,
 }, testInfo) => {
   const now = Date.parse("2026-09-20T12:00:00Z");
@@ -84,38 +84,19 @@ test("My rows shares the scheduled summary and keeps past results and actions", 
     );
   });
   await page.goto("/?preview=1");
-  const forecastCard = page
-    .locator(".row-card")
-    .filter({ hasText: "Masters Novice" });
-  const forecastSummary = await forecastCard
-    .locator(".scheduled-card-weather")
-    .innerText();
-  await page.getByRole("button", { name: "My rows", exact: true }).click();
-  const upcoming = page
-    .locator(".outing-card")
-    .filter({ hasText: "Masters Novice" });
-  await expect(upcoming.locator(".scheduled-card-weather")).toHaveText(
-    forecastSummary,
-    { useInnerText: true },
-  );
-  // The later wind peak must survive; the former start-only reading was 6 mph.
-  await expect(upcoming.locator(".wind-speed")).toHaveText("6–18 mph");
-  await expect(upcoming.locator(".row-card-header")).toContainText(
-    "8:00 AM – 10:00 AM",
-  );
-  await expect(
-    upcoming.getByRole("button", { name: "View forecast" }),
-  ).toBeVisible();
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
-  await page.screenshot({
-    path: testInfo.outputPath("upcoming.png"),
-    fullPage: true,
-  });
-  await page.getByRole("button", { name: "Past", exact: true }).click();
+  await page.getByRole("button", { name: "History", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Upcoming", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Past", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Schedule independent row", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Export my data", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Masters Novice & Recreational" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Independent afternoon row" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Account", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Export my data", exact: true })).toBeVisible();
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export my data", exact: true }).click();
+  expect((await downloaded).suggestedFilename()).toBe("mendocean-my-data.json");
+  await page.getByRole("button", { name: "Close", exact: true }).click();
   const past = page
     .locator(".outing-card")
     .filter({ hasText: "Morning practice" });
@@ -148,4 +129,12 @@ test("My rows shares the scheduled summary and keeps past results and actions", 
     path: testInfo.outputPath("past.png"),
     fullPage: true,
   });
+  await unlogged.getByRole("button", { name: "Log this row" }).click();
+  await expect(page.getByRole("combobox", { name: "Which row?" })).toHaveValue("unlogged");
+  await page.goto("/?preview=1&tab=My%20rows");
+  await expect(page.getByRole("button", { name: "History", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.locator(".outing-card")).toHaveCount(2);
+  await page.goto("/?preview=1&tab=History");
+  await expect(page.getByRole("button", { name: "History", exact: true })).toHaveAttribute("aria-current", "page");
+
 });
