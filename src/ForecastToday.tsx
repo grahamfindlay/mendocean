@@ -11,6 +11,7 @@ import {
   weatherDescription,
 } from "../shared/presentation";
 import { hourlyRainChance, windowSamples, dayBounds } from "../shared/timeline";
+import LakeCamera from "./LakeCamera";
 import WeatherChart from "./WeatherChart";
 import { WindCompass, WindSpeed } from "./WindReading";
 import WeatherIcon from "./WeatherIcon";
@@ -82,6 +83,7 @@ export default function ForecastToday({
         ) : (
           <p>A current estimate is unavailable.</p>
         )}
+        <LakeCamera />
       </section>
       {!!rows.length && (
         <section

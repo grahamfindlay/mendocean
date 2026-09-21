@@ -86,7 +86,7 @@ export default defineConfig({
           );
           const path = resolve(output, "_headers");
           const headers = readFileSync(path, "utf8");
-          const policy = `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' ${origin} ${origin.replace("https:", "wss:")}; img-src 'self' data:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`;
+          const policy = `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' ${origin} ${origin.replace("https:", "wss:")}; img-src 'self' data: blob:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`;
           writeFileSync(
             path,
             headers + "\n/*\n  Content-Security-Policy: " + policy + "\n",
