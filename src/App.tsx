@@ -21,7 +21,7 @@ import ForecastView, { type ForecastSelection } from "./ForecastView";
 import HistoryView from "./HistoryView";
 import AttendanceEditor from "./AttendanceEditor";
 import { useClock } from "./useClock";
-import { canLog, type RowFilters } from "../shared/presentation";
+import { canSelectForLog, type RowFilters } from "../shared/presentation";
 import Logger from "./Logger";
 import { Auth, Modal, SettingsForm, PlanForm } from "./Account";
 import { discard, flush, pending, type PendingReport } from "./outbox";
@@ -453,7 +453,7 @@ export default function App() {
             editing={editing}
             initialOuting={
               account?.outings.some(
-                (o) => o.id === selectedOuting && canLog(o, now),
+                (o) => o.id === selectedOuting && canSelectForLog(o, now),
               )
                 ? selectedOuting
                 : undefined

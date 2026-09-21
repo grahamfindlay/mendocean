@@ -15,6 +15,14 @@ export function outingPhase(
 export function canLog(o: Pick<Outing, "starts_at">, now: number) {
   return Date.parse(o.starts_at) <= now + 15 * 60_000;
 }
+/** Keep personal logs even if imported attendance later changes. */
+export function hasAttendanceEvidence(o: Outing) {
+  return o.kind === "independent" ||
+    bhcAttendance(o.attendance) === "attending" || !!o.reports?.length;
+}
+export function canSelectForLog(o: Outing, now: number) {
+  return canLog(o, now) && hasAttendanceEvidence(o);
+}
 export type RowTypeFilter = "All" | "Practices" | "Independent";
 export type AttendanceFilter =
   "All" | "Attending" | "Unknown" | "Not attending";
@@ -57,9 +65,7 @@ export function visibleOutings(
       if (
         view === "Past" &&
         !allPractices &&
-        practice &&
-        !logged &&
-        bhcAttendance(o.attendance) !== "attending"
+        !hasAttendanceEvidence(o)
       )
         return false;
       // Attendance describes practices only. An independent row carries no BHC

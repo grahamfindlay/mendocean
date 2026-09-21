@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import {
   canLog,
+  canSelectForLog,
   scheduledAttendance,
   outingPhase,
   visibleOutings,
@@ -327,4 +328,14 @@ test("scheduled attendance classifies independent rows as attending and missing 
   expect(
     scheduledAttendance({ kind: "official", attendance: "attending" }),
   ).toBe("attending");
+});
+
+test("log choices require attendance evidence while keeping personal reports", () => {
+  for (const attendance of [undefined, "unknown", "declined", "not attending"]) {
+    expect(canSelectForLog({ ...past, attendance }, now)).toBe(false);
+    expect(canSelectForLog({ ...past, attendance, reports: [{} as never] }, now)).toBe(true);
+  }
+  expect(canSelectForLog(past, now)).toBe(true);
+  expect(canSelectForLog({ ...past, kind: "independent", attendance: undefined }, now)).toBe(true);
+  expect(canSelectForLog(future, now)).toBe(false);
 });

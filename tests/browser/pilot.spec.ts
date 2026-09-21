@@ -194,7 +194,6 @@ test("future outing stays forecast-only, past rows sort and saved reports have n
   await expect(options).toHaveText([
     "＋ Independent / unofficial row",
     /Recent practice/,
-    /Older practice/,
   ]);
   await page.getByRole("button", { name: "History", exact: true }).click();
   // R30. A practice the owner declined and never logged leaves the default
@@ -277,13 +276,21 @@ test("past rows mark logged, needs log and a report still on this device", async
   // Direct report actions retain full touch targets.
   const logged = page
     .locator(".outing-card")
-    .filter({ hasText: "Logged practice" });
+    .filter({ has: page.getByRole("heading", { name: "Logged practice", exact: true }) });
   await expect(
     logged.getByRole("button", { name: "Edit report" }),
   ).toBeVisible();
   const trash = logged.getByRole("button", { name: "Delete report" });
   await expect(trash).toBeVisible();
   expect((await trash.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  const summary = logged.locator(".report-summary > span");
+  const markBox = (await summary.nth(0).boundingBox())!;
+  const detailBox = (await summary.nth(1).boundingBox())!;
+  expect(Math.abs(markBox.y + markBox.height / 2 - detailBox.y - detailBox.height / 2)).toBeLessThan(1);
+  const cardBox = (await logged.boundingBox())!;
+  const actionBox = (await logged.locator(".outing-card-actions").boundingBox())!;
+  expect(cardBox.y + cardBox.height - actionBox.y - actionBox.height).toBeLessThanOrEqual(4);
+
   await page.getByRole("button", { name: "Log this row" }).click();
   await page
     .getByRole("button", { name: "Stayed ashore", exact: true })
@@ -343,6 +350,14 @@ test("History filters relevant past rows by type and report status", async ({
         },
         {
           ...base,
+          id: "unknown",
+          title: "Unknown practice",
+          attendance: "unknown",
+          starts_at: "2026-09-13T16:00:00Z",
+          ends_at: "2026-09-13T17:30:00Z",
+        },
+        {
+          ...base,
           id: "single",
           kind: "independent",
           bhc_practice_id: null,
@@ -359,6 +374,14 @@ test("History filters relevant past rows by type and report status", async ({
   await page.getByRole("button", { name: "History", exact: true }).click();
   const titles = page.locator(".outing-card h3");
   await expect(titles).toHaveText(["Sunrise single", "Attending practice"]);
+  const header = page.locator(".history-card-header").first();
+  const meta = header.locator(".row-meta");
+  await expect(meta).toHaveCount(2);
+  for (const item of await meta.all()) {
+    await expect(item).toHaveCSS("font-size", "15px");
+    await expect(item).toHaveCSS("font-weight", "500");
+  }
+  expect((await meta.nth(1).boundingBox())!.y).toBeGreaterThan((await meta.nth(0).boundingBox())!.y);
   await page.locator(".row-filters > summary").click();
   await page.selectOption('label:has-text("Type") select', "Independent");
   await expect(titles).toHaveText(["Sunrise single"]);
@@ -370,6 +393,10 @@ test("History filters relevant past rows by type and report status", async ({
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole("button", { name: "Clear filters" }).click();
   await expect(titles).toHaveText(["Sunrise single", "Attending practice"]);
+  await page.getByRole("button", { name: "Log", exact: true }).click();
+  const options = page.locator("select").first().locator("option");
+  await expect(options).toHaveCount(3);
+  await expect(options).not.toContainText(["Declined practice", "Unknown practice"]);
 });
 
 test("uninstalled iOS explains Home Screen setup before requesting permission", async ({

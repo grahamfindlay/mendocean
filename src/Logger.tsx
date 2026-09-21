@@ -16,7 +16,7 @@ import {
   type Report,
   type ReportInput,
 } from "../shared/domain";
-import { canLog } from "../shared/presentation";
+import { canLog, canSelectForLog } from "../shared/presentation";
 import { useClock } from "./useClock";
 import { clearDraft, draft, flush, stage } from "./outbox";
 export default function Logger({
@@ -110,7 +110,7 @@ export default function Logger({
       .then((v) => {
         if (v) {
           setSelected(
-            outings.some((o) => o.id === v.selected && canLog(o, Date.now()))
+            outings.some((o) => o.id === v.selected && canSelectForLog(o, Date.now()))
               ? v.selected
               : "new",
           );
@@ -301,7 +301,7 @@ export default function Logger({
               {outings
                 .filter(
                   (o) =>
-                    (canLog(o, now) || editing?.outing.id === o.id) &&
+                    (canSelectForLog(o, now) || editing?.outing.id === o.id) &&
                     (!o.reports?.length || editing?.outing.id === o.id),
                 )
                 .sort(
