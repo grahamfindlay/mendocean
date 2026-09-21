@@ -7,7 +7,7 @@ export const DESTINATIONS = [
   { id: "Week", group: "Forecasts" },
   { id: "Rows", group: "Forecasts" },
   { id: "Log", group: null },
-  { id: "My rows", group: null },
+  { id: "History", group: null },
 ] as const;
 export type Destination = (typeof DESTINATIONS)[number]["id"];
 export const FORECASTS = "Forecasts";
@@ -33,3 +33,9 @@ export function isForecast(value: string): boolean {
 /** Keep stored destination IDs compatible while allowing clearer labels. */
 export const destinationLabel = (id: string) =>
   id === "Rows" ? "Scheduled rows" : id;
+
+/** Preserve bookmarks and update-resume positions from before History. */
+export function resolveDestination(value: unknown): Destination | undefined {
+  if (value === "My rows") return "History";
+  return isDestination(value) ? value : undefined;
+}

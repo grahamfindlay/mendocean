@@ -84,8 +84,7 @@ test("independent report requires a boat, allows optional classes, and hides coa
     localStorage.setItem(key, JSON.stringify(outings));
   });
   await page.reload();
-  await page.getByRole("button", { name: "My rows", exact: true }).click();
-  await page.getByRole("button", { name: "Past", exact: true }).click();
+  await page.getByRole("button", { name: "History", exact: true }).click();
   await page.getByRole("button", { name: "Edit report", exact: true }).click();
   await page.getByRole("button", { name: "5 Forced off", exact: true }).click();
   await boat.getByRole("button", { name: "2x", exact: true }).click();
@@ -171,16 +170,10 @@ test("future outing stays forecast-only, past rows sort and saved reports have n
     );
   });
   await page.goto("/?preview=1");
-  await page.getByRole("button", { name: "My rows", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Tomorrow practice" }),
-  ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Log this row" })).toHaveCount(
-    0,
-  );
-  await page
-    .getByRole("button", { name: "View forecast", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Scheduled rows", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Tomorrow practice" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log this row" })).toHaveCount(0);
+  await page.locator(".row-card").filter({ hasText: "Tomorrow practice" }).click();
   await expect(page.locator('.row-card[aria-pressed="true"] h3')).toHaveText(
     "Tomorrow practice",
   );
@@ -203,8 +196,7 @@ test("future outing stays forecast-only, past rows sort and saved reports have n
     /Recent practice/,
     /Older practice/,
   ]);
-  await page.getByRole("button", { name: "My rows", exact: true }).click();
-  await page.getByRole("button", { name: "Past", exact: true }).click();
+  await page.getByRole("button", { name: "History", exact: true }).click();
   // R30. A practice the owner declined and never logged leaves the default
   // set; one they logged stays whatever BHC now says about attendance.
   await expect(page.locator(".outing-card h3")).toHaveText([
@@ -289,8 +281,7 @@ test("past rows mark logged, needs log and a report still on this device", async
     );
   });
   await page.goto("/?preview=1");
-  await page.getByRole("button", { name: "My rows", exact: true }).click();
-  await page.getByRole("button", { name: "Past", exact: true }).click();
+  await page.getByRole("button", { name: "History", exact: true }).click();
   const marks = page.locator(".log-status .log-mark");
   await expect(marks).toHaveText(["Logged", "Needs log"]);
   // Every mark names its state in words. Color alone would leave the three
@@ -317,7 +308,6 @@ test("past rows mark logged, needs log and a report still on this device", async
   await context.setOffline(true);
   await page.getByRole("button", { name: "Save report", exact: true }).click();
   await expect(page.getByText("On this device · 1 pending")).toBeVisible();
-  await page.getByRole("button", { name: "Past", exact: true }).click();
   // A report sitting in the outbox is neither logged nor waiting to be
   // written, and the row it belongs to says so rather than "Needs log".
   await expect(marks).toHaveText(["Logged", "Saved on this device"]);
@@ -328,11 +318,10 @@ test("past rows mark logged, needs log and a report still on this device", async
   // Reconnecting flushes the outbox on its own; the mark follows the upload.
   await context.setOffline(false);
   await expect(page.getByText("On this device · 1 pending")).toHaveCount(0);
-  await page.getByRole("button", { name: "Past", exact: true }).click();
   await expect(marks).toHaveText(["Logged", "Logged"]);
 });
 
-test("upcoming filters narrow by type and attendance without hiding independent rows", async ({
+test("History filters by row type and can include unattended practices", async ({
   page,
 }, testInfo) => {
   const viewport = testInfo.project.use.viewport!;
@@ -357,16 +346,16 @@ test("upcoming filters narrow by type and attendance without hiding independent 
           ...base,
           id: "going",
           title: "Attending practice",
-          starts_at: "2026-09-16T14:00:00Z",
-          ends_at: "2026-09-16T15:30:00Z",
+          starts_at: "2026-09-12T14:00:00Z",
+          ends_at: "2026-09-12T15:30:00Z",
         },
         {
           ...base,
           id: "skipping",
           title: "Declined practice",
           attendance: "declined",
-          starts_at: "2026-09-17T14:00:00Z",
-          ends_at: "2026-09-17T15:30:00Z",
+          starts_at: "2026-09-13T14:00:00Z",
+          ends_at: "2026-09-13T15:30:00Z",
         },
         {
           ...base,
@@ -376,50 +365,29 @@ test("upcoming filters narrow by type and attendance without hiding independent 
           attendance: undefined,
           owner_id: "10000000-0000-4000-8000-000000000001",
           title: "Sunrise single",
-          starts_at: "2026-09-18T11:00:00Z",
-          ends_at: "2026-09-18T12:00:00Z",
+          starts_at: "2026-09-14T11:00:00Z",
+          ends_at: "2026-09-14T12:00:00Z",
         },
       ]),
     );
   });
   await page.goto("/?preview=1");
-  await page.getByRole("button", { name: "My rows", exact: true }).click();
+  await page.getByRole("button", { name: "History", exact: true }).click();
   const titles = page.locator(".outing-card h3");
-  await expect(titles).toHaveText([
-    "Attending practice",
-    "Declined practice",
-    "Sunrise single",
-  ]);
+  await expect(titles).toHaveText(["Sunrise single", "Attending practice"]);
   await page.locator(".row-filters > summary").click();
-  // R29's trap, from the owner's seat: asking for rows they are attending must
-  // not drop the row they scheduled themselves, which carries no BHC value.
-  await page.selectOption('label:has-text("Attendance") select', "Attending");
-  await expect(titles).toHaveText(["Attending practice", "Sunrise single"]);
-  await page.selectOption(
-    'label:has-text("Attendance") select',
-    "Not attending",
-  );
-  await expect(titles).toHaveText(["Declined practice", "Sunrise single"]);
-  // Attendance describes practices, so it is not offered once they are gone.
+  await page.getByRole("checkbox", { name: "Show all practices" }).check();
+  await expect(titles).toHaveText(["Sunrise single", "Declined practice", "Attending practice"]);
   await page.selectOption('label:has-text("Type") select', "Independent");
   await expect(titles).toHaveText(["Sunrise single"]);
-  await expect(page.getByLabel("Attendance")).toHaveCount(0);
   await page.selectOption('label:has-text("Type") select', "Practices");
-  await expect(titles).toHaveText(["Declined practice"]);
-  await page.selectOption('label:has-text("Attendance") select', "Unknown");
+  await expect(titles).toHaveText(["Declined practice", "Attending practice"]);
+  await page.selectOption('label:has-text("Reports") select', "Logged");
   await expect(titles).toHaveCount(0);
-  await expect(
-    page.getByText("No upcoming rows match these filters."),
-  ).toBeVisible();
-  // The panel is open with every control showing: still no page-widening.
-  expect(
-    await page.evaluate(() => ({
-      docWidth: document.documentElement.scrollWidth,
-      innerWidth: window.innerWidth,
-    })),
-  ).toEqual({ docWidth: viewport.width, innerWidth: viewport.width });
+  await expect(page.getByText("No past rows match these filters.")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole("button", { name: "Clear filters" }).click();
-  await expect(titles).toHaveCount(3);
+  await expect(titles).toHaveText(["Sunrise single", "Attending practice"]);
 });
 
 test("uninstalled iOS explains Home Screen setup before requesting permission", async ({
@@ -1030,16 +998,16 @@ test("scheduled filters, card-driven days, and accessible full-day inspection", 
     .getByRole("button", { name: "Scheduled rows", exact: true })
     .click();
   await expect(cards).toHaveCount(1);
-  await page.getByRole("button", { name: "My rows", exact: true }).click();
+  await page.getByRole("button", { name: "History", exact: true }).click();
   await page.getByRole("button", { name: "Forecasts", exact: true }).click();
   await page.getByRole("button", { name: "Scheduled rows", exact: true }).click();
   await expect(cards).toHaveCount(1);
-  await page.getByRole("button", { name: "My rows", exact: true }).click();
-  await page
-    .locator(".outing-card")
-    .filter({ hasText: "Unknown practice" })
-    .getByRole("button", { name: "View forecast", exact: true })
-    .click();
+  await page.getByRole("button", { name: "History", exact: true }).click();
+  await expect(page.locator(".outing-card").filter({ hasText: "Unknown practice" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Forecasts", exact: true }).click();
+  await page.getByRole("button", { name: "Scheduled rows", exact: true }).click();
+  await page.getByRole("checkbox", { name: "Unknown", exact: true }).check();
+  await cards.filter({ hasText: "Unknown practice" }).click();
   await expect(
     page.getByRole("checkbox", { name: "Unknown", exact: true }),
   ).toBeChecked();
@@ -1372,11 +1340,11 @@ test("practice attendance badges open the matching modal without selecting the f
     );
   });
   await page.goto("/?preview=1&tab=Today");
-  for (const surface of ["Today", "Scheduled rows", "My rows"]) {
+  for (const surface of ["Today", "Scheduled rows"]) {
     if (surface !== "Today") {
       await page.getByRole("button", { name: surface, exact: true }).click();
     }
-    if (surface !== "My rows") {
+    {
       await page
         .getByRole("checkbox", { name: "Unknown", exact: true })
         .check();
@@ -1396,9 +1364,7 @@ test("practice attendance badges open the matching modal without selecting the f
       "Not attending",
     ].entries()) {
       const selected =
-        surface === "My rows"
-          ? null
-          : await page.locator('.row-card[aria-pressed="true"]').textContent();
+        await page.locator('.row-card[aria-pressed="true"]').textContent();
       const badge = page.getByRole("button", {
         name: `Practice attendance: ${status}`,
         exact: true,

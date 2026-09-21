@@ -263,7 +263,7 @@ export default function Logger({
       const result = navigator.onLine ? await flush(user) : { remaining: [1] };
       onSaved(
         result.remaining.length
-          ? "Saved on this device. Waiting to upload; you can retry from My rows."
+          ? "Saved on this device. Waiting to upload; you can retry from History."
           : "Report saved.",
       );
     } catch (e) {

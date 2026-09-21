@@ -8,6 +8,8 @@ test("production forecast renders and public navigation works", async ({
   await expect(
     page.getByRole("button", { name: "Forecasts", exact: true }),
   ).toBeVisible();
+  await expect(page.getByRole("button", { name: "History", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "My rows", exact: true })).toHaveCount(0);
   await expect(page.locator("main")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Today", exact: true }),
