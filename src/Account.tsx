@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { Download, X } from "lucide-react";
 import { api, supabase } from "./client";
 import {
   BOAT_CLASSES,
@@ -225,10 +225,12 @@ export function PlanForm({
 export function SettingsForm({
   account,
   onUpdated,
+  onExport,
   onSignOut,
 }: {
   account: AccountData | null;
   onUpdated: () => void;
+  onExport: () => Promise<void>;
   onSignOut: () => void;
 }) {
   const [error, setError] = useState("");
@@ -358,6 +360,18 @@ export function SettingsForm({
           Save preferences
         </button>
       </form>
+      <hr />
+      <h3>Your data</h3>
+      <button className="text-button" disabled={busy} onClick={async () => {
+        setBusy(true);
+        setError("");
+        try { await onExport(); }
+        catch (e) { setError((e as Error).message); }
+        finally { setBusy(false); }
+      }}>
+        <Download size={16} />
+        Export my data
+      </button>
       <hr />
       <UpdateSettings />
       <hr />

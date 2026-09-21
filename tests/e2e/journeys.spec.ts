@@ -143,8 +143,7 @@ test("independent row persists, reloads, edits; unwanted scope field absent", as
   await page.getByRole("button", { name: "Save report", exact: true }).click();
   await expect(page.getByText("2 · Good · east")).toBeVisible();
   await page.reload();
-  await page.getByRole("button", { name: "My rows", exact: true }).click();
-  await page.getByRole("button", { name: "Past", exact: true }).click();
+  await page.getByRole("button", { name: "History", exact: true }).click();
   await expect(page.getByText("2 · Good · east")).toBeVisible();
   await page.getByRole("button", { name: "Edit report", exact: true }).click();
   await page.getByRole("button", { name: "3 Fine", exact: true }).click();
@@ -469,13 +468,11 @@ test("upcoming, past and saved outing actions follow server reminder state", asy
     m.createOuting(actor, { title: "Finished independent", reminder: true }),
   );
   await loggedIn(page);
-  await page.getByRole("button", { name: "My rows", exact: true }).click();
+  await page.getByRole("button", { name: "Scheduled rows", exact: true }).click();
   await expect(page.getByRole("heading", { name: future.title })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Log this row" })).toHaveCount(
-    0,
-  );
-  await expect(page.getByText(/Logging reminder scheduled/)).toBeVisible();
-  await page.getByRole("button", { name: "Past", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Log this row" })).toHaveCount(0);
+  await page.getByRole("button", { name: "History", exact: true }).click();
+  await expect(page.getByRole("heading", { name: future.title })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: past.title })).toBeVisible();
   // Reminder controls live behind the card's More disclosure; its state stays
   // on the face of the card.
@@ -607,8 +604,7 @@ test("partial reminder delivery is visible without implying device registration"
   });
   await tick();
   await loggedIn(page);
-  await page.getByRole("button", { name: "My rows", exact: true }).click();
-  await page.getByRole("button", { name: "Past", exact: true }).click();
+  await page.getByRole("button", { name: "History", exact: true }).click();
   await expect(
     page.getByText("Logging reminder partially sent", { exact: false }),
   ).toBeVisible();
@@ -653,11 +649,11 @@ test("attendance changes persist in BHC, closed windows and uncertain sends stay
   await api(actor, "bhc/connect", { token: syntheticToken });
   await tick();
   await loggedIn(page);
-  await page.getByRole("button", { name: "My rows", exact: true }).click();
-  const card = page.locator(".outing-card").filter({ hasText: p.name });
-  await card.getByRole("button", { name: "More" }).click();
+  await page.getByRole("button", { name: "Scheduled rows", exact: true }).click();
+  await page.getByRole("checkbox", { name: "Unknown", exact: true }).check();
+  const card = page.locator(".scheduled-row-entry").filter({ hasText: p.name });
   await card
-    .getByRole("button", { name: "Change attendance", exact: true })
+    .getByRole("button", { name: /^Practice attendance:/ })
     .click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("Status checked with BHC.")).toBeVisible();
@@ -665,14 +661,12 @@ test("attendance changes persist in BHC, closed windows and uncertain sends stay
   await dialog.getByRole("button", { name: "Save attendance in BHC" }).click();
   await expect(dialog.getByText("Attendance updated in BHC.")).toBeVisible();
   await dialog.getByRole("button", { name: "Close", exact: true }).click();
-  await expect(card.locator(".attendance-badge")).toHaveText("Attending");
+  await expect(card.getByRole("button", { name: /^Practice attendance:/ })).toHaveText("Attending");
   await page.reload();
-  await page.getByRole("button", { name: "My rows", exact: true }).click();
-  await expect(card.locator(".attendance-badge")).toHaveText("Attending");
-  // A reload closes the disclosure again.
-  await card.getByRole("button", { name: "More" }).click();
+  await page.getByRole("button", { name: "Scheduled rows", exact: true }).click();
+  await expect(card.getByRole("button", { name: /^Practice attendance:/ })).toHaveText("Attending");
   await card
-    .getByRole("button", { name: "Change attendance", exact: true })
+    .getByRole("button", { name: /^Practice attendance:/ })
     .click();
   await expect(dialog.getByText("Status checked with BHC.")).toBeVisible();
   await fixtures({ failure: "attendance_unreadable" });
