@@ -67,7 +67,7 @@ export default function ForecastToday({
             onClick={() => setCameraOpen(!cameraOpen)}
           >
             <Camera size={15} aria-hidden="true" />
-            <span>{cameraOpen ? "Hide" : "Camera"}</span>
+            <span>{cameraOpen ? "Hide" : "Webcam"}</span>
           </button>
         </div>
         {current ? (

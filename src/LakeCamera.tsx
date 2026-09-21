@@ -33,6 +33,8 @@ export default function LakeCamera() {
     let failures = 0;
     const controller = new AbortController();
     async function next() {
+      // Visibility effects can be deferred in a background tab, especially WebKit.
+      if (stopped || document.hidden) return;
       const started = performance.now();
       let pendingURL: string | undefined;
       try {
