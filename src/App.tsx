@@ -471,20 +471,6 @@ export default function App() {
           />
         ) : (
           <>
-            <div className="toolbar">
-              <button className="button subtle" onClick={() => {
-                setEditing(undefined);
-                setSelectedOuting(undefined);
-                setTab("Log");
-              }}>
-                <Plus size={16} />
-                Log independent row
-              </button>
-              <button className="text-button" disabled={busy} onClick={() => void act(refresh)}>
-                <RefreshCw size={15} />
-                Refresh
-              </button>
-            </div>
             {!!queue.length && (
               <section className="form-card">
                 <h2>On this device · {queue.length} pending</h2>
@@ -533,7 +519,7 @@ export default function App() {
                 outings={account.outings}
                 queued={queue.map((q) => q.outing.id)}
                 profile={account.profile}
-                onAttendance={setAttendanceOuting}
+                onRefresh={() => void act(refresh)}
                 now={now}
                 user={user.id}
                 filters={rowFilters}

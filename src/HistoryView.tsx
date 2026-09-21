@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   formatDate,
   formatTime,
@@ -12,6 +11,9 @@ import {
   CloudUpload,
   PenLine,
   SlidersHorizontal,
+  RefreshCw,
+  Share,
+  Trash2,
 } from "lucide-react";
 import { visibleOutings, type RowFilters } from "../shared/presentation";
 import {
@@ -20,7 +22,6 @@ import {
   reminderPresentation,
   type ReminderProfile,
 } from "../shared/reminders";
-import { RowCardHeader } from "./RowCardHeader";
 export default function HistoryView({
   outings,
   queued,
@@ -34,7 +35,7 @@ export default function HistoryView({
   onDelete,
   onShare,
   onSettings,
-  onAttendance,
+  onRefresh,
   busy,
 }: {
   outings: Outing[];
@@ -50,90 +51,78 @@ export default function HistoryView({
   onDelete: (report: Report) => void;
   onShare: (outing: Outing) => void;
   onSettings: () => void;
-  onAttendance: (outing: Outing) => void;
+  onRefresh: () => void;
   busy: boolean;
 }) {
-  const [expanded, setExpanded] = useState<string[]>([]);
   const inView: RowFilters = {
     type: filters.type,
     attendance: "All",
     reports: filters.reports,
-    allPractices: filters.allPractices,
+    allPractices: false,
   };
-  const active = [
-    inView.type !== "All",
-    inView.reports !== "All",
-    inView.allPractices,
-  ].filter(Boolean).length;
+  const active = [inView.type !== "All", inView.reports !== "All"].filter(
+    Boolean,
+  ).length;
   const set = (patch: RowFilters) => onFilters({ ...filters, ...patch });
   const visible = visibleOutings(outings, "Past", now, inView);
   const accountBlock = accountReminderBlock(visible, profile, now);
-  // A second pass rather than a flag on the first: the count is only wanted
-  // when the list looks emptier than the owner expects.
-  const hidden = !inView.allPractices
-    ? visibleOutings(outings, "Past", now, { ...inView, allPractices: true })
-        .length - visible.length
-    : 0;
   return (
     <>
-      <details className="row-filters">
-        <summary>
-          <SlidersHorizontal size={15} />
-          Filters{active ? ` · ${active}` : ""}
-          <ChevronDown className="chevron" size={16} />
-        </summary>
-        <div className="row-filter-fields">
-          <label>
-            Type
-            <select
-              value={inView.type}
-              onChange={(e) =>
-                set({ type: e.target.value as RowFilters["type"] })
-              }
-            >
-              {["All", "Practices", "Independent"].map((v) => (
-                <option key={v}>{v}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Reports
-            <select
-              value={inView.reports}
-              onChange={(e) =>
-                set({ reports: e.target.value as RowFilters["reports"] })
-              }
-            >
-              {["All", "Unlogged", "Logged"].map((v) => (
-                <option key={v}>{v}</option>
-              ))}
-            </select>
-          </label>
-          <label className="filter-toggle">
-            <input
-              type="checkbox"
-              checked={!!inView.allPractices}
-              onChange={(e) => set({ allPractices: e.target.checked })}
-            />
-            Show all practices
-          </label>
-          {!!active && (
-            <button
-              className="text-button"
-              onClick={() =>
-                onFilters({
-                  type: "All",
-                  attendance: "All",
-                  reports: "All",
-                  allPractices: false,
-                })
-              }
-            >
-              Clear filters
-            </button>
-          )}
-        </div>
-      </details>
+      <div className="history-toolbar">
+        <details className="row-filters">
+          <summary>
+            <SlidersHorizontal size={15} />
+            Filters{active ? ` · ${active}` : ""}
+            <ChevronDown className="chevron" size={16} />
+          </summary>
+          <div className="row-filter-fields">
+            <label>
+              Type
+              <select
+                value={inView.type}
+                onChange={(e) =>
+                  set({ type: e.target.value as RowFilters["type"] })
+                }
+              >
+                {["All", "Practices", "Independent"].map((v) => (
+                  <option key={v}>{v}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Reports
+              <select
+                value={inView.reports}
+                onChange={(e) =>
+                  set({ reports: e.target.value as RowFilters["reports"] })
+                }
+              >
+                {["All", "Unlogged", "Logged"].map((v) => (
+                  <option key={v}>{v}</option>
+                ))}
+              </select>
+            </label>
+            {!!active && (
+              <button
+                className="text-button"
+                onClick={() =>
+                  onFilters({
+                    type: "All",
+                    attendance: "All",
+                    reports: "All",
+                    allPractices: false,
+                  })
+                }
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        </details>
+        <button className="text-button" disabled={busy} onClick={onRefresh}>
+          <RefreshCw size={15} /> Refresh
+        </button>
+      </div>
       {!visible.length && (
         <p className="empty">
           {active ? "No past rows match these filters." : "No past rows yet."}
@@ -149,14 +138,7 @@ export default function HistoryView({
           </button>
         </p>
       )}
-      {!!hidden && (
-        <p className="help">
-          {hidden === 1
-            ? "1 past practice you did not attend is hidden."
-            : `${hidden} past practices you did not attend are hidden.`}
-        </p>
-      )}
-      <div className="outing-grid">
+      <div className="outing-grid history-grid">
         {visible.map((o) => {
           const report = o.reports?.[0];
           // Three states, never distinguished by color alone. A report held in
@@ -169,34 +151,18 @@ export default function HistoryView({
               ? ("pending" as const)
               : ("needed" as const);
           const reminder = reminderPresentation(o, profile, now);
-          const more =
-            (o.kind === "independent" && o.owner_id === user) ||
-            !!report ||
-            !!reminder;
-          const open = expanded.includes(o.id);
           return (
-            <article className="outing-card" key={o.id}>
-              <RowCardHeader
-                outing={o}
-                showKind
-                attendance={
-                  o.kind === "official" ? (
-                    <button
-                      type="button"
-                      aria-label={`Practice attendance: ${o.attendance === "attending" ? "Attending" : o.attendance === "declined" ? "Not attending" : "Unknown"}`}
-                      aria-haspopup="dialog"
-                      onClick={() => onAttendance(o)}
-                      className={`attendance-badge attendance-${o.attendance || "unknown"}`}
-                    >
-                      {o.attendance === "attending"
-                        ? "Attending"
-                        : o.attendance === "declined"
-                          ? "Not attending"
-                          : "Unknown"}
-                    </button>
-                  ) : undefined
-                }
-              />
+            <article className="outing-card history-card" key={o.id}>
+              <header className="history-card-header">
+                <h3>{o.title}</h3>
+                <span className="row-kind">
+                  {o.kind === "official" ? "Practice" : "Independent"}
+                </span>
+                <div className="row-meta">
+                  {formatDate(o.starts_at)} · {formatTime(o.starts_at)} –{" "}
+                  {formatTime(o.ends_at)}
+                </div>
+              </header>
               {status && (
                 <div className={`report-summary log-status log-${status}`}>
                   <span className="log-mark">
@@ -244,25 +210,30 @@ export default function HistoryView({
                     </button>
                   )
                 )}
-                {more && (
-                  <button
-                    className="text-button subtle-action"
-                    aria-expanded={open}
-                    aria-controls={`more-${o.id}`}
-                    onClick={() =>
-                      setExpanded((ids) =>
-                        open ? ids.filter((id) => id !== o.id) : [...ids, o.id],
-                      )
-                    }
-                  >
-                    More
-                    <ChevronDown
-                      className="card-expand-icon"
-                      size={18}
-                      aria-hidden="true"
-                    />
-                  </button>
-                )}
+                <div className="history-icon-actions">
+                  {o.kind === "independent" && o.owner_id === user && (
+                    <button
+                      className="icon-button"
+                      aria-label="Share row"
+                      title="Share row"
+                      disabled={busy}
+                      onClick={() => onShare(o)}
+                    >
+                      <Share size={17} />
+                    </button>
+                  )}
+                  {report && (
+                    <button
+                      className="icon-button danger"
+                      aria-label="Delete report"
+                      title="Delete report"
+                      disabled={busy}
+                      onClick={() => onDelete(report)}
+                    >
+                      <Trash2 size={17} />
+                    </button>
+                  )}
+                </div>
               </div>
               {/* The state stays on the face of the card; only its controls
                   move, so a scheduled or failed reminder is still legible at a
@@ -284,74 +255,51 @@ export default function HistoryView({
                   )}
                 </p>
               )}
-              {more && open && (
-                <div className="card-more" id={`more-${o.id}`}>
-                  {o.kind === "independent" && o.owner_id === user && (
+              {reminder && !!o.reminder_state?.channels?.length && (
+                <details className="history-reminder-details">
+                  <summary>Reminder delivery</summary>
+                  <div className="reminder-details">
+                    {o.reminder &&
+                      !o.skipped &&
+                      !!o.reminder_state?.channels?.length && (
+                        <ul className="channel-status">
+                          {o.reminder_state.channels.map((c) => (
+                            <li key={c.channel}>
+                              {c.channel === "email" ? "Email" : "Push"}:{" "}
+                              {c.status === "sent"
+                                ? "Sent"
+                                : c.status === "not_requested"
+                                  ? "Not requested for this reminder"
+                                  : c.error === "no_device"
+                                    ? "No registered device"
+                                    : c.error === "quota"
+                                      ? "Sending limit reached"
+                                      : c.status === "retrying"
+                                        ? "Retry scheduled"
+                                        : c.status === "failed"
+                                          ? "Could not send"
+                                          : "Pending"}
+                              {c.channel === "push" &&
+                                c.devices_sent > 0 &&
+                                c.status !== "sent" &&
+                                ` · ${c.devices_sent} device${c.devices_sent === 1 ? "" : "s"} already accepted`}
+                              {c.status === "retrying" &&
+                                (c.error === "no_device" ||
+                                  c.error === "quota") &&
+                                " · Retry scheduled"}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     <div className="card-actions">
-                      <button
-                        className="text-button"
-                        disabled={busy}
-                        onClick={() => onShare(o)}
-                      >
-                        Share
-                      </button>
+                      {o.reminder_state?.channels?.some((c) => c.error) && (
+                        <button className="text-button" onClick={onSettings}>
+                          Reminder settings
+                        </button>
+                      )}
                     </div>
-                  )}
-                  {report && (
-                    <div className="card-actions">
-                      <button
-                        className="text-button danger"
-                        disabled={busy}
-                        onClick={() => onDelete(report)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  )}
-                  {reminder && (
-                    <div className="reminder-details">
-                      {o.reminder &&
-                        !o.skipped &&
-                        !!o.reminder_state?.channels?.length && (
-                          <ul className="channel-status">
-                            {o.reminder_state.channels.map((c) => (
-                              <li key={c.channel}>
-                                {c.channel === "email" ? "Email" : "Push"}:{" "}
-                                {c.status === "sent"
-                                  ? "Sent"
-                                  : c.status === "not_requested"
-                                    ? "Not requested for this reminder"
-                                    : c.error === "no_device"
-                                      ? "No registered device"
-                                      : c.error === "quota"
-                                        ? "Sending limit reached"
-                                        : c.status === "retrying"
-                                          ? "Retry scheduled"
-                                          : c.status === "failed"
-                                            ? "Could not send"
-                                            : "Pending"}
-                                {c.channel === "push" &&
-                                  c.devices_sent > 0 &&
-                                  c.status !== "sent" &&
-                                  ` · ${c.devices_sent} device${c.devices_sent === 1 ? "" : "s"} already accepted`}
-                                {c.status === "retrying" &&
-                                  (c.error === "no_device" ||
-                                    c.error === "quota") &&
-                                  " · Retry scheduled"}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      <div className="card-actions">
-                        {o.reminder_state?.channels?.some((c) => c.error) && (
-                          <button className="text-button" onClick={onSettings}>
-                            Reminder settings
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                  </div>
+                </details>
               )}
             </article>
           );

@@ -474,10 +474,8 @@ test("upcoming, past and saved outing actions follow server reminder state", asy
   await page.getByRole("button", { name: "History", exact: true }).click();
   await expect(page.getByRole("heading", { name: future.title })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: past.title })).toBeVisible();
-  // Reminder controls live behind the card's More disclosure; its state stays
-  // on the face of the card.
+  // Reminder state stays visible without per-row reminder controls.
   const pastCard = page.locator(".outing-card").filter({ hasText: past.title });
-  await pastCard.getByRole("button", { name: "More" }).click();
   await expect(pastCard.getByRole("button", { name: /Remind me/ })).toHaveCount(0);
   await page.getByRole("button", { name: "Log this row" }).click();
   await chooseRow(page);
@@ -608,7 +606,7 @@ test("partial reminder delivery is visible without implying device registration"
   await expect(
     page.getByText("Logging reminder partially sent", { exact: false }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "More" }).first().click();
+  await page.locator(".history-reminder-details > summary").first().click();
   await expect(page.locator(".channel-status")).toContainText("Email: Sent");
   await expect(page.locator(".channel-status")).toContainText(
     "Push: No registered device",
