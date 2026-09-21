@@ -81,8 +81,6 @@ export default function ForecastView({
           expired={expired}
           now={now}
           outings={userId ? outings : []}
-          attendance={attendance}
-          onAttendanceChange={onAttendanceChange}
           onAttendance={onAttendance}
         />
       )}
