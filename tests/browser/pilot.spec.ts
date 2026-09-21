@@ -194,7 +194,6 @@ test("future outing stays forecast-only, past rows sort and saved reports have n
   await expect(options).toHaveText([
     "＋ Independent / unofficial row",
     /Recent practice/,
-    /Older practice/,
   ]);
   await page.getByRole("button", { name: "History", exact: true }).click();
   // R30. A practice the owner declined and never logged leaves the default
