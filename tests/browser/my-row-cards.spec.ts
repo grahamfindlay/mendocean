@@ -85,16 +85,32 @@ test("History shows only past rows, preserves logging actions, and resolves old 
   });
   await page.goto("/?preview=1");
   await page.getByRole("button", { name: "History", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Upcoming", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Past", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Schedule independent row", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Export my data", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Masters Novice & Recreational" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Independent afternoon row" })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Upcoming", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Past", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Schedule independent row", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Export my data", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Masters Novice & Recreational" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Independent afternoon row" }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "Account", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Export my data", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Export my data", exact: true }),
+  ).toBeVisible();
   const downloaded = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export my data", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Export my data", exact: true })
+    .click();
   expect((await downloaded).suggestedFilename()).toBe("mendocean-my-data.json");
   await page.getByRole("button", { name: "Close", exact: true }).click();
   const past = page
@@ -115,11 +131,25 @@ test("History shows only past rows, preserves logging actions, and resolves old 
   await expect(
     unlogged.getByRole("button", { name: "Log this row" }),
   ).toBeVisible();
-  await past.getByRole("button", { name: "More", exact: true }).click();
   await expect(
-    past.getByRole("button", { name: "Delete", exact: true }),
-  ).toBeVisible();
-  await past.getByRole("button", { name: "More", exact: true }).click();
+    page.getByRole("button", { name: "Log independent row", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "More", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator(".attendance-badge")).toHaveCount(0);
+  const deleteReport = past.getByRole("button", {
+    name: "Delete report",
+    exact: true,
+  });
+  await expect(deleteReport).toBeVisible();
+  page.once("dialog", async (dialog) => {
+    expect(dialog.type()).toBe("confirm");
+    expect(dialog.message()).toContain("Delete your report?");
+    await dialog.dismiss();
+  });
+  await deleteReport.click();
+  await expect(past).toContainText("Logged");
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -129,12 +159,23 @@ test("History shows only past rows, preserves logging actions, and resolves old 
     path: testInfo.outputPath("past.png"),
     fullPage: true,
   });
+  page.once("dialog", async (dialog) => {
+    await dialog.accept();
+  });
+  await deleteReport.click();
+  await expect(past).toContainText("Needs log");
+  await expect(deleteReport).toHaveCount(0);
   await unlogged.getByRole("button", { name: "Log this row" }).click();
-  await expect(page.getByRole("combobox", { name: "Which row?" })).toHaveValue("unlogged");
+  await expect(page.getByRole("combobox", { name: "Which row?" })).toHaveValue(
+    "unlogged",
+  );
   await page.goto("/?preview=1&tab=My%20rows");
-  await expect(page.getByRole("button", { name: "History", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(
+    page.getByRole("button", { name: "History", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
   await expect(page.locator(".outing-card")).toHaveCount(2);
   await page.goto("/?preview=1&tab=History");
-  await expect(page.getByRole("button", { name: "History", exact: true })).toHaveAttribute("aria-current", "page");
-
+  await expect(
+    page.getByRole("button", { name: "History", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
 });

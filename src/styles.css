@@ -2102,3 +2102,19 @@ button:hover:not(:disabled) {
 .scheduled-row-entry:has(.scheduled-row-actions button) > .scheduled-row-card > .row-card-header > .scheduled-card-top:nth-of-type(3) {
   padding-right: 40px;
 }
+
+/* History keeps each past row compact without changing scheduled cards. */
+.history-toolbar { display: flex; align-items: flex-start; gap: 16px; }
+.history-toolbar .row-filters { flex: 1; margin: 0; }
+.history-toolbar > .text-button { flex-shrink: 0; }
+.history-grid { margin-top: 12px; gap: 10px; align-items: start; }
+.history-card { padding: 10px 12px; }
+.history-card-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 8px; }
+.history-card-header h3 { margin: 0; flex: 1; overflow-wrap: anywhere; }
+.history-card-header .row-meta { flex-basis: 100%; font-size: 12px; }
+.history-card .report-summary { margin-top: 8px; padding-top: 8px; flex-direction: row; gap: 3px 10px; }
+.history-card .outing-card-actions { margin-top: 0; padding-top: 0; }
+.history-icon-actions { display: flex; margin-left: auto; }
+.history-card .outing-reminder { margin: 0; font-size: 12px; }
+.history-reminder-details { font-size: 12px; margin-top: 4px; }
+.history-reminder-details summary { cursor: pointer; padding: 8px 0; }

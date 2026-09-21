@@ -203,35 +203,22 @@ test("future outing stays forecast-only, past rows sort and saved reports have n
     "Recent practice",
     "Logged practice",
   ]);
-  await expect(page.getByText("Not attending", { exact: true })).toBeVisible();
+  await expect(page.locator(".attendance-badge")).toHaveCount(0);
   // R28. The account-level reason is stated once for the list, and no card
   // carries a reminder sentence explaining a reminder it cannot have.
   await expect(
     page.getByText("Choose a logging reminder channel in Account first."),
   ).toHaveCount(1);
   await expect(page.locator(".outing-reminder")).toHaveCount(0);
-  await expect(
-    page.getByText("1 past practice you did not attend is hidden."),
-  ).toBeVisible();
   await page.locator(".row-filters > summary").click();
-  expect(
-    (await page.locator(".filter-toggle").boundingBox())!.height,
-  ).toBeLessThanOrEqual(32);
-  await page.getByRole("checkbox", { name: "Show all practices" }).check();
-  await expect(page.locator(".outing-card h3")).toHaveText([
-    "Recent practice",
-    "Older practice",
-    "Logged practice",
-  ]);
-  await expect(page.getByText("you did not attend")).toHaveCount(0);
+  await expect(page.getByRole("checkbox", { name: "Show all practices" })).toHaveCount(0);
   // The report filter composes with the default set rather than replacing it.
   await page.selectOption('label:has-text("Reports") select', "Unlogged");
   await expect(page.locator(".row-filters > summary")).toContainText(
-    "Filters · 2",
+    "Filters · 1",
   );
   await expect(page.locator(".outing-card h3")).toHaveText([
     "Recent practice",
-    "Older practice",
   ]);
   await page.getByRole("button", { name: "Clear filters" }).click();
   await expect(page.locator(".row-filters > summary")).toHaveText("Filters");
@@ -287,19 +274,16 @@ test("past rows mark logged, needs log and a report still on this device", async
   // Every mark names its state in words. Color alone would leave the three
   // indistinguishable to anyone who cannot separate them.
   await expect(page.locator(".log-logged svg")).toBeVisible();
-  // R26. One primary action on the face of the card; the rest a tap away,
-  // behind a summary that keeps a full touch target.
+  // Direct report actions retain full touch targets.
   const logged = page
     .locator(".outing-card")
     .filter({ hasText: "Logged practice" });
   await expect(
     logged.getByRole("button", { name: "Edit report" }),
   ).toBeVisible();
-  await expect(logged.getByRole("button", { name: "Delete" })).toBeHidden();
-  const more = logged.getByRole("button", { name: "More" });
-  expect((await more.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-  await more.click();
-  await expect(logged.getByRole("button", { name: "Delete" })).toBeVisible();
+  const trash = logged.getByRole("button", { name: "Delete report" });
+  await expect(trash).toBeVisible();
+  expect((await trash.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await page.getByRole("button", { name: "Log this row" }).click();
   await page
     .getByRole("button", { name: "Stayed ashore", exact: true })
@@ -321,7 +305,7 @@ test("past rows mark logged, needs log and a report still on this device", async
   await expect(marks).toHaveText(["Logged", "Logged"]);
 });
 
-test("History filters by row type and can include unattended practices", async ({
+test("History filters relevant past rows by type and report status", async ({
   page,
 }, testInfo) => {
   const viewport = testInfo.project.use.viewport!;
@@ -376,12 +360,10 @@ test("History filters by row type and can include unattended practices", async (
   const titles = page.locator(".outing-card h3");
   await expect(titles).toHaveText(["Sunrise single", "Attending practice"]);
   await page.locator(".row-filters > summary").click();
-  await page.getByRole("checkbox", { name: "Show all practices" }).check();
-  await expect(titles).toHaveText(["Sunrise single", "Declined practice", "Attending practice"]);
   await page.selectOption('label:has-text("Type") select', "Independent");
   await expect(titles).toHaveText(["Sunrise single"]);
   await page.selectOption('label:has-text("Type") select', "Practices");
-  await expect(titles).toHaveText(["Declined practice", "Attending practice"]);
+  await expect(titles).toHaveText(["Attending practice"]);
   await page.selectOption('label:has-text("Reports") select', "Logged");
   await expect(titles).toHaveCount(0);
   await expect(page.getByText("No past rows match these filters.")).toBeVisible();
