@@ -19,7 +19,7 @@ export async function cameraResponse(
     const saved = await cache?.match(key);
     if (saved) return outgoing(saved);
     const upstream = await upstreamFetch(CAMERA_URL, {
-      redirect: "error",
+      redirect: "manual",
       signal: AbortSignal.any([request.signal, AbortSignal.timeout(8000)]),
     });
     if (
@@ -66,7 +66,11 @@ export async function cameraResponse(
     });
     await cache?.put(key, response.clone());
     return outgoing(response);
-  } catch {
+  } catch (error) {
+    console.error(
+      "Lake camera relay failed",
+      error instanceof Error ? error.message : "Unknown failure",
+    );
     return new Response("Camera temporarily unavailable", {
       status: 502,
       headers: { "Cache-Control": "no-store" },

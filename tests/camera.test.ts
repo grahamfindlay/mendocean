@@ -26,7 +26,7 @@ describe("camera relay", () => {
     expect(fetcher.mock.calls[0][0]).toBe(
       "http://mendota-camera-origin.mendocean.fyi/nph-jpeg.cgi?0",
     );
-    expect(fetcher.mock.calls[0][1]?.redirect).toBe("error");
+    expect(fetcher.mock.calls[0][1]?.redirect).toBe("manual");
     const second = await cameraResponse(request(), cache, fetcher);
     expect(second.headers.get("X-Camera-Fetched-At")).toBe(
       first.headers.get("X-Camera-Fetched-At"),
@@ -42,6 +42,10 @@ describe("camera relay", () => {
       headers: { "content-type": "image/jpeg" },
     }),
     new Response(null, { status: 503 }),
+    new Response(null, {
+      status: 302,
+      headers: { Location: "http://elsewhere.example" },
+    }),
   ])("rejects invalid upstream responses without caching", async (response) => {
     const put = vi.fn();
     const result = await cameraResponse(
