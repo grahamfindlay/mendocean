@@ -16,23 +16,19 @@ import LakeCamera from "./LakeCamera";
 import WeatherChart from "./WeatherChart";
 import { WindCompass, WindSpeed } from "./WindReading";
 import WeatherIcon from "./WeatherIcon";
-import { AttendanceFilters, ScheduledRowCards } from "./ScheduledRowCards";
+import { ScheduledRowCards } from "./ScheduledRowCards";
 
 export default function ForecastToday({
   weather,
   expired,
   now,
   outings,
-  attendance,
-  onAttendanceChange,
   onAttendance,
 }: {
   weather: Forecast;
   expired: boolean;
   now: number;
   outings: Outing[];
-  attendance: string[];
-  onAttendanceChange: (values: string[]) => void;
   onAttendance: (outing: Outing) => void;
 }) {
   const { current } = forecastSamples(weather, now);
@@ -44,7 +40,7 @@ export default function ForecastToday({
     .filter((o) => localDateTime(o.starts_at).startsWith(today))
     .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
   const matching = rows.filter((o) =>
-    attendance.includes(scheduledAttendance(o)),
+    scheduledAttendance(o) === "attending",
   );
   const [cameraOpen, setCameraOpen] = useState(false);
   const [selected, setSelected] = useState("");
@@ -102,27 +98,19 @@ export default function ForecastToday({
         )}
         {cameraOpen && <LakeCamera />}
       </section>
-      {!!rows.length && (
+      {!!matching.length && (
         <section
           className="today-scheduled"
           aria-label="Today's scheduled rows"
         >
-          <div className="today-attendance">
-            <AttendanceFilters
-              attendance={attendance}
-              onAttendanceChange={onAttendanceChange}
-            />
-          </div>
-          {!!matching.length && (
-            <ScheduledRowCards
-              weather={weather}
-              onAttendance={onAttendance}
-              rows={matching}
-              selectedRow={row?.id}
-              onSelectRow={setSelected}
-              expired={expired}
-            />
-          )}
+          <ScheduledRowCards
+            weather={weather}
+            onAttendance={onAttendance}
+            rows={matching}
+            selectedRow={row?.id}
+            onSelectRow={setSelected}
+            expired={expired}
+          />
         </section>
       )}
       <WeatherChart

@@ -1973,9 +1973,6 @@ button:hover:not(:disabled) {
   width: 18px;
   height: 18px;
 }
-.today-attendance {
-  margin: 10px 0;
-}
 .chart-now-marker {
   pointer-events: none;
 }

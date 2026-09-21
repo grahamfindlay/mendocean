@@ -1146,23 +1146,12 @@ test("Today shows only today's rows and keeps its chart and clock marker without
   const surface = page.locator(".chart-surface");
   const domainStart = await surface.getAttribute("data-domain-start");
   await expect(page.locator(".chart-highlight")).toHaveCount(1);
-  await page.getByRole("checkbox", { name: "Unknown", exact: true }).check();
-  await page.locator(".row-card").filter({ hasText: "Later today" }).click();
-  await expect(page.locator(".chart-highlight title")).toContainText("5:00 PM");
+  await expect(page.locator(".attendance-filters")).toHaveCount(0);
+  await expect(page.getByText("Later today")).toHaveCount(0);
   const nowX = await page.locator(".chart-now").getAttribute("x1");
   await page.getByRole("slider").press("End");
   await expect(page.locator(".chart-now")).toHaveAttribute("x1", nowX!);
   await expect(surface).toHaveAttribute("data-domain-start", domainStart!);
-  await page.getByRole("checkbox", { name: "Unknown", exact: true }).uncheck();
-  await page
-    .getByRole("checkbox", { name: "Attending", exact: true })
-    .uncheck();
-  await expect(page.locator(".row-card, .chart-highlight")).toHaveCount(0);
-  await expect(page.getByText(/No rows match|No rows scheduled/)).toHaveCount(
-    0,
-  );
-  await expect(page.locator(".chart-now-marker")).toHaveCount(1);
-  await page.getByRole("checkbox", { name: "Attending", exact: true }).check();
   for (const width of [390, 1280]) {
     await page.setViewportSize({ width, height: 844 });
     await expect
@@ -1176,11 +1165,14 @@ test("Today shows only today's rows and keeps its chart and clock marker without
       fullPage: true,
     });
   }
-  // Clear the preview rows after initialization, without reseeding on reload.
-  await page.evaluate(() =>
-    localStorage.setItem("mendocean-explicit-preview-v1", "[]"),
-  );
-  // Remove the init script by using a fresh page in this context; stored rows remain empty.
+  // Keep today's unknown/declined rows and tomorrow's attending row.
+  await page.evaluate(() => {
+    const key = "mendocean-explicit-preview-v1";
+    const rows = JSON.parse(localStorage.getItem(key)!);
+    rows.find((row: { id: string }) => row.id === "early").attendance = "declined";
+    localStorage.setItem(key, JSON.stringify(rows));
+  });
+  // A fresh page uses the updated rows without rerunning the seed script.
   const emptyPage = await page.context().newPage();
   await emptyPage.clock.install({ time: now - 1000 });
   await emptyPage.clock.pauseAt(now);
@@ -1196,6 +1188,9 @@ test("Today shows only today's rows and keeps its chart and clock marker without
   );
   await emptyPage.goto("/?preview=1&tab=Today");
   await expect(emptyPage.locator(".today-scheduled")).toHaveCount(0);
+  await expect(emptyPage.locator(".attendance-filters, .row-card, .chart-highlight")).toHaveCount(0);
+  await expect(emptyPage.locator(".now-panel + .weather-chart")).toHaveCount(1);
+  await expect(emptyPage.getByText(/No rows match|No rows scheduled/)).toHaveCount(0);
   await expect(emptyPage.locator(".weather-chart")).toHaveCount(1);
   await expect(emptyPage.locator(".chart-now-marker")).toHaveCount(1);
   await expect(emptyPage.locator(".weather-chart")).toContainText(
