@@ -665,6 +665,33 @@ test("touch scrubbing preserves vertical scrolling and releases a cancelled gest
     testInfo.project.name !== "phone",
     "Touch input requires the phone project",
   );
+  // Keep the swipe's full-day forecast independent of the runner's current hour.
+  const now = Date.parse("2026-09-20T12:00:00Z");
+  const start = Date.parse("2026-09-20T05:00:00Z");
+  await page.clock.install({ time: now });
+  const hours = Array.from({ length: 48 }, (_, i) => ({
+    time: new Date(start + i * 3600000).toISOString(),
+    wind: 7,
+    direction: 180,
+    gust: 10,
+    temperature: 65,
+    precipitation: 0,
+    probability: 0,
+    visibility: 16000,
+    code: 0,
+  }));
+  await page.route("**/api/weather", (route) =>
+    route.fulfill({
+      json: {
+        fetched_at: new Date(now).toISOString(),
+        provider: "Test fixture",
+        source_kind: "fixture",
+        model_version: "hannah-1.0.0",
+        current: hours[7],
+        hours,
+      },
+    }),
+  );
   await page.setViewportSize({ width: 390, height: 600 });
   await page.goto("/?tab=Today");
   const chart = page.getByRole("region", { name: "All day", exact: true });

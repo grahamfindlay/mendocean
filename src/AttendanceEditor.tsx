@@ -131,7 +131,7 @@ export default function AttendanceEditor({
               >
                 {COACHES_EMAIL}
               </a>
-              . Nothing is sent until you send it.
+              .
             </p>
           )}
         </>
