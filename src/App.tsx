@@ -434,9 +434,10 @@ export default function App() {
           )
         ) : !user ? (
           <section className="empty-state">
-            <p className="eyebrow">A SMALL EFFORT. A BETTER FORECAST.</p>
-            <h1>Log a row</h1>
-            <p>Sign in to log practices and independent rows.</p>
+            <h1>How was the water?</h1>
+            <p>
+              Your reports help build better wind-wave models and rowing forecasts.
+            </p>
             <button className="button" onClick={() => setAuthOpen(true)}>
               Sign in to log <ArrowUpRight size={16} />
             </button>

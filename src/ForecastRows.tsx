@@ -61,8 +61,6 @@ export default function ForecastRows({
     return (
       <section className="form-card">
         <h2>Sign in to forecast your rows</h2>
-        <p>Scheduled rows and their forecasts need an account.</p>
-        <p>Today and Week stay available without one.</p>
       </section>
     );
   const day = row ? localDateTime(row.starts_at).slice(0, 10) : "";

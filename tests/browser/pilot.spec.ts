@@ -38,7 +38,7 @@ test("public forecast, planner, and invitation boundary", async ({ page }) => {
   ).toBeVisible();
   await expect(
     page.getByText("Today and Week stay available without one."),
-  ).toBeVisible();
+  ).toHaveCount(0);
   // Public forecasts remain reachable through the other forecast tabs.
   await page.getByRole("button", { name: "Week", exact: true }).click();
   await expect(page.locator(".week-card").first()).toBeVisible();
