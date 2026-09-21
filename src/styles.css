@@ -2108,11 +2108,9 @@ button:hover:not(:disabled) {
 .history-toolbar .row-filters { flex: 1; margin: 0; }
 .history-toolbar > .text-button { flex-shrink: 0; }
 .history-grid { margin-top: 12px; gap: 10px; align-items: start; }
-.history-card { padding: 10px 12px; }
-.history-card-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 8px; }
-.history-card-header h3 { margin: 0; flex: 1; overflow-wrap: anywhere; }
-.history-card-header .row-meta { flex-basis: 100%; font-size: 12px; }
-.history-card .report-summary { margin-top: 8px; padding-top: 8px; flex-direction: row; gap: 3px 10px; }
+.history-card { padding: 10px 12px 2px; }
+.history-card-header .scheduled-card-top .row-meta { margin-bottom: 0; }
+.history-card .report-summary { margin-top: 8px; padding-top: 8px; flex-direction: row; align-items: center; line-height: 1.5; gap: 3px 10px; }
 .history-card .outing-card-actions { margin-top: 0; padding-top: 0; }
 .history-icon-actions { display: flex; margin-left: auto; }
 .history-card .outing-reminder { margin: 0; font-size: 12px; }

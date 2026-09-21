@@ -153,14 +153,16 @@ export default function HistoryView({
           const reminder = reminderPresentation(o, profile, now);
           return (
             <article className="outing-card history-card" key={o.id}>
-              <header className="history-card-header">
-                <h3>{o.title}</h3>
-                <span className="row-kind">
-                  {o.kind === "official" ? "Practice" : "Independent"}
-                </span>
+              <header className="row-card-header history-card-header">
                 <div className="row-meta">
                   {formatDate(o.starts_at)} · {formatTime(o.starts_at)} –{" "}
                   {formatTime(o.ends_at)}
+                </div>
+                <div className="scheduled-card-top">
+                  <h3 className="row-meta">{o.title}</h3>
+                  <span className="row-kind">
+                    {o.kind === "official" ? "Practice" : "Independent"}
+                  </span>
                 </div>
               </header>
               {status && (
