@@ -1426,3 +1426,40 @@ test("practice attendance badges open the matching modal without selecting the f
     }
   }
 });
+
+test("scheduled row actions stay separate from expansion and Log opens before start", async ({ page }) => {
+  await page.goto("/?preview=1");
+  await page.evaluate(() => {
+    const make = (id: string, title: string, minutes: number) => ({
+      id, title, kind: "independent", owner_id: "10000000-0000-4000-8000-000000000001",
+      starts_at: new Date(Date.now() + minutes * 60000).toISOString(),
+      ends_at: new Date(Date.now() + (minutes + 90) * 60000).toISOString(),
+      attendance: "attending", reminder: false, planned_boat: "1x", reports: [], version: 1,
+    });
+    localStorage.setItem("mendocean-explicit-preview-v1", JSON.stringify([
+      make("20000000-0000-4000-8000-000000000091", "Early morning independent row", 10),
+      make("20000000-0000-4000-8000-000000000092", "Later row", 30),
+    ]));
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Scheduled rows", exact: true }).click();
+  const card = page.locator(".scheduled-row-entry").filter({ hasText: "Early morning independent row" });
+  await expect(card.getByRole("button", { name: "Share independent row" })).toBeVisible();
+  await expect(card.locator("button button")).toHaveCount(0);
+  await expect(card.getByRole("button", { name: /logging reminder/i })).toHaveCount(0);
+  await page.getByRole("button", { name: "Account", exact: true }).click();
+  await expect(page.getByRole("checkbox", { name: "Pause all logging reminders", exact: true })).toBeVisible();
+  await expect(page.getByText("When do changes take effect?", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(card.locator(".scheduled-row-card")).toHaveAttribute("aria-expanded", "false");
+  await page.screenshot({ path: `test-results/scheduled-actions-${test.info().project.name}.png` });
+  await page.getByRole("button", { name: "Log", exact: true }).click();
+  const rows = page.getByRole("combobox", { name: "Which row?" });
+  await expect(rows.locator("option").filter({ hasText: "Later row" })).toHaveCount(0);
+  await rows.selectOption("20000000-0000-4000-8000-000000000091");
+  await page.getByRole("button", { name: "2 Good", exact: true }).click();
+  await page.getByRole("button", { name: "East", exact: true }).click();
+  await expect(page.getByRole("group", { name: "Select your boat class", exact: true }).getByRole("button", { name: "1x", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Save report", exact: true }).click();
+  await expect(page.getByText("Sample report saved only on this device.")).toBeVisible();
+});

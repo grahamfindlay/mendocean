@@ -8,6 +8,7 @@ import {
   CalendarPlus,
   RefreshCw,
   Settings,
+  Share,
   X,
 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
@@ -303,6 +304,11 @@ export default function App() {
       setBusy(false);
     }
   };
+  const shareRow = (o: Outing) => void act(async () => {
+    const result = await api<{ url: string }>("share", { outing_id: o.id });
+    await navigator.clipboard.writeText(result.url);
+    setMessage("Invitation link copied. It expires in seven days and requires an invited account.");
+  });
   function navigate(name: string) {
     setEditing(undefined);
     setSelectedOuting(undefined);
@@ -406,6 +412,12 @@ export default function App() {
               tab={tab}
               outings={account?.outings || []}
               onSchedule={() => setPlanned(true)}
+              renderRowActions={(o) => o.kind === "independent" && o.owner_id === user?.id ? (
+                <button className="icon-button" aria-label="Share independent row"
+                  title="Copy invitation link" disabled={busy} onClick={() => shareRow(o)}>
+                  <Share size={18} />
+                </button>
+              ) : null}
             />
           ) : (
             <section className="empty-state">
@@ -476,9 +488,6 @@ export default function App() {
         ) : (
           <>
             <div className="page-heading">
-              <div>
-                <h1>My rows</h1>
-              </div>
               {/* Both entries are explicit: "Log" alone reads as recording
                   something that already happened, which left scheduling
                   discoverable only by accident. */}
@@ -622,30 +631,7 @@ export default function App() {
                     }
                   })
                 }
-                onShare={(o) =>
-                  void act(async () => {
-                    const result = await api<{ url: string }>("share", {
-                      outing_id: o.id,
-                    });
-                    await navigator.clipboard.writeText(result.url);
-                    setMessage(
-                      "Invitation link copied. It expires in seven days and requires an invited account.",
-                    );
-                  })
-                }
-                onReminder={(o, action) =>
-                  void act(async () => {
-                    await api("reminder", { outing_id: o.id, action });
-                    setMessage(
-                      action === "skip"
-                        ? "Logging reminder turned off."
-                        : action === "snooze"
-                          ? "Logging reminder scheduled for one hour from now."
-                          : "Logging reminder enabled.",
-                    );
-                    await refresh();
-                  })
-                }
+                onShare={shareRow}
               />
             ) : (
               <p role="status">Loading your rows…</p>

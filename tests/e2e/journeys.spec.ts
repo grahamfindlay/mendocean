@@ -481,12 +481,7 @@ test("upcoming, past and saved outing actions follow server reminder state", asy
   // on the face of the card.
   const pastCard = page.locator(".outing-card").filter({ hasText: past.title });
   await pastCard.getByRole("button", { name: "More" }).click();
-  await pastCard
-    .getByRole("button", { name: "Remind me to log in 1 hour" })
-    .click();
-  await expect(
-    page.getByText("Logging reminder scheduled for one hour from now."),
-  ).toBeVisible();
+  await expect(pastCard.getByRole("button", { name: /Remind me/ })).toHaveCount(0);
   await page.getByRole("button", { name: "Log this row" }).click();
   await chooseRow(page);
   await page.getByRole("button", { name: "Save report", exact: true }).click();
@@ -627,7 +622,7 @@ test("partial reminder delivery is visible without implying device registration"
       name: "Remind me again in 1 hour",
       exact: true,
     }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "Account", exact: true }).click();
   await expect(
     page.getByRole("checkbox", { name: "Email", exact: true }),

@@ -46,7 +46,6 @@ export default function OutingsView({
   onForecast,
   onDelete,
   onShare,
-  onReminder,
   onSettings,
   onAttendance,
   bhcConnected,
@@ -68,7 +67,6 @@ export default function OutingsView({
   onForecast: (outing: Outing) => void;
   onDelete: (report: Report) => void;
   onShare: (outing: Outing) => void;
-  onReminder: (outing: Outing, action: "skip" | "enable" | "snooze") => void;
   onSettings: () => void;
   onAttendance: (outing: Outing) => void;
   bhcConnected: boolean;
@@ -340,7 +338,7 @@ export default function OutingsView({
                   // tapping it would stage a second one under a new submission
                   // id, and both would upload. The queue owns that report until
                   // it lands, including discarding it.
-                  canLog(o, now) &&
+                  view === "Past" && canLog(o, now) &&
                   status !== "pending" && (
                     <button className="text-button" onClick={() => onLog(o)}>
                       Log this row
@@ -461,46 +459,10 @@ export default function OutingsView({
                             ))}
                           </ul>
                         )}
-                      {phase !== "past" && reminder.toggle && (
-                        <small>
-                          To log after the outing, normally 15 minutes after it
-                          ends.
-                        </small>
-                      )}
-                      {reminder.partial && reminder.snooze && (
-                        <small>
-                          Requesting another reminder sends all your selected
-                          channels again.
-                        </small>
-                      )}
                       <div className="card-actions">
                         {o.reminder_state?.channels?.some((c) => c.error) && (
                           <button className="text-button" onClick={onSettings}>
                             Reminder settings
-                          </button>
-                        )}
-                        {reminder.toggle &&
-                          (phase !== "past" ||
-                            (reminder.toggle === "skip" && !reminder.sent)) && (
-                            <button
-                              className="text-button"
-                              disabled={busy}
-                              onClick={() => onReminder(o, reminder.toggle!)}
-                            >
-                              {reminder.toggle === "skip"
-                                ? "Turn off logging reminder"
-                                : "Turn on logging reminder"}
-                            </button>
-                          )}
-                        {reminder.snooze && (
-                          <button
-                            className="text-button"
-                            disabled={busy}
-                            onClick={() => onReminder(o, "snooze")}
-                          >
-                            {reminder.sent || reminder.partial
-                              ? "Remind me again in 1 hour"
-                              : "Remind me to log in 1 hour"}
                           </button>
                         )}
                       </div>

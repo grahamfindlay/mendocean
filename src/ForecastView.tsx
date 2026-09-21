@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useEffect, useState, useRef } from "react";
 import {
   HEURISTIC_VERSION,
@@ -29,6 +30,7 @@ export default function ForecastView({
   userId,
   attendance,
   onAttendanceChange,
+  renderRowActions,
   onAttendance,
 }: {
   weather: Forecast;
@@ -38,6 +40,7 @@ export default function ForecastView({
   now: number;
   selection?: ForecastSelection;
   userId?: string;
+  renderRowActions?: (outing: Outing) => ReactNode;
   attendance: string[];
   onAttendanceChange: (values: string[]) => void;
   onAttendance: (outing: Outing) => void;
@@ -98,6 +101,7 @@ export default function ForecastView({
       {tab === "Rows" && (
         <ForecastRows
           weather={weather}
+          renderRowActions={renderRowActions}
           outings={outings}
           now={now}
           expired={expired}

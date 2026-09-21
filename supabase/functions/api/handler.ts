@@ -1,3 +1,4 @@
+import { canLog } from "../../../shared/presentation.ts";
 import { DEFAULT_WEEK_PERIODS, legacyPeriods, weekPeriodsSchema } from "../../../shared/weekPeriods.ts";
 import { liveProviders, type Providers } from "../_shared/providers.ts";
 import { z } from "zod";
@@ -277,8 +278,8 @@ export function createApiHandler(providers: Providers = liveProviders) {
       if (path === "report") {
         const outing = outingSchema.parse(input.outing);
         const report = reportSchema.parse(input.report);
-        if (Date.parse(report.actual_start || outing.starts_at) > Date.now())
-          throw new HttpError(400, "This outing has not started yet.");
+        if (!canLog({ starts_at: report.actual_start || outing.starts_at }, Date.now()))
+          throw new HttpError(400, "Logging opens 15 minutes before the row starts.");
         if (outing.kind === "independent") {
           const m = check(
             await client

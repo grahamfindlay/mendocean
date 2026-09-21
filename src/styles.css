@@ -2089,3 +2089,16 @@ button:hover:not(:disabled) {
 
 .card-expand-icon { flex-shrink: 0; }
 .outing-card-actions [aria-expanded="true"] .card-expand-icon { transform: rotate(180deg); }
+
+.scheduled-row-actions {
+  position: absolute;
+  top: 39px;
+  right: 12px;
+  display: flex;
+  gap: 2px;
+}
+.scheduled-row-actions .icon-button { min-width: 36px; min-height: 36px; }
+.scheduled-row-entry:has(.scheduled-row-actions button) > .scheduled-row-card > .row-card-header > .row-meta,
+.scheduled-row-entry:has(.scheduled-row-actions button) > .scheduled-row-card > .row-card-header > .scheduled-card-top:nth-of-type(3) {
+  padding-right: 40px;
+}
