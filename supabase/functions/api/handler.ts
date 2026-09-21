@@ -1,3 +1,4 @@
+import { canLog } from "../../../shared/presentation.ts";
 import { DEFAULT_WEEK_PERIODS, legacyPeriods, weekPeriodsSchema } from "../../../shared/weekPeriods.ts";
 import { liveProviders, type Providers } from "../_shared/providers.ts";
 import { z } from "zod";
@@ -208,6 +209,12 @@ export function createApiHandler(providers: Providers = liveProviders) {
       if (path === "admin/outings" && req.method === "GET") {
         if (profile.role !== "admin")
           throw new HttpError(403, "Administrator access required.");
+        const offset = z.coerce
+          .number()
+          .int()
+          .min(0)
+          .max(1_000_000)
+          .parse(new URL(req.url).searchParams.get("offset") ?? 0);
         return json(
           req,
           check(
@@ -217,7 +224,8 @@ export function createApiHandler(providers: Providers = liveProviders) {
                 "id,title,kind,starts_at,ends_at,actual_starts_at,actual_ends_at",
               )
               .order("starts_at", { ascending: false })
-              .limit(200),
+              .order("id", { ascending: false })
+              .range(offset, offset + 199),
           ),
         );
       }
@@ -270,8 +278,8 @@ export function createApiHandler(providers: Providers = liveProviders) {
       if (path === "report") {
         const outing = outingSchema.parse(input.outing);
         const report = reportSchema.parse(input.report);
-        if (Date.parse(report.actual_start || outing.starts_at) > Date.now())
-          throw new HttpError(400, "This outing has not started yet.");
+        if (!canLog({ starts_at: report.actual_start || outing.starts_at }, Date.now()))
+          throw new HttpError(400, "Logging opens 15 minutes before the row starts.");
         if (outing.kind === "independent") {
           const m = check(
             await client

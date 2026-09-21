@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useEffect, useState, useRef } from "react";
 import {
   HEURISTIC_VERSION,
@@ -29,6 +30,8 @@ export default function ForecastView({
   userId,
   attendance,
   onAttendanceChange,
+  renderRowActions,
+  onAttendance,
 }: {
   weather: Forecast;
   tab: string;
@@ -37,8 +40,10 @@ export default function ForecastView({
   now: number;
   selection?: ForecastSelection;
   userId?: string;
+  renderRowActions?: (outing: Outing) => ReactNode;
   attendance: string[];
   onAttendanceChange: (values: string[]) => void;
+  onAttendance: (outing: Outing) => void;
 }) {
   /* Held here rather than in the destination components so the selected row,
      day survive moving between Today, Week and Rows. */
@@ -76,6 +81,7 @@ export default function ForecastView({
           outings={userId ? outings : []}
           attendance={attendance}
           onAttendanceChange={onAttendanceChange}
+          onAttendance={onAttendance}
         />
       )}
       {tab === "Week" && (
@@ -95,6 +101,7 @@ export default function ForecastView({
       {tab === "Rows" && (
         <ForecastRows
           weather={weather}
+          renderRowActions={renderRowActions}
           outings={outings}
           now={now}
           expired={expired}
@@ -103,6 +110,7 @@ export default function ForecastView({
           onSchedule={onSchedule}
           attendance={attendance}
           onAttendanceChange={onAttendanceChange}
+          onAttendance={onAttendance}
           userId={userId}
         />
       )}

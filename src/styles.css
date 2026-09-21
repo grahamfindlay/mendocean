@@ -63,10 +63,22 @@ button:disabled {
   border-bottom: 1px solid var(--line);
 }
 .wordmark {
+  display: inline-block;
   text-decoration: none;
   font-size: 30px;
   font-weight: 700;
   letter-spacing: -1.5px;
+}
+.wordmark-name {
+  display: flex;
+  align-items: baseline;
+  gap: 1px;
+}
+.wordmark-icon {
+  flex-shrink: 0;
+  width: 0.88em;
+  height: 0.64em;
+  fill: #005b45;
 }
 .wordmark span {
   display: block;
@@ -356,6 +368,15 @@ footer {
     padding-bottom: 8px;
   }
 }
+@media (max-width: 380px) {
+  .wordmark {
+    font-size: 24px;
+  }
+  .wordmark span {
+    font-size: 7px;
+    letter-spacing: 0.8px;
+  }
+}
 .setup-note {
   padding: 10px 0;
   font-size: 12px;
@@ -631,16 +652,14 @@ input[type="checkbox"] {
 }
 .outing-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
+  gap: 0.75rem;
   margin: 20px 0 40px;
 }
 .outing-card {
-  padding: 19px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: var(--paper);
-  text-align: left;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 .outing-card p {
   font-size: 13px;
@@ -1314,9 +1333,6 @@ button:hover:not(:disabled) {
     gap: 20px;
     flex-wrap: wrap;
   }
-  .outing-card {
-    padding: 17px;
-  }
   .outing-filters {
     align-items: flex-start;
     flex-direction: column;
@@ -1492,18 +1508,9 @@ button:hover:not(:disabled) {
   background: #235d51;
   color: white;
 }
-.sample-details > summary {
-  cursor: pointer;
-  padding: 1rem 0;
-  font-weight: 600;
-}
+
 .week-grid article { min-width: 0; }
 .week-card { height: 100%; }
-.week-card .practice-window { display: block; margin-top: 12px; }
-.week-card .practice-window + .practice-window {
-  border-top: 1px solid var(--line);
-  padding-top: 12px;
-}
 .window-time {
   display: block;
   white-space: nowrap;
@@ -1590,8 +1597,8 @@ button:hover:not(:disabled) {
   gap: 0.75rem;
   margin-bottom: 1.2rem;
 }
-.row-card {
-  display: block;
+.row-card,
+.outing-card {
   width: 100%;
   border: 1px solid #deddd3;
   border-radius: 10px;
@@ -1599,6 +1606,9 @@ button:hover:not(:disabled) {
   background: var(--paper);
   text-align: left;
   font-size: 0.8rem;
+}
+.row-card {
+  display: block;
   cursor: pointer;
 }
 .row-card[aria-pressed="true"] {
@@ -1776,7 +1786,7 @@ button:hover:not(:disabled) {
   justify-content: space-between;
   gap: 8px;
 }
-.scheduled-row-card .row-meta {
+.row-card-header .row-meta {
   display: block;
   font-size: 15px;
   font-weight: 500;
@@ -1784,7 +1794,7 @@ button:hover:not(:disabled) {
   margin: 0 0 5px;
   line-height: 1.45;
 }
-.scheduled-row-card .attendance-badge {
+.row-card-header .attendance-badge {
   flex-shrink: 0;
   font-size: 11px;
 }
@@ -1805,7 +1815,7 @@ button:hover:not(:disabled) {
 .scheduled-weather-line svg {
   flex: 0 0 20px;
 }
-.scheduled-row-card .wind-speed {
+.scheduled-card-weather .wind-speed {
   font-size: inherit;
   font-weight: inherit;
 }
@@ -2029,3 +2039,66 @@ button:hover:not(:disabled) {
 .week-period-form h3 { font-size: 15px; font-weight: 500; margin: 0 0 12px; }
 .week-period-actions button { appearance: none; border: 1px solid var(--line); border-radius: 7px; padding: 8px 12px; min-height: 44px; background: var(--paper); color: var(--ink); }
 .week-period-actions button[type="submit"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+.chart-window-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  padding: 0;
+  margin: 0 0 14px;
+  list-style: none;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.chart-window-key li { overflow-wrap: anywhere; min-width: 0; }
+.chart-window-key li::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border: 1px dashed #235d51;
+  background: #235d511a;
+}
+
+.scheduled-row-entry { min-width: 0; }
+.scheduled-row-entry > .row-card { height: 100%; }
+.scheduled-row-grid > .scheduled-row-expanded { grid-column: 1 / -1; }
+.scheduled-row-grid > .scheduled-row-expanded > .row-card { height: auto; }
+
+/* Keep attendance and forecast selection as separate native controls. */
+.scheduled-row-entry {
+  position: relative;
+}
+.attendance-placeholder {
+  visibility: hidden;
+}
+.scheduled-attendance-button {
+  position: absolute;
+  top: calc(0.8rem + 1px);
+  right: calc(0.8rem + 1px);
+  font-size: 11px;
+}
+
+.row-card-header { overflow-wrap: anywhere; }
+.row-kind { display: block; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.outing-card .report-summary { margin-top: 12px; padding: 12px 0 0; font-size: 13px; gap: 7px; flex-direction: column; }
+.outing-card-actions { margin-top: auto; padding-top: 12px; align-items: center; justify-content: space-between; gap: 0 12px; }
+.outing-card-actions .subtle-action { margin-left: auto; }
+
+.card-expand-icon { flex-shrink: 0; }
+.outing-card-actions [aria-expanded="true"] .card-expand-icon { transform: rotate(180deg); }
+
+.scheduled-row-actions {
+  position: absolute;
+  top: 39px;
+  right: 12px;
+  display: flex;
+  gap: 2px;
+}
+.scheduled-row-actions .icon-button { min-width: 36px; min-height: 36px; }
+.scheduled-row-entry:has(.scheduled-row-actions button) > .scheduled-row-card > .row-card-header > .row-meta,
+.scheduled-row-entry:has(.scheduled-row-actions button) > .scheduled-row-card > .row-card-header > .scheduled-card-top:nth-of-type(3) {
+  padding-right: 40px;
+}

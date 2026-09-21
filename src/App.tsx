@@ -8,6 +8,7 @@ import {
   CalendarPlus,
   RefreshCw,
   Settings,
+  Share,
   X,
 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
@@ -303,6 +304,11 @@ export default function App() {
       setBusy(false);
     }
   };
+  const shareRow = (o: Outing) => void act(async () => {
+    const result = await api<{ url: string }>("share", { outing_id: o.id });
+    await navigator.clipboard.writeText(result.url);
+    setMessage("Invitation link copied. It expires in seven days and requires an invited account.");
+  });
   function navigate(name: string) {
     setEditing(undefined);
     setSelectedOuting(undefined);
@@ -313,8 +319,14 @@ export default function App() {
     <div className="app-shell">
       <UpdateBanner />
       <header className="site-header">
-        <a className="wordmark" href="/">
-          mendocean<span>LAKE MENDOTA / MADISON, WI</span>
+        <a className="wordmark" href="/" aria-label="Mendocean — Lake Mendota / Madison, WI">
+          <div className="wordmark-name" aria-hidden="true">
+            <svg className="wordmark-icon" viewBox="10 16 44 32" focusable="false">
+              <path d="M10 47 C12 29 18 15 29 17 C25 21 24 28 29 34 C33 21 42 15 52 18 C45 23 46 35 54 47 L43 47 C39 41 37 35 38 29 C34 33 33 39 32 44 L25 44 C20 38 19 33 20 29 C17 35 17 42 17 47 Z" />
+            </svg>
+            endocean
+          </div>
+          <span>LAKE MENDOTA / MADISON, WI</span>
         </a>
         {user ? (
           <button className="button subtle" onClick={() => setSettings(true)}>
@@ -394,11 +406,18 @@ export default function App() {
               selection={forecastSelection}
               attendance={forecastAttendance}
               onAttendanceChange={setForecastAttendance}
+              onAttendance={setAttendanceOuting}
               userId={user?.id}
               weather={weather}
               tab={tab}
               outings={account?.outings || []}
               onSchedule={() => setPlanned(true)}
+              renderRowActions={(o) => o.kind === "independent" && o.owner_id === user?.id ? (
+                <button className="icon-button" aria-label="Share independent row"
+                  title="Copy invitation link" disabled={busy} onClick={() => shareRow(o)}>
+                  <Share size={18} />
+                </button>
+              ) : null}
             />
           ) : (
             <section className="empty-state">
@@ -437,7 +456,6 @@ export default function App() {
             }
             user={user.id}
             outings={account?.outings || []}
-            coaches={account?.coaches || []}
             editing={editing}
             initialOuting={
               account?.outings.some(
@@ -470,9 +488,6 @@ export default function App() {
         ) : (
           <>
             <div className="page-heading">
-              <div>
-                <h1>My rows</h1>
-              </div>
               {/* Both entries are explicit: "Log" alone reads as recording
                   something that already happened, which left scheduling
                   discoverable only by accident. */}
@@ -616,30 +631,7 @@ export default function App() {
                     }
                   })
                 }
-                onShare={(o) =>
-                  void act(async () => {
-                    const result = await api<{ url: string }>("share", {
-                      outing_id: o.id,
-                    });
-                    await navigator.clipboard.writeText(result.url);
-                    setMessage(
-                      "Invitation link copied. It expires in seven days and requires an invited account.",
-                    );
-                  })
-                }
-                onReminder={(o, action) =>
-                  void act(async () => {
-                    await api("reminder", { outing_id: o.id, action });
-                    setMessage(
-                      action === "skip"
-                        ? "Logging reminder turned off."
-                        : action === "snooze"
-                          ? "Logging reminder scheduled for one hour from now."
-                          : "Logging reminder enabled.",
-                    );
-                    await refresh();
-                  })
-                }
+                onShare={shareRow}
               />
             ) : (
               <p role="status">Loading your rows…</p>

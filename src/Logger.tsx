@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, Save } from "lucide-react";
+import { Check, Save } from "lucide-react";
 import {
   BOAT_CLASSES,
   RATINGS,
@@ -11,7 +11,6 @@ import {
   formatTime,
   outingSchema,
   reportSchema,
-  type Coach,
   type Outing,
   type OutingInput,
   type Report,
@@ -23,14 +22,12 @@ import { clearDraft, draft, flush, stage } from "./outbox";
 export default function Logger({
   user,
   outings,
-  coaches,
   editing,
   initialOuting,
   onSaved,
 }: {
   user: string;
   outings: Outing[];
-  coaches: Coach[];
   editing?: { outing: Outing; report: Report };
   initialOuting?: string;
   onSaved: (message: string) => void;
@@ -63,7 +60,9 @@ export default function Logger({
         editing?.outing.ends_at ||
         (initial
           ? new Date(
-              Math.min(Date.parse(initial.ends_at), Date.now()),
+              Date.now() < Date.parse(initial.starts_at) + 60_000
+                ? Date.parse(initial.ends_at)
+                : Math.min(Date.parse(initial.ends_at), Date.now()),
             ).toISOString()
           : undefined) ||
         new Date().toISOString(),
@@ -80,6 +79,7 @@ export default function Logger({
   const [reason, setReason] = useState<ReportInput["reason"]>(
     editing?.report.reason ?? "unknown",
   );
+  // Preserve existing report metadata; BHC planned coaches stay on the linked outing.
   const [coachState, setCoachState] = useState<ReportInput["coach_state"]>(
     editing?.report.coach_state ||
       (initial?.kind === "official" ? "unknown" : "uncoached"),
@@ -92,12 +92,6 @@ export default function Logger({
   );
   const [launched, setLaunched] = useState<ReportInput["launched_boats"]>(
     editing?.report.launched_boats || [],
-  );
-  const [smallest, setSmallest] = useState<number | null>(
-    editing?.report.smallest_boat ?? null,
-  );
-  const [largest, setLargest] = useState<number | null>(
-    editing?.report.largest_boat ?? null,
   );
   const [notes, setNotes] = useState(editing?.report.notes || "");
   const [segments, setSegments] = useState<ReportInput["segments"]>(
@@ -132,8 +126,6 @@ export default function Logger({
           setCoachIds(v.coachIds);
           setCoachCount(v.coachCount);
           setLaunched(v.launched);
-          setSmallest(v.smallest);
-          setLargest(v.largest);
           setNotes(v.notes);
           setSegments(v.segments);
           setRestored(true);
@@ -168,8 +160,6 @@ export default function Logger({
       coachIds,
       coachCount,
       launched,
-      smallest,
-      largest,
       notes,
       segments,
     };
@@ -195,19 +185,10 @@ export default function Logger({
     coachIds,
     coachCount,
     launched,
-    smallest,
-    largest,
     notes,
     segments,
   ]);
   const chosen = outings.find((o) => o.id === selected);
-  const toggleCoach = (id: string) => {
-    const ids = coachIds.includes(id)
-      ? coachIds.filter((c) => c !== id)
-      : [...coachIds, id];
-    setCoachIds(ids);
-    setCoachCount(ids.length || null);
-  };
   function choose(id: string) {
     setSelected(id);
     const o = outings.find((o) => o.id === id);
@@ -215,7 +196,11 @@ export default function Logger({
       setStart(localDateTime(o.starts_at));
       setEnd(
         localDateTime(
-          new Date(Math.min(Date.parse(o.ends_at), Date.now())).toISOString(),
+          new Date(
+            Date.now() < Date.parse(o.starts_at) + 60_000
+              ? Date.parse(o.ends_at)
+              : Math.min(Date.parse(o.ends_at), Date.now()),
+          ).toISOString(),
         ),
       );
       setCoachState(o.kind === "official" ? "unknown" : "uncoached");
@@ -233,6 +218,8 @@ export default function Logger({
     setBusy(true);
     setError("");
     try {
+      if (outcome === "rowed" && !boat)
+        throw new Error("Choose your boat class.");
       const outing: OutingInput =
         chosen ??
         outingSchema.parse({
@@ -244,13 +231,11 @@ export default function Logger({
           planned_boat: boat,
           reminder: false,
         });
-      if (Date.parse(chicagoToISO(start)) > Date.now())
+      if (!canLog({ starts_at: chicagoToISO(start) }, Date.now()))
         throw new Error(
-          "This row has not started yet. Use “Schedule independent row” to schedule it.",
+          "Logging opens 15 minutes before the row starts. Use “Schedule independent row” to schedule it.",
         );
-      const extremes = launched.length
-        ? boatExtremes(launched)
-        : { smallest, largest };
+      const extremes = boatExtremes(launched);
       const report = reportSchema.parse({
         submission_id: crypto.randomUUID(),
         expected_version: editing?.report.version || 0,
@@ -291,8 +276,11 @@ export default function Logger({
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">A SMALL EFFORT. A BETTER FORECAST.</p>
           <h1>{editing ? "Edit your report." : "How was the water?"}</h1>
+          <p className="help">
+            Your reports help build better wind-wave models and rowing
+            forecasts.
+          </p>
         </div>
       </div>
       {restored && (
@@ -416,6 +404,25 @@ export default function Logger({
           )}
           {outcome === "rowed" && (
             <>
+              <fieldset aria-describedby="boat-required">
+                <legend>Select your boat class</legend>
+                <p className="help" id="boat-required">
+                  Required when you row. Select one.
+                </p>
+                <div className="choices wrap">
+                  {BOAT_CLASSES.map((b) => (
+                    <button
+                      type="button"
+                      key={b}
+                      aria-pressed={boat === b}
+                      className={boat === b ? "active" : ""}
+                      onClick={() => setBoat(b)}
+                    >
+                      {b}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
               <fieldset>
                 <legend>How was the water?</legend>
                 <div className="rating-choices">
@@ -454,180 +461,61 @@ export default function Logger({
             </>
           )}
         </section>
-        <details className="form-card" open={!!editing}>
-          <summary>
-            Boats, coaches & more <ChevronDown size={18} />
-          </summary>
-          <p className="help">
-            Optional details help explain why the same wind can mean different
-            things to different crews.
-          </p>
-          {outcome === "rowed" && (
-            <>
-              <label>
-                Your boat
+        {outcome === "rowed" && (
+          <section className="form-card">
+            <fieldset>
+              <legend>All boat classes that launched (optional)</legend>
+              <p className="help">Select any you noticed, if you remember.</p>
+              <div className="choices wrap">
+                {BOAT_CLASSES.map((b) => (
+                  <button
+                    type="button"
+                    key={b}
+                    aria-pressed={launched.includes(b)}
+                    className={launched.includes(b) ? "active" : ""}
+                    onClick={() =>
+                      setLaunched(
+                        launched.includes(b)
+                          ? launched.filter((x) => x !== b)
+                          : [...launched, b],
+                      )
+                    }
+                  >
+                    {b}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          </section>
+        )}
+        {route === "both" && outcome === "rowed" && (
+          <section className="form-card field-grid">
+            {(["east", "west"] as const).map((r) => (
+              <label key={r}>
+                {r === "east" ? "East" : "West"} water (optional)
                 <select
-                  value={boat ?? ""}
+                  value={segments.find((s) => s.route === r)?.rating ?? ""}
                   onChange={(e) =>
-                    setBoat(
-                      (e.target.value as ReportInput["boat_class"]) || null,
-                    )
+                    setSegments([
+                      ...segments.filter((s) => s.route !== r),
+                      ...(e.target.value
+                        ? [{ route: r, rating: Number(e.target.value) }]
+                        : []),
+                    ])
                   }
                 >
-                  <option value="">Unknown / not recorded</option>
-                  {BOAT_CLASSES.map((b) => (
-                    <option key={b}>{b}</option>
+                  <option value="">Not rated separately</option>
+                  {RATINGS.map((s, i) => (
+                    <option key={s} value={i + 1}>
+                      {i + 1} · {s}
+                    </option>
                   ))}
                 </select>
               </label>
-              <fieldset>
-                <legend>Boat classes that actually went out</legend>
-                <div className="choices wrap">
-                  {BOAT_CLASSES.map((b) => (
-                    <button
-                      type="button"
-                      key={b}
-                      aria-pressed={launched.includes(b)}
-                      className={launched.includes(b) ? "active" : ""}
-                      onClick={() =>
-                        setLaunched(
-                          launched.includes(b)
-                            ? launched.filter((x) => x !== b)
-                            : [...launched, b],
-                        )
-                      }
-                    >
-                      {b}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-              {!launched.length && (
-                <div className="field-grid">
-                  <label>
-                    Smallest boat
-                    <select
-                      value={smallest ?? ""}
-                      onChange={(e) =>
-                        setSmallest(Number(e.target.value) || null)
-                      }
-                    >
-                      <option value="">Unknown</option>
-                      {[1, 2, 4, 8].map((n) => (
-                        <option key={n} value={n}>
-                          {n} rower{n > 1 ? "s" : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Biggest boat
-                    <select
-                      value={largest ?? ""}
-                      onChange={(e) =>
-                        setLargest(Number(e.target.value) || null)
-                      }
-                    >
-                      <option value="">Unknown</option>
-                      {[1, 2, 4, 8].map((n) => (
-                        <option key={n} value={n}>
-                          {n} rower{n > 1 ? "s" : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              )}
-            </>
-          )}
-          <label>
-            Coaching
-            <select
-              value={coachState}
-              onChange={(e) => {
-                setCoachState(e.target.value as ReportInput["coach_state"]);
-                setCoachIds([]);
-                setCoachCount(e.target.value === "uncoached" ? 0 : null);
-              }}
-            >
-              <option value="uncoached">N/A — uncoached</option>
-              <option value="known">Coached</option>
-              <option value="unknown">Unknown</option>
-            </select>
-          </label>
-          {coachState === "known" && (
-            <>
-              <fieldset>
-                <legend>Which coaches?</legend>
-                <div className="choices wrap">
-                  {coaches.map((c) => (
-                    <button
-                      type="button"
-                      key={c.id}
-                      aria-pressed={coachIds.includes(c.id)}
-                      className={coachIds.includes(c.id) ? "active" : ""}
-                      onClick={() => toggleCoach(c.id)}
-                    >
-                      {c.name}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-              <label>
-                Coach count{coachIds.length ? " (from your selection)" : ""}
-                <input
-                  type="number"
-                  min="0"
-                  max="30"
-                  value={coachCount ?? ""}
-                  disabled={!!coachIds.length}
-                  onChange={(e) =>
-                    setCoachCount(
-                      e.target.value === "" ? null : Number(e.target.value),
-                    )
-                  }
-                />
-              </label>
-            </>
-          )}
-          {route === "both" && outcome === "rowed" && (
-            <div className="field-grid">
-              {(["east", "west"] as const).map((r) => (
-                <label key={r}>
-                  {r === "east" ? "East" : "West"} water (optional)
-                  <select
-                    value={segments.find((s) => s.route === r)?.rating ?? ""}
-                    onChange={(e) =>
-                      setSegments([
-                        ...segments.filter((s) => s.route !== r),
-                        ...(e.target.value
-                          ? [{ route: r, rating: Number(e.target.value) }]
-                          : []),
-                      ])
-                    }
-                  >
-                    <option value="">Not rated separately</option>
-                    {RATINGS.map((s, i) => (
-                      <option key={s} value={i + 1}>
-                        {i + 1} · {s}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ))}
-            </div>
-          )}
-          <label>
-            Anything else?
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              maxLength={2000}
-              placeholder="Different water on the return, a shortened row…"
-            />
-          </label>
-        </details>
+            ))}
+          </section>
+        )}
+
         {error && (
           <div role="alert" className="alert">
             {error}

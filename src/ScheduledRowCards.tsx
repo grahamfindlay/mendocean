@@ -1,11 +1,8 @@
-import {
-  formatDate,
-  formatTime,
-  type Forecast,
-  type Outing,
-} from "../shared/domain";
+import { type ReactNode, useId } from "react";
+import { type Forecast, type Outing } from "../shared/domain";
 import { summarizeWindow } from "../shared/timeline";
 import { scheduledAttendance } from "../shared/presentation";
+import { RowCardHeader } from "./RowCardHeader";
 import { WindowReading } from "./WindowReading";
 
 const choices = [
@@ -49,14 +46,22 @@ export function ScheduledRowCards({
   rows,
   selectedRow,
   onSelectRow,
+  onAttendance,
   expired,
+  expandedContent,
+  renderRowActions,
 }: {
   weather: Forecast;
   rows: Outing[];
   selectedRow?: string;
   onSelectRow: (id: string) => void;
+  onAttendance: (outing: Outing) => void;
   expired: boolean;
+  expandedContent?: ReactNode;
+  renderRowActions?: (outing: Outing) => ReactNode;
 }) {
+  const id = useId();
+  const expandable = expandedContent !== undefined;
   return (
     <div className="row-grid scheduled-row-grid">
       {rows.map((o) => {
@@ -65,25 +70,56 @@ export function ScheduledRowCards({
           Date.parse(o.starts_at),
           Date.parse(o.ends_at),
         );
+        const attendanceLabel = choices.find(
+          ([v]) => v === scheduledAttendance(o),
+        )![1];
+        const actions = renderRowActions?.(o);
         return (
-          <button
-            className="row-card scheduled-row-card"
+          <article
             key={o.id}
-            aria-pressed={o.id === selectedRow}
-            onClick={() => onSelectRow(o.id)}
+            className={
+              expandable && o.id === selectedRow
+                ? "scheduled-row-entry scheduled-row-expanded"
+                : "scheduled-row-entry"
+            }
           >
-            <span className="scheduled-card-top">
-              <span className="row-meta">{formatDate(o.starts_at)}</span>
-              <span className="attendance-badge">
-                {choices.find(([v]) => v === scheduledAttendance(o))![1]}
-              </span>
-            </span>
-            <span className="row-meta">
-              {formatTime(o.starts_at)} – {formatTime(o.ends_at)}
-            </span>
-            <h3 className="row-meta">{o.title}</h3>
-            <WindowReading summary={summary} expired={expired} />
-          </button>
+            <button
+              className="row-card scheduled-row-card"
+              aria-pressed={o.id === selectedRow}
+              aria-expanded={expandable ? o.id === selectedRow : undefined}
+              aria-controls={expandable ? `${id}-${o.id}` : undefined}
+              onClick={() => onSelectRow(o.id)}
+            >
+              <RowCardHeader
+                outing={o}
+                attendance={
+                  <span
+                    className={`attendance-badge${o.kind === "official" ? " attendance-placeholder" : ""}`}
+                  >
+                    {attendanceLabel}
+                  </span>
+                }
+              />
+              <WindowReading summary={summary} expired={expired} />
+            </button>
+            {o.kind === "official" && (
+              <button
+                type="button"
+                className="attendance-badge scheduled-attendance-button"
+                aria-label={`Practice attendance: ${attendanceLabel}`}
+                aria-haspopup="dialog"
+                onClick={() => onAttendance(o)}
+              >
+                {attendanceLabel}
+              </button>
+            )}
+            {actions && <div className="scheduled-row-actions">{actions}</div>}
+            {expandable && (
+              <div id={`${id}-${o.id}`} hidden={o.id !== selectedRow}>
+                {o.id === selectedRow && expandedContent}
+              </div>
+            )}
+          </article>
         );
       })}
     </div>

@@ -24,6 +24,7 @@ export default function ForecastToday({
   outings,
   attendance,
   onAttendanceChange,
+  onAttendance,
 }: {
   weather: Forecast;
   expired: boolean;
@@ -31,6 +32,7 @@ export default function ForecastToday({
   outings: Outing[];
   attendance: string[];
   onAttendanceChange: (values: string[]) => void;
+  onAttendance: (outing: Outing) => void;
 }) {
   const { current } = forecastSamples(weather, now);
   const today = localDateTime(new Date(now).toISOString()).slice(0, 10);
@@ -99,6 +101,7 @@ export default function ForecastToday({
           {!!matching.length && (
             <ScheduledRowCards
               weather={weather}
+              onAttendance={onAttendance}
               rows={matching}
               selectedRow={row?.id}
               onSelectRow={setSelected}

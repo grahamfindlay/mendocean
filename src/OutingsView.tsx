@@ -27,8 +27,9 @@ import {
   reminderPresentation,
   type ReminderProfile,
 } from "../shared/reminders";
-import { windowSamples, sampleMinutes } from "../shared/timeline";
-import { WindSpeed, Gust } from "./WindReading";
+import { summarizeWindow } from "../shared/timeline";
+import { WindowReading } from "./WindowReading";
+import { RowCardHeader } from "./RowCardHeader";
 export default function OutingsView({
   outings,
   queued,
@@ -45,7 +46,6 @@ export default function OutingsView({
   onForecast,
   onDelete,
   onShare,
-  onReminder,
   onSettings,
   onAttendance,
   bhcConnected,
@@ -67,7 +67,6 @@ export default function OutingsView({
   onForecast: (outing: Outing) => void;
   onDelete: (report: Report) => void;
   onShare: (outing: Outing) => void;
-  onReminder: (outing: Outing, action: "skip" | "enable" | "snooze") => void;
   onSettings: () => void;
   onAttendance: (outing: Outing) => void;
   bhcConnected: boolean;
@@ -245,40 +244,38 @@ export default function OutingsView({
             !!report ||
             !!reminder;
           const open = expanded.includes(o.id);
-          const preview = weather
-            ? windowSamples(
-                weather,
-                Date.parse(o.starts_at),
-                Date.parse(o.starts_at),
-              )
-            : null;
-          const hour = preview?.covered ? preview.samples[0] : undefined;
+          const preview =
+            weather && weatherFreshness(weather.fetched_at, now) !== "expired"
+              ? summarizeWindow(
+                  weather,
+                  Date.parse(o.starts_at),
+                  Date.parse(o.ends_at),
+                )
+              : null;
           return (
             <article className="outing-card" key={o.id}>
-              <div className="card-top">
-                <span className="eyebrow">
-                  {o.kind === "official" ? "PRACTICE" : "INDEPENDENT"}
-                </span>
-                {o.kind === "official" && (
-                  <span
-                    className={`attendance-badge attendance-${o.attendance || "unknown"}`}
-                  >
-                    {o.attendance === "attending"
-                      ? "Attending"
-                      : o.attendance === "declined"
-                        ? "Not attending"
-                        : "Unknown"}
-                  </span>
-                )}
-              </div>
-              <h3>{o.title}</h3>
-              <p>
-                {formatDate(o.starts_at)} · {formatTime(o.starts_at)}–
-                {formatTime(o.ends_at)}
-                {phase === "in_progress" && (
-                  <span className="phase-label"> · In progress</span>
-                )}
-              </p>
+              <RowCardHeader
+                outing={o}
+                showKind
+                inProgress={phase === "in_progress"}
+                attendance={
+                  o.kind === "official" ? (
+                    <button
+                      type="button"
+                      aria-label={`Practice attendance: ${o.attendance === "attending" ? "Attending" : o.attendance === "declined" ? "Not attending" : "Unknown"}`}
+                      aria-haspopup="dialog"
+                      onClick={() => onAttendance(o)}
+                      className={`attendance-badge attendance-${o.attendance || "unknown"}`}
+                    >
+                      {o.attendance === "attending"
+                        ? "Attending"
+                        : o.attendance === "declined"
+                          ? "Not attending"
+                          : "Unknown"}
+                    </button>
+                  ) : undefined
+                }
+              />
               {status && (
                 <div className={`report-summary log-status log-${status}`}>
                   <span className="log-mark">
@@ -307,30 +304,23 @@ export default function OutingsView({
                   {status === "pending" && <span>Waiting to upload.</span>}
                 </div>
               )}
-              {phase !== "past" && (
-                <div className="outing-forecast">
-                  {hour &&
-                  weather &&
-                  weatherFreshness(weather.fetched_at, now) !== "expired" ? (
-                    <>
-                      <small>
-                        {sampleMinutes(hour)}-minute forecast ·{" "}
-                        {formatTime(hour.time)}
-                      </small>
-                      <span>
-                        <WindSpeed hour={hour} /> <Gust value={hour.gust} /> ·{" "}
-                        {hour.temperature?.toFixed(0) ?? "—"}°F
-                      </span>
-                    </>
-                  ) : (
-                    <small>Forecast not available yet.</small>
-                  )}
-                </div>
-              )}
+              {phase !== "past" &&
+                (preview && weather ? (
+                  <WindowReading
+                    summary={preview}
+                    expired={
+                      weatherFreshness(weather.fetched_at, now) === "expired"
+                    }
+                  />
+                ) : (
+                  <div className="scheduled-card-weather">
+                    Forecast not available.
+                  </div>
+                ))}
               {/* One thing to do with this row, plus the forecast it is
                   scheduled against. Everything else is a tap away rather than
                   competing for the card. */}
-              <div className="card-actions">
+              <div className="card-actions outing-card-actions">
                 {phase !== "past" && (
                   <button className="text-button" onClick={() => onForecast(o)}>
                     View forecast
@@ -348,7 +338,7 @@ export default function OutingsView({
                   // tapping it would stage a second one under a new submission
                   // id, and both would upload. The queue owns that report until
                   // it lands, including discarding it.
-                  canLog(o, now) &&
+                  view === "Past" && canLog(o, now) &&
                   status !== "pending" && (
                     <button className="text-button" onClick={() => onLog(o)}>
                       Log this row
@@ -368,8 +358,9 @@ export default function OutingsView({
                   >
                     More
                     <ChevronDown
-                      className={open ? "chevron open" : "chevron"}
-                      size={15}
+                      className="card-expand-icon"
+                      size={18}
+                      aria-hidden="true"
                     />
                   </button>
                 )}
@@ -468,46 +459,10 @@ export default function OutingsView({
                             ))}
                           </ul>
                         )}
-                      {phase !== "past" && reminder.toggle && (
-                        <small>
-                          To log after the outing, normally 15 minutes after it
-                          ends.
-                        </small>
-                      )}
-                      {reminder.partial && reminder.snooze && (
-                        <small>
-                          Requesting another reminder sends all your selected
-                          channels again.
-                        </small>
-                      )}
                       <div className="card-actions">
                         {o.reminder_state?.channels?.some((c) => c.error) && (
                           <button className="text-button" onClick={onSettings}>
                             Reminder settings
-                          </button>
-                        )}
-                        {reminder.toggle &&
-                          (phase !== "past" ||
-                            (reminder.toggle === "skip" && !reminder.sent)) && (
-                            <button
-                              className="text-button"
-                              disabled={busy}
-                              onClick={() => onReminder(o, reminder.toggle!)}
-                            >
-                              {reminder.toggle === "skip"
-                                ? "Turn off logging reminder"
-                                : "Turn on logging reminder"}
-                            </button>
-                          )}
-                        {reminder.snooze && (
-                          <button
-                            className="text-button"
-                            disabled={busy}
-                            onClick={() => onReminder(o, "snooze")}
-                          >
-                            {reminder.sent || reminder.partial
-                              ? "Remind me again in 1 hour"
-                              : "Remind me to log in 1 hour"}
                           </button>
                         )}
                       </div>

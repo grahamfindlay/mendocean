@@ -1,0 +1,137 @@
+/* Week keeps the shared row-card surface and selection treatment. */
+.week-overview .week-card,
+.week-period-headings {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px;
+  align-items: start;
+}
+.week-overview .week-card {
+  min-height: 66px;
+  color: var(--ink);
+}
+.week-date {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+.week-date small {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.week-period-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+.week-overview .week-card .practice-window {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.week-period-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+.week-period-label .window-time {
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 14px;
+  letter-spacing: 0;
+  color: var(--muted);
+  margin: 2px 0 6px;
+}
+.week-card .compact-window-reading {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  gap: 2px;
+  font-size: 12px;
+}
+.week-card .compact-window-reading .scheduled-weather-line {
+  gap: 4px;
+  line-height: 18px;
+  flex-wrap: wrap;
+}
+.week-card .compact-window-reading .scheduled-weather-line svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}
+.week-card .compact-window-reading .wind-speed {
+  font-size: 14px;
+  font-weight: 500;
+}
+.week-card .compact-wind-facts {
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--muted);
+}
+.week-card .window-partial {
+  font-size: 11px;
+  line-height: 14px;
+}
+.week-no-periods {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--muted);
+  align-self: center;
+}
+.week-period-headings {
+  display: none;
+}
+@media (max-width: 650px) {
+  .week-overview .week-grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .week-shared-headings .week-period-headings {
+    display: grid;
+    padding-top: 0;
+    padding-bottom: 4px;
+  }
+  /* Keep each period's label accessible within its day button. */
+  .week-shared-headings .week-card .week-period-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+  .week-shared-headings .week-card {
+    align-items: center;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+}
+@media (max-width: 360px) {
+  .week-overview .week-card,
+  .week-period-headings {
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 7px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .week-period-grid {
+    column-gap: 8px;
+  }
+  .week-card .compact-window-reading .wind-speed {
+    font-size: 13px;
+  }
+}
+
+.week-day-expanded { grid-column: 1 / -1; }
+.week-day-expanded .week-card { height: auto; }

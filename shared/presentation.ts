@@ -13,7 +13,7 @@ export function outingPhase(
       : "past";
 }
 export function canLog(o: Pick<Outing, "starts_at">, now: number) {
-  return Date.parse(o.starts_at) <= now;
+  return Date.parse(o.starts_at) <= now + 15 * 60_000;
 }
 export type RowTypeFilter = "All" | "Practices" | "Independent";
 export type AttendanceFilter =

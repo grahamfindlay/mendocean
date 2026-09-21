@@ -10,6 +10,13 @@ import { weatherDescription } from "../shared/presentation";
 import { WindVector } from "./WindReading";
 import WeatherIcon from "./WeatherIcon";
 
+export interface ChartWindow {
+  id: string;
+  label: string;
+  start: number;
+  end: number;
+}
+
 const left = 8,
   right = 30;
 /** Straight segments preserve peaks; nulls and missing time intervals break paths. */
@@ -45,7 +52,10 @@ export default function WeatherChart({
   expired = false,
   title = "Weather over time",
   showTitle = true,
+  showReading = true,
+  showWindowLegend = true,
   highlight,
+  windows = [],
   probabilityHours = [],
 }: {
   samples: WeatherHour[];
@@ -57,8 +67,12 @@ export default function WeatherChart({
   expired?: boolean;
   title?: string;
   showTitle?: boolean;
+  showReading?: boolean;
+  showWindowLegend?: boolean;
   /** A period to mark, in epoch ms. Drawn behind the series, never inspected. */
   highlight?: [number, number];
+  /** Enabled Week periods for the displayed local day. */
+  windows?: ChartWindow[];
 }) {
   const id = useId();
   const surface = useRef<SVGSVGElement>(null);
@@ -84,8 +98,17 @@ export default function WeatherChart({
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [samples.length > 0]);
-  if (!samples.length && !frozen && (!domain || currentTime === undefined))
+  }, [
+    samples.length > 0,
+    !!domain,
+    currentTime !== undefined,
+    windows.length > 0,
+  ]);
+  if (
+    !samples.length &&
+    !frozen &&
+    (!domain || (currentTime === undefined && !windows.length))
+  )
     return (
       <section className="weather-chart" aria-label={title}>
         {showTitle && <p className="chart-date">{title}</p>}
@@ -213,6 +236,14 @@ export default function WeatherChart({
           { length: W < 400 ? 3 : 5 },
           (_, i) => start + ((end - start) * i) / (W < 400 ? 2 : 4),
         );
+  const markedWindows = windows.filter(
+    (w) =>
+      Number.isFinite(w.start) &&
+      Number.isFinite(w.end) &&
+      Math.min(end, w.end) > Math.max(start, w.start),
+  );
+  const windowDescription = (w: ChartWindow) =>
+    `${w.label}: ${formatTime(new Date(w.start).toISOString())}–${formatTime(new Date(w.end).toISOString())}`;
   const cursor = Math.min(W - right, Math.max(left, x(h.time)));
   const finish = () => {
     pointer.current = null;
@@ -220,24 +251,43 @@ export default function WeatherChart({
   };
   return (
     <section className="weather-chart" aria-label={title}>
-      <header className="chart-header">
-        {showTitle && <p className="chart-date">{title}</p>}
-        {!data.length && <p>Forecast samples unavailable.</p>}
-        <div className="chart-reading" aria-live="polite" aria-atomic="true">
-          <time dateTime={h.time}>{formatTime(h.time)}</time>
-          <span className="chart-primary-reading">
-            {h.wind?.toFixed(0) ?? "—"}{" "}
-            <small>mph · {directionLabel(h.direction)}</small>
-          </span>
-          <span className="chart-secondary-reading">
-            Gusts: {h.gust?.toFixed(0) ?? "—"} mph
-          </span>
-          <span>
-            {h.temperature?.toFixed(0) ?? "—"}°F · {weatherDescription(h.code)}{" "}
-            · {chance ? `${chance.probability}% rain` : "Rain chance unknown"}
-          </span>
-        </div>
-      </header>
+      {(showTitle || showReading || !data.length) && (
+        <header className="chart-header">
+          {showTitle && <p className="chart-date">{title}</p>}
+          {!data.length && <p>Forecast samples unavailable.</p>}
+          {showReading && (
+            <div
+              className="chart-reading"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              <time dateTime={h.time}>{formatTime(h.time)}</time>
+              <span className="chart-primary-reading">
+                {h.wind?.toFixed(0) ?? "—"}{" "}
+                <small>mph · {directionLabel(h.direction)}</small>
+              </span>
+              <span className="chart-secondary-reading">
+                Gusts: {h.gust?.toFixed(0) ?? "—"} mph
+              </span>
+              <span>
+                {h.temperature?.toFixed(0) ?? "—"}°F ·{" "}
+                {weatherDescription(h.code)} ·{" "}
+                {chance ? `${chance.probability}% rain` : "Rain chance unknown"}
+              </span>
+            </div>
+          )}
+        </header>
+      )}
+      {showWindowLegend && markedWindows.length > 0 && (
+        <ul
+          className="chart-window-key"
+          aria-label="Times of interest shown on chart"
+        >
+          {markedWindows.map((w) => (
+            <li key={w.id}>{windowDescription(w)}</li>
+          ))}
+        </ul>
+      )}
       <svg
         ref={surface}
         className="chart-surface"
@@ -341,6 +391,24 @@ export default function WeatherChart({
               </rect>
             );
           })()}
+        {markedWindows.map((w) => (
+          <rect
+            key={w.id}
+            className="chart-highlight chart-period-highlight"
+            data-window-id={w.id}
+            data-start={w.start}
+            data-end={w.end}
+            x={x(Math.max(start, w.start))}
+            y="0"
+            width={Math.max(
+              1,
+              x(Math.min(end, w.end)) - x(Math.max(start, w.start)),
+            )}
+            height="400"
+          >
+            <title>{windowDescription(w)}</title>
+          </rect>
+        ))}
         {ticks.map((t) => (
           <line
             key={t}
