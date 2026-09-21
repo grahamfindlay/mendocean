@@ -134,6 +134,22 @@ test("reports persist, retry once, conflict safely, remain private, and delete",
       .rowCount,
   ).toBe(0);
 });
+test.each([
+  [-10, 200],
+  [10, 200],
+  [16, 400],
+])("logging a row starting in %i minutes returns %i", async (minutes, status) => {
+  const starts = Date.now() + minutes * 60_000;
+  const o = await createOuting(a, {
+    starts_at: new Date(starts).toISOString(),
+    ends_at: new Date(starts + 90 * 60_000).toISOString(),
+  });
+  const response = await api(a, "report", { outing: o, report: row(o) });
+  expect(response.status).toBe(status);
+  expect((await sql.query("select id from reports where outing_id=$1", [o.id])).rowCount)
+    .toBe(status === 200 ? 1 : 0);
+});
+
 test.each(["wind_waves", "non_weather"])(
   "cancellation %s survives API validation and storage",
   async (reason) => {

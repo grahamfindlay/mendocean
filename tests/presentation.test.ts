@@ -33,9 +33,11 @@ const current = outing("2026-09-15T14:00:00Z", "2026-09-15T15:30:00Z");
 const future = outing("2026-09-16T14:00:00Z", "2026-09-16T15:30:00Z");
 const past = outing("2026-09-15T12:00:00Z", "2026-09-15T13:30:00Z");
 const profile = { reminder_channel: "email", reminders_paused: false };
-test("logging begins exactly at start, while Past begins exactly at end", () => {
-  expect(canLog(current, Date.parse(current.starts_at) - 1)).toBe(false);
+test("logging opens 15 minutes before start, while Past begins exactly at end", () => {
+  expect(canLog(current, Date.parse(current.starts_at) - 15 * 60_000 - 1)).toBe(false);
+  expect(canLog(current, Date.parse(current.starts_at) - 15 * 60_000)).toBe(true);
   expect(canLog(current, Date.parse(current.starts_at))).toBe(true);
+  expect(canLog(current, now)).toBe(true);
   expect(outingPhase(current, now)).toBe("in_progress");
   expect(outingPhase(current, Date.parse(current.ends_at))).toBe("past");
   expect(canLog(future, now)).toBe(false);
@@ -310,7 +312,6 @@ test("multiple reminder channels treat an explicit empty selection as off and su
     now,
   );
   expect(state?.text).toBe("Logging reminder partially sent");
-  expect(state?.snooze).toBe(true);
 });
 
 test("scheduled attendance classifies independent rows as attending and missing practices as unknown", () => {

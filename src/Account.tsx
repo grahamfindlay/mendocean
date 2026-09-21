@@ -162,7 +162,7 @@ export function PlanForm({
             starts_at: chicagoToISO(String(f.get("start"))),
             ends_at: chicagoToISO(String(f.get("end"))),
             planned_boat: f.get("boat") || null,
-            reminder: f.get("reminder") === "on",
+            reminder: true,
           });
         } catch (e) {
           setError((e as Error).message);
@@ -214,11 +214,7 @@ export function PlanForm({
           ))}
         </select>
       </label>
-      <label className="checkbox">
-        <input type="checkbox" name="reminder" />
-        Remind me to log, 15 minutes after the row ends
-      </label>
-      <p className="help">Choose email, push, or both in Account.</p>
+      <p className="help">Logging reminders follow your preferences in Account.</p>
       {error && <p className="alert">{error}</p>}
       <button className="button full" disabled={busy}>
         Save row
@@ -350,21 +346,13 @@ export function SettingsForm({
           Choose email, push, or both. Leave both unchecked to turn reminders
           off. Push needs a registered device below.
         </p>
-        <details className="help">
-          <summary>When do changes take effect?</summary>
-          <p>
-            New choices apply to upcoming and unfinished reminders. Only
-            selected channels are used. To repeat a reminder already sent,
-            request another from My rows.
-          </p>
-        </details>
         <label className="checkbox">
           <input
             name="paused"
             type="checkbox"
             defaultChecked={account?.profile.reminders_paused}
           />
-          Pause all reminders
+          Pause all logging reminders
         </label>
         <button className="button" disabled={busy}>
           Save preferences

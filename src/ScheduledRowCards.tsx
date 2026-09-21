@@ -49,6 +49,7 @@ export function ScheduledRowCards({
   onAttendance,
   expired,
   expandedContent,
+  renderRowActions,
 }: {
   weather: Forecast;
   rows: Outing[];
@@ -57,6 +58,7 @@ export function ScheduledRowCards({
   onAttendance: (outing: Outing) => void;
   expired: boolean;
   expandedContent?: ReactNode;
+  renderRowActions?: (outing: Outing) => ReactNode;
 }) {
   const id = useId();
   const expandable = expandedContent !== undefined;
@@ -71,6 +73,7 @@ export function ScheduledRowCards({
         const attendanceLabel = choices.find(
           ([v]) => v === scheduledAttendance(o),
         )![1];
+        const actions = renderRowActions?.(o);
         return (
           <article
             key={o.id}
@@ -110,6 +113,7 @@ export function ScheduledRowCards({
                 {attendanceLabel}
               </button>
             )}
+            {actions && <div className="scheduled-row-actions">{actions}</div>}
             {expandable && (
               <div id={`${id}-${o.id}`} hidden={o.id !== selectedRow}>
                 {o.id === selectedRow && expandedContent}

@@ -103,8 +103,6 @@ export function reminderPresentation(
     partial,
     due: due || undefined,
     sent: on ? sent || undefined : undefined,
-    toggle: on ? ("skip" as const) : ("enable" as const),
-    snooze: !reminderBlock(o, profile, "snooze", now),
   };
 }
 export function reminderEligible(

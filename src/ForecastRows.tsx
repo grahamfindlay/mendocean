@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { CalendarPlus } from "lucide-react";
 import {
@@ -22,6 +23,7 @@ export default function ForecastRows({
   userId,
   attendance,
   onAttendanceChange,
+  renderRowActions,
   onAttendance,
 }: {
   weather: Forecast;
@@ -32,6 +34,7 @@ export default function ForecastRows({
   onSelectRow: (id: string) => void;
   onSchedule: () => void;
   userId?: string;
+  renderRowActions?: (outing: Outing) => ReactNode;
   attendance: string[];
   onAttendanceChange: (values: string[]) => void;
   onAttendance: (outing: Outing) => void;
@@ -107,6 +110,7 @@ export default function ForecastRows({
       ) : (
         <ScheduledRowCards
           weather={weather}
+          renderRowActions={renderRowActions}
           onAttendance={onAttendance}
           rows={matching}
           selectedRow={row?.id}

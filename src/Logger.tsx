@@ -60,7 +60,9 @@ export default function Logger({
         editing?.outing.ends_at ||
         (initial
           ? new Date(
-              Math.min(Date.parse(initial.ends_at), Date.now()),
+              Date.now() < Date.parse(initial.starts_at) + 60_000
+                ? Date.parse(initial.ends_at)
+                : Math.min(Date.parse(initial.ends_at), Date.now()),
             ).toISOString()
           : undefined) ||
         new Date().toISOString(),
@@ -194,7 +196,11 @@ export default function Logger({
       setStart(localDateTime(o.starts_at));
       setEnd(
         localDateTime(
-          new Date(Math.min(Date.parse(o.ends_at), Date.now())).toISOString(),
+          new Date(
+            Date.now() < Date.parse(o.starts_at) + 60_000
+              ? Date.parse(o.ends_at)
+              : Math.min(Date.parse(o.ends_at), Date.now()),
+          ).toISOString(),
         ),
       );
       setCoachState(o.kind === "official" ? "unknown" : "uncoached");
@@ -225,9 +231,9 @@ export default function Logger({
           planned_boat: boat,
           reminder: false,
         });
-      if (Date.parse(chicagoToISO(start)) > Date.now())
+      if (!canLog({ starts_at: chicagoToISO(start) }, Date.now()))
         throw new Error(
-          "This row has not started yet. Use “Schedule independent row” to schedule it.",
+          "Logging opens 15 minutes before the row starts. Use “Schedule independent row” to schedule it.",
         );
       const extremes = boatExtremes(launched);
       const report = reportSchema.parse({
