@@ -1,15 +1,35 @@
-.lake-camera {
-  margin-top: 1rem;
-}
-.lake-camera-actions {
+.now-heading {
   display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
 }
-.lake-camera-actions a,
-.lake-camera-caption {
-  font-size: 0.8rem;
+.lake-camera-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted, #61736d);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+.lake-camera-toggle::before {
+  content: "";
+  position: absolute;
+  inset: -10px -6px;
+}
+.lake-camera-toggle:hover,
+.lake-camera-toggle[aria-expanded="true"] {
+  color: var(--ink, #193e39);
+}
+.lake-camera-toggle:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 5px;
+  border-radius: 2px;
 }
 .lake-camera-image {
   margin-top: 0.75rem;
@@ -25,7 +45,4 @@
   display: block;
   width: 100%;
   height: auto;
-}
-.lake-camera-caption {
-  margin: 0.5rem 0;
 }
