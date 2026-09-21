@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { CalendarPlus } from "lucide-react";
+import { ArrowUpRight, CalendarPlus } from "lucide-react";
 import {
   formatDate,
   localDateTime,
@@ -20,6 +20,7 @@ export default function ForecastRows({
   selectedRow,
   onSelectRow,
   onSchedule,
+  onSignIn,
   userId,
   attendance,
   onAttendanceChange,
@@ -33,6 +34,7 @@ export default function ForecastRows({
   selectedRow: string;
   onSelectRow: (id: string) => void;
   onSchedule: () => void;
+  onSignIn: () => void;
   userId?: string;
   renderRowActions?: (outing: Outing) => ReactNode;
   attendance: string[];
@@ -59,8 +61,17 @@ export default function ForecastRows({
   }, [row]);
   if (!userId)
     return (
-      <section className="form-card">
-        <h2>Sign in to forecast your rows</h2>
+      <section className="empty-state">
+        <h1>Sign in to see scheduled rows</h1>
+        <p>
+          Schedule rows in advance and monitor their forecasts here. Optional
+          Boathouse Connect integration lets you see upcoming practices, their
+          forecasts, and change attendance status without leaving the app.
+        </p>
+        <button className="button" onClick={onSignIn}>
+          Sign in <ArrowUpRight size={16} />
+        </button>
+        <p className="help">The pilot is invitation-only.</p>
       </section>
     );
   const day = row ? localDateTime(row.starts_at).slice(0, 10) : "";

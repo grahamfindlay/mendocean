@@ -34,7 +34,7 @@ test("public forecast, planner, and invitation boundary", async ({ page }) => {
     .getByRole("button", { name: "Scheduled rows", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Sign in to forecast your rows" }),
+    page.getByRole("heading", { name: "Sign in to see scheduled rows" }),
   ).toBeVisible();
   await expect(
     page.getByText("Today and Week stay available without one."),

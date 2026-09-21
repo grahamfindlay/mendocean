@@ -406,6 +406,7 @@ export default function App() {
               tab={tab}
               outings={account?.outings || []}
               onSchedule={() => setPlanned(true)}
+              onSignIn={() => setAuthOpen(true)}
               renderRowActions={(o) => o.kind === "independent" && o.owner_id === user?.id ? (
                 <button className="icon-button" aria-label="Share independent row"
                   title="Copy invitation link" disabled={busy} onClick={() => shareRow(o)}>
@@ -437,9 +438,11 @@ export default function App() {
             <h1>How was the water?</h1>
             <p>
               Your reports help build better wind-wave models and rowing forecasts.
+              Logging takes less than 10 seconds. Receive optional reminders to log
+              after each scheduled row.
             </p>
             <button className="button" onClick={() => setAuthOpen(true)}>
-              Sign in to log <ArrowUpRight size={16} />
+              Sign in <ArrowUpRight size={16} />
             </button>
             <p className="help">The pilot is invitation-only.</p>
           </section>
