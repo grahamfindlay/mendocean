@@ -25,6 +25,7 @@ export default function ForecastView({
   tab,
   outings,
   onSchedule,
+  onSignIn,
   now,
   selection,
   userId,
@@ -37,6 +38,7 @@ export default function ForecastView({
   tab: string;
   outings: Outing[];
   onSchedule: () => void;
+  onSignIn: () => void;
   now: number;
   selection?: ForecastSelection;
   userId?: string;
@@ -108,6 +110,7 @@ export default function ForecastView({
           selectedRow={selectedRow}
           onSelectRow={setSelectedRow}
           onSchedule={onSchedule}
+          onSignIn={onSignIn}
           attendance={attendance}
           onAttendanceChange={onAttendanceChange}
           onAttendance={onAttendance}
