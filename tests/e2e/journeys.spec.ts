@@ -429,9 +429,18 @@ test("push setup explains dismissed permission and tests only the saved device",
   await expect(page.locator(".notice[role=status]")).toContainText(
     "Permission was not granted",
   );
+  // Registration refreshes the account and then verifies this device again.
+  // Wait for both real responses before clicking through the transient state.
+  const refreshed = page.waitForResponse(
+    (r) => r.url().endsWith("/api/account") && r.request().method() === "GET" && r.ok(),
+  );
+  const checked = page.waitForResponse(async (r) =>
+    r.url().endsWith("/api/push/status") && r.ok() && (await r.json()).registered === true,
+  );
   await page
     .getByRole("button", { name: "Enable push on this device", exact: true })
     .click();
+  await Promise.all([refreshed, checked]);
   await expect(page.locator(".notice[role=status]")).toContainText(
     "This device is registered",
   );
