@@ -1,0 +1,36 @@
+name: Weekly owner digest
+on:
+  workflow_dispatch:
+    inputs:
+      preview:
+        description: Preview without sending email
+        type: boolean
+        default: true
+  schedule:
+    # Both offsets cover daylight saving; the script and server check Chicago time.
+    - cron: "5,25,45 13,14 * * 1"
+permissions:
+  contents: read
+concurrency:
+  group: owner-digest
+  cancel-in-progress: false
+jobs:
+  digest:
+    if: vars.OWNER_DIGEST_ENABLED == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      OWNER_DIGEST_SECRET: ${{ secrets.OWNER_DIGEST_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Preview
+        if: github.event_name == 'workflow_dispatch' && inputs.preview
+        run: node scripts/owner-digest.mjs
+      - name: Send during delivery window
+        if: github.event_name != 'workflow_dispatch' || !inputs.preview
+        run: node scripts/owner-digest.mjs --send

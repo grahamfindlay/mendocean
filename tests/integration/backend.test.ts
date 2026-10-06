@@ -21,11 +21,19 @@ import {
   secret,
   type Actor,
 } from "../support/stack";
-let a: Actor, b: Actor, unapproved: Actor;
+let a: Actor, b: Actor, unapproved: Actor, digestOwner: Actor;
 beforeAll(async () => {
   a = await user();
   b = await user();
   unapproved = await user(false);
+  digestOwner = await user();
+  await sql.query(
+    "update auth.users set email='owner@example.test' where id=$1",
+    [digestOwner.id],
+  );
+  await sql.query("update profiles set role='admin' where id=$1", [
+    digestOwner.id,
+  ]);
   await resetJobs();
   await tick();
 });
@@ -42,7 +50,7 @@ beforeEach(async () => {
   );
 });
 afterAll(async () => {
-  await cleanupUsers([a, b, unapproved]);
+  await cleanupUsers([a, b, unapproved, digestOwner]);
   await sql.end();
 });
 const row = (
@@ -70,6 +78,151 @@ test("real Auth invitations and unsigned access boundaries", async () => {
     body: '{"action":"tick"}',
   });
   expect(r.status).toBe(401);
+});
+test("monitoring routes enforce owner, member, monitor and digest boundaries", async () => {
+  for (const path of [
+    "admin/activity",
+    "admin/operations",
+    `admin/timeline?user=${a.id}`,
+  ]) {
+    expect((await api(null, path)).status).toBe(401);
+    expect((await api(b, path)).status).toBe(403);
+  }
+  expect(
+    (await b.client.rpc("monitoring_query", { action: "activity", args: {} }))
+      .error,
+  ).toBeTruthy();
+  await sql.query("update profiles set role='admin' where id=$1", [a.id]);
+  try {
+    const owner = await api(a, "admin/activity");
+    expect(owner.status).toBe(200);
+    expect(owner.data.users.some((u: any) => u.id === b.id)).toBe(true);
+    expect((await api(a, `admin/timeline?user=${b.id}`)).status).toBe(200);
+    expect((await api(a, "admin/activity?days=31")).status).toBe(400);
+  } finally {
+    await sql.query("update profiles set role='member' where id=$1", [a.id]);
+  }
+  await sql.query("delete from private.activity where user_id=$1", [b.id]);
+  await sql.query("delete from private.user_observations where user_id=$1", [
+    b.id,
+  ]);
+  expect((await api(b, "activity/observe", {})).status).toBe(200);
+  expect((await api(b, "activity/observe", {})).status).toBe(200);
+  expect((await api(b, "activity/observe", { notes: "private" })).status).toBe(
+    400,
+  );
+  expect((await api(unapproved, "activity/observe", {})).status).toBe(403);
+  expect(
+    (
+      await sql.query(
+        "select * from private.activity where user_id=$1 and event='app_observed'",
+        [b.id],
+      )
+    ).rowCount,
+  ).toBe(1);
+  const rid = randomUUID();
+  const denied = await fetch(`${url}/functions/v1/api/account`, {
+    headers: { apikey: anon, "X-Request-ID": rid },
+  });
+  expect(denied.headers.get("x-request-id")).toBe(rid);
+  const ready = (credential: string) =>
+    fetch(`${url}/functions/v1/api/monitor/ready`, {
+      headers: { apikey: anon, Authorization: `Bearer ${credential}` },
+    });
+  expect((await ready(secret)).status).toBe(401);
+  expect((await ready(b.token)).status).toBe(401);
+  await sql.query(
+    "update private.monitoring_state set last_tick_started_at=null,last_tick_completed_at=null",
+  );
+  const clockWrite = await db.rpc("monitoring_query", {
+    action: "tick_started",
+    args: { at: new Date().toISOString() },
+  });
+  expect(clockWrite.error).toBeNull();
+  await sql.query(
+    "update private.monitoring_state set last_tick_started_at=null",
+  );
+  await tick();
+  const heartbeat = (
+    await sql.query(
+      "select last_tick_started_at,last_tick_completed_at from private.monitoring_state",
+    )
+  ).rows[0];
+  expect(heartbeat.last_tick_started_at).toBeTruthy();
+  expect(heartbeat.last_tick_completed_at).toBeTruthy();
+  await sql.query(
+    "update private.monitoring_state set last_tick_completed_at=now()",
+  );
+  expect((await ready(`${secret}-monitor`)).status).toBe(200);
+  await sql.query(
+    "update private.monitoring_state set last_tick_completed_at=now()-interval '16 minutes'",
+  );
+  const stale = await ready(`${secret}-monitor`);
+  expect(stale.status).toBe(503);
+  expect(await stale.json()).toEqual({
+    status: "unhealthy",
+    reasons: ["dispatcher_stalled"],
+  });
+  await sql.query(
+    "update private.monitoring_state set last_tick_completed_at=now()",
+  );
+  const digest = (credential: string, body: unknown, fixture = false) =>
+    fetch(`${url}/functions/v1/${fixture ? "digest-fixture" : "jobs"}`, {
+      method: "POST",
+      headers: {
+        apikey: anon,
+        Authorization: `Bearer ${credential}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+  expect(
+    (await digest(secret, { action: "owner-digest", preview: true })).status,
+  ).toBe(400);
+  expect((await digest(`${secret}-digest`, { action: "tick" })).status).toBe(
+    400,
+  );
+  expect(
+    (
+      await digest(`${secret}-monitor`, {
+        action: "owner-digest",
+        preview: true,
+      })
+    ).status,
+  ).toBe(401);
+  expect(
+    (
+      await digest(`${secret}-digest`, {
+        action: "owner-digest",
+        preview: true,
+        to: b.email,
+      })
+    ).status,
+  ).toBe(400);
+  const preview = await digest(`${secret}-digest`, {
+    action: "owner-digest",
+    preview: true,
+  });
+  expect(preview.status).toBe(200);
+  expect((await preview.json()).text).toContain("PostHog summary unavailable");
+  expect((await fixtures()).deliveries).toHaveLength(0);
+  const first = await digest(
+    `${secret}-digest`,
+    { action: "owner-digest", preview: false },
+    true,
+  );
+  expect(first.status).toBe(200);
+  expect((await first.json()).accepted).toBe(true);
+  const again = await digest(
+    `${secret}-digest`,
+    { action: "owner-digest", preview: false },
+    true,
+  );
+  expect((await again.json()).skipped).toBeTruthy();
+  const deliveries = (await fixtures()).deliveries;
+  expect(deliveries).toHaveLength(1);
+  expect(deliveries[0].payload.to).toBe("owner@example.test");
+  expect(deliveries[0].key).toBe("owner-digest:2026-09-28");
 });
 test("reports persist, retry once, conflict safely, remain private, and delete", async () => {
   const o = await createOuting(a);
@@ -1173,34 +1326,75 @@ test("BHC sync lock serializes attendance writes and service RPCs reject ordinar
 test("Week periods persist per account with validated authenticated writes", async () => {
   const initial = await api(a, "week-periods");
   expect(initial.status).toBe(200);
-  expect(initial.data.periods.map((p: any) => p.label)).toEqual(["Early morning", "Evening"]);
-  const periods = [{id: "mid", label: "Mid morning", start: "09:00", end: "11:00", enabled: true}];
-  expect((await api(a, "week-periods", {periods})).status).toBe(200);
+  expect(initial.data.periods.map((p: any) => p.label)).toEqual([
+    "Early morning",
+    "Evening",
+  ]);
+  const periods = [
+    {
+      id: "mid",
+      label: "Mid morning",
+      start: "09:00",
+      end: "11:00",
+      enabled: true,
+    },
+  ];
+  expect((await api(a, "week-periods", { periods })).status).toBe(200);
   expect((await api(a, "week-periods")).data.periods).toEqual(periods);
   expect((await api(b, "week-periods")).data.periods).toHaveLength(2);
-  expect((await api(null, "week-periods", {periods})).status).toBe(401);
-  expect((await api(unapproved, "week-periods", {periods})).status).toBe(403);
-  expect((await api(a, "week-periods", {periods: [{...periods[0], end: "08:00"}]})).status).toBe(400);
-  expect((await api(a, "week-periods", {periods, user_id: b.id})).status).toBe(400);
+  expect((await api(null, "week-periods", { periods })).status).toBe(401);
+  expect((await api(unapproved, "week-periods", { periods })).status).toBe(403);
+  expect(
+    (
+      await api(a, "week-periods", {
+        periods: [{ ...periods[0], end: "08:00" }],
+      })
+    ).status,
+  ).toBe(400);
+  expect(
+    (await api(a, "week-periods", { periods, user_id: b.id })).status,
+  ).toBe(400);
   expect((await api(a, "week-periods")).data.periods).toEqual(periods);
-  expect((await api(a, "week-periods", {periods: []})).status).toBe(200);
+  expect((await api(a, "week-periods", { periods: [] })).status).toBe(200);
   expect((await api(a, "week-periods")).data.periods).toEqual([]);
 });
 
 test("weekday preferences are private, validated, and preserved by older clients", async () => {
-  const base = {id:"weekday-test", label:"Early morning", start:"05:30", end:"07:00", enabled:true};
+  const base = {
+    id: "weekday-test",
+    label: "Early morning",
+    start: "05:30",
+    end: "07:00",
+    enabled: true,
+  };
   // A legacy saved object has no weekdays; the new endpoint supplies every day.
-  await api(a,"week-periods",{periods:[base]});
-  expect((await api(a,"week-periods/v2")).data.periods[0].days).toEqual([0,1,2,3,4,5,6]);
-  const periods = [{...base,days:[0,2,4]}];
-  expect((await api(a,"week-periods/v2",{periods})).status).toBe(200);
-  expect((await api(a,"week-periods/v2")).data.periods).toEqual(periods);
-  expect((await api(b,"week-periods/v2")).data.periods.every((p:any)=>p.days.length===7)).toBe(true);
-  expect((await api(null,"week-periods/v2")).status).toBe(401);
-  expect((await api(unapproved,"week-periods/v2",{periods})).status).toBe(403);
-  for (const days of [[],[0,0],[7],[-1],[1.5]])
-    expect((await api(a,"week-periods/v2",{periods:[{...base,days}]})).status).toBe(400);
-  expect((await api(a,"week-periods")).data.periods).toEqual([base]);
-  expect((await api(a,"week-periods",{periods:[{...base,label:"Dawn"}]})).status).toBe(200);
-  expect((await api(a,"week-periods/v2")).data.periods).toEqual([{...periods[0],label:"Dawn"}]);
+  await api(a, "week-periods", { periods: [base] });
+  expect((await api(a, "week-periods/v2")).data.periods[0].days).toEqual([
+    0, 1, 2, 3, 4, 5, 6,
+  ]);
+  const periods = [{ ...base, days: [0, 2, 4] }];
+  expect((await api(a, "week-periods/v2", { periods })).status).toBe(200);
+  expect((await api(a, "week-periods/v2")).data.periods).toEqual(periods);
+  expect(
+    (await api(b, "week-periods/v2")).data.periods.every(
+      (p: any) => p.days.length === 7,
+    ),
+  ).toBe(true);
+  expect((await api(null, "week-periods/v2")).status).toBe(401);
+  expect((await api(unapproved, "week-periods/v2", { periods })).status).toBe(
+    403,
+  );
+  for (const days of [[], [0, 0], [7], [-1], [1.5]])
+    expect(
+      (await api(a, "week-periods/v2", { periods: [{ ...base, days }] }))
+        .status,
+    ).toBe(400);
+  expect((await api(a, "week-periods")).data.periods).toEqual([base]);
+  expect(
+    (await api(a, "week-periods", { periods: [{ ...base, label: "Dawn" }] }))
+      .status,
+  ).toBe(200);
+  expect((await api(a, "week-periods/v2")).data.periods).toEqual([
+    { ...periods[0], label: "Dawn" },
+  ]);
 });

@@ -9,8 +9,15 @@ export async function previewAPI(path: string, body: any) {
   const outings = load();
   if (path === "week-periods" || path === "week-periods/v2") {
     const key = "mendocean-preview-week-periods";
-    if (body) localStorage.setItem(key, JSON.stringify(weekPeriodsSchema.parse(body.periods)));
-    return { periods: JSON.parse(localStorage.getItem(key) || "null") ?? DEFAULT_WEEK_PERIODS };
+    if (body)
+      localStorage.setItem(
+        key,
+        JSON.stringify(weekPeriodsSchema.parse(body.periods)),
+      );
+    return {
+      periods:
+        JSON.parse(localStorage.getItem(key) || "null") ?? DEFAULT_WEEK_PERIODS,
+    };
   }
   if (path === "account")
     return {
@@ -21,6 +28,7 @@ export async function previewAPI(path: string, body: any) {
         id: `30000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
       })),
       profile: {
+        id: "preview-user",
         display_name: "Sample rower",
         role: "member",
         reminder_channel: "none",

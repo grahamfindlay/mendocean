@@ -1005,6 +1005,40 @@ button:hover:not(:disabled) {
   padding-top: 20px;
   margin-top: 22px;
 }
+.admin-monitor-controls {
+  display: flex;
+  align-items: end;
+  gap: 1rem;
+}
+.admin-monitor-controls label {
+  flex: 1;
+}
+.admin-table-scroll {
+  overflow-x: auto;
+}
+.admin-table-scroll table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.admin-table-scroll th,
+.admin-table-scroll td {
+  text-align: left;
+  padding: 0.6rem;
+  border-bottom: 1px solid #ddd;
+  vertical-align: top;
+  min-width: 8rem;
+}
+.admin-health {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.5rem;
+}
+.admin-health dd {
+  margin: 0;
+}
+.admin-activity small {
+  overflow-wrap: anywhere;
+}
 .admin-tools > summary {
   font-weight: 600;
   cursor: pointer;

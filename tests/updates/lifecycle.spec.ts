@@ -61,6 +61,17 @@ async function signedIn(page: Page) {
     page.getByRole("button", { name: "Account", exact: true }),
   ).toBeVisible();
   await controlled(page);
+  // A controller can arrive before the entry update check settles. Switching
+  // releases at that point can legitimately auto-apply B before the test clicks.
+  await page.getByRole("button", { name: "Account", exact: true }).click();
+  const settings = page.getByRole("region", {
+    name: "App version and updates",
+  });
+  await expect(settings.getByRole("status")).toHaveText("Up to date.");
+  await expect(
+    settings.getByRole("button", { name: "Check for updates", exact: true }),
+  ).toBeEnabled();
+  await closeAccount(page);
 }
 async function check(page: Page) {
   await page.getByRole("button", { name: "Account", exact: true }).click();

@@ -429,9 +429,18 @@ test("push setup explains dismissed permission and tests only the saved device",
   await expect(page.locator(".notice[role=status]")).toContainText(
     "Permission was not granted",
   );
+  // Registration refreshes the account and then verifies this device again.
+  // Wait for both real responses before clicking through the transient state.
+  const refreshed = page.waitForResponse(
+    (r) => r.url().endsWith("/api/account") && r.request().method() === "GET" && r.ok(),
+  );
+  const checked = page.waitForResponse(async (r) =>
+    r.url().endsWith("/api/push/status") && r.ok() && (await r.json()).registered === true,
+  );
   await page
     .getByRole("button", { name: "Enable push on this device", exact: true })
     .click();
+  await Promise.all([refreshed, checked]);
   await expect(page.locator(".notice[role=status]")).toContainText(
     "This device is registered",
   );
@@ -549,6 +558,37 @@ test("Scheduled forecasts remain chart-only when model contexts are available", 
   } finally {
     await sql.query("delete from private.model_runs where id=$1", [id]);
   }
+});
+
+test("owner can inspect activity and operations while members cannot", async ({
+  page,
+}) => {
+  await sql.query("update profiles set role='admin' where id=$1", [actor.id]);
+  await loggedIn(page);
+  await page.getByRole("button", { name: "Account", exact: true }).click();
+  await page.getByText("Pilot administration", { exact: true }).click();
+  const monitoring = page.getByRole("region", {
+    name: "Activity and operations",
+  });
+  await expect(
+    monitoring.getByRole("heading", { name: "Activity", exact: true }),
+  ).toBeVisible();
+  await expect(monitoring.getByText(/approved accounts/)).toBeVisible();
+  await monitoring.getByLabel("Period").selectOption("30");
+  await expect(
+    monitoring.getByRole("button", { name: "Refresh", exact: true }),
+  ).toBeEnabled();
+  await expect(
+    monitoring.getByText("Last completed dispatch", { exact: true }),
+  ).toBeVisible();
+  expect((await api(actor, "admin/operations")).status).toBe(200);
+  await sql.query("update profiles set role='member' where id=$1", [actor.id]);
+  expect((await api(actor, "admin/operations")).status).toBe(403);
+  await page.reload();
+  await page.getByRole("button", { name: "Account", exact: true }).click();
+  await expect(
+    page.getByText("Pilot administration", { exact: true }),
+  ).toHaveCount(0);
 });
 
 test("production timeline offers quarter-hour inspection and selectable daily forecasts", async ({

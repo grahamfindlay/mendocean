@@ -1,5 +1,6 @@
 import { openDB } from "idb";
-import { api, previewMode } from "./client";
+import { api, ApiError, previewMode } from "./client";
+import { track } from "./telemetry";
 import type { OutingInput, ReportInput } from "../shared/domain";
 export interface PendingReport {
   key: string;
@@ -36,6 +37,12 @@ export async function stage(
     report,
     savedAt: new Date().toISOString(),
   });
+  track(
+    "report_queued",
+    { $insert_id: report.submission_id },
+    user,
+    `queued:${user}:${report.submission_id}`,
+  );
 }
 export async function discard(key: string) {
   await (await db).delete("outbox", key);
@@ -54,9 +61,32 @@ export async function flush(user: string) {
   for (const item of items) {
     try {
       await api("report", { outing: item.outing, report: item.report }, user);
+      track(
+        "report_save_confirmed",
+        { $insert_id: item.report.submission_id },
+        user,
+        `confirmed:${user}:${item.report.submission_id}`,
+      );
       await discard(item.key);
       sent++;
     } catch (error) {
+      const category = !navigator.onLine
+        ? "offline"
+        : error instanceof ApiError
+          ? error.status === 409
+            ? "conflict"
+            : [401, 403].includes(error.status)
+              ? "auth"
+              : error.status >= 500
+                ? "server"
+                : "other"
+          : "network";
+      track(
+        "report_upload_failed",
+        { category },
+        user,
+        `upload-failed:${user}:${item.report.submission_id}:${category}`,
+      );
       item.error = error instanceof Error ? error.message : "Upload failed";
       await (await db).put("outbox", item);
       break;

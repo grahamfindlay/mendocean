@@ -1,5 +1,15 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Forecast } from "../shared/domain";
+import { captureFailure } from "./telemetry";
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public requestId: string,
+  ) {
+    super(message);
+  }
+}
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
 export const supabase = url && key ? createClient(url, key) : null;
@@ -30,12 +40,22 @@ export async function api<T>(
       apikey: key,
       Authorization: `Bearer ${session?.access_token || key}`,
       "Content-Type": "application/json",
+      "X-Request-ID": crypto.randomUUID(),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await response.json();
-  if (!response.ok)
-    throw new Error(data.error || "Unable to complete this request.");
+  if (!response.ok) {
+    const requestId = response.headers.get("X-Request-ID") || "";
+    const error = new ApiError(
+      data.error || "Unable to complete this request.",
+      response.status,
+      requestId,
+    );
+    if (response.status >= 500 && path !== "activity/observe")
+      captureFailure(error, "api", requestId, session?.user.id ?? null);
+    throw error;
+  }
   return data as T;
 }
 export async function getWeather(): Promise<Forecast> {

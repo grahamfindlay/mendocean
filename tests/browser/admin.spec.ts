@@ -56,7 +56,34 @@ async function mount(
     const url = new URL(route.request().url());
     const path = url.pathname.replace("/__admin/", "") + url.search;
     await route.fulfill({
-      json: await reply(path, route.request().postDataJSON()),
+      json: path.startsWith("admin/activity?")
+        ? {
+            started_at: "2026-10-06T00:00:00Z",
+            days: 7,
+            users: [],
+            summary: {
+              active_users: 0,
+              returning_users: 0,
+              reports_created: 0,
+              contributors: 0,
+            },
+          }
+        : path === "admin/operations"
+          ? {
+              started_at: "2026-10-06T00:00:00Z",
+              last_weather: null,
+              last_tick_started_at: null,
+              last_tick_completed_at: null,
+              overdue_jobs: 0,
+              retries_24h: 0,
+              failed_jobs_24h: 0,
+              api_failures_15m: 0,
+              api_affected_users_15m: 0,
+              bhc_problems: 0,
+              reminder_problems: 0,
+              recent_events: [],
+            }
+          : await reply(path, route.request().postDataJSON()),
     });
   });
   await page.goto("/");
