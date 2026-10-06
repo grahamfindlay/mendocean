@@ -155,6 +155,9 @@ export function filterEvent(
             .slice(0, 20)
             .map((f: Properties) => ({
               platform: "web:javascript",
+              // Required by PostHog's frame parser; never retain raw function names.
+              function: "?",
+              in_app: true,
               filename: f.filename,
               ...(Number.isSafeInteger(f.lineno) && Number(f.lineno) > 0
                 ? { lineno: f.lineno }
