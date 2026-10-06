@@ -87,6 +87,8 @@ try {
       verify_ssl: true,
       follow_redirects: false,
       email: true,
+      // Route to the verified Mendocean team even when its on-call schedule is empty.
+      team_wait: 0,
       sms: false,
       call: false,
       push: false,

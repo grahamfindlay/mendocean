@@ -36,7 +36,7 @@ try {
     throw new Error(
       "Set PostHog project ID, supported host, and comma-separated owner UUIDs",
     );
-  const exclude = `distinct_id NOT IN (${owners.map((id) => `'${id}'`).join(",")})`;
+  const exclude = `distinct_id NOT IN (${owners.map((id) => `'${id}'`).join(",")}) AND coalesce(properties.build, '') NOT LIKE 'monitoring-acceptance-%'`;
   const signed = `properties.signed_in = true AND ${exclude}`;
   const definitions = [
     {
@@ -73,7 +73,7 @@ try {
     {
       name: "Mendocean \u00b7 Consecutive-week users",
       description:
-        "Observed signed-in people active in both a calendar week and its predecessor. Owner excluded. Derived from the explicit app event contract; collection has not started.",
+        "Observed signed-in people active in both a calendar week and its predecessor. Owner excluded. Derived from the explicit app event contract. Setup validation builds excluded.",
       query: {
         kind: "DataVisualizationNode",
         display: "ActionsTable",
@@ -87,7 +87,7 @@ try {
     {
       name: "Mendocean \u00b7 Forecast destinations",
       description:
-        "Observed views of Today, Week and Rows, split by sign-in state. Owner excluded. Analytics has not been activated yet.",
+        "Observed views of Today, Week and Rows, split by sign-in state. Owner excluded. Setup validation builds excluded.",
       query: {
         kind: "InsightVizNode",
         source: {
@@ -167,7 +167,7 @@ try {
     {
       name: "Mendocean \u00b7 Errors by build",
       description:
-        "Sanitized exceptions and observed affected people by deployed build over 30 days. Owner excluded. Error collection is not activated yet.",
+        "Sanitized exceptions and observed affected people by deployed build over 30 days. Owner excluded. Setup validation builds excluded.",
       query: {
         kind: "InsightVizNode",
         source: {

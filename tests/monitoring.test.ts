@@ -113,6 +113,7 @@ describe("telemetry privacy and identity", () => {
                   lineno: 10,
                   colno: 20,
                   chunk_id: "chunk-123",
+                  function: "private-report-function",
                   vars: { token: "private-token" },
                   context_line: "private-report",
                 },
@@ -129,6 +130,17 @@ describe("telemetry privacy and identity", () => {
     expect(JSON.stringify(event)).not.toContain("private-");
     expect(JSON.stringify(event)).toContain("chunk-123");
     expect(event?.properties.$release_id).toBe("release-123");
+    expect((event?.properties.$exception_list as any)[0].stacktrace.frames).toEqual([
+      {
+        platform: "web:javascript",
+        function: "?",
+        in_app: true,
+        filename: "https://mendocean.fyi/assets/main-abc.js",
+        lineno: 10,
+        colno: 20,
+        chunk_id: "chunk-123",
+      },
+    ]);
   });
   it("resets identities, suppresses old account completions, and deduplicates retries", () => {
     const sink = {
