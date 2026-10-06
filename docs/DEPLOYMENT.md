@@ -2,6 +2,8 @@
 
 See [current deployment status](DEPLOYMENT_STATUS.md) before repeating setup steps.
 
+For activity, browser diagnostics, external health checks and the weekly owner digest, see the [monitoring setup and recovery runbook](MONITORING.md).
+
 ## 1. Supabase project
 
 Create a free project named **mendocean** in a nearby US region. Enable Data API, disable automatically exposing new tables, and enable automatic RLS. Save the database password in a password manager. GitHub linking is optional and is not needed here.

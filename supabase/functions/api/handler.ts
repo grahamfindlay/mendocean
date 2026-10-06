@@ -28,13 +28,50 @@ import {
   reminderChannels,
 } from "../../../shared/reminders.ts";
 import { weatherFeatures } from "../_shared/weather.ts";
+import { monitoring, observeFailure } from "../_shared/observability.ts";
+import { readiness, type Operations } from "../../../shared/monitoring.ts";
 const uuid = z.string().uuid();
 export function createApiHandler(providers: Providers = liveProviders) {
   return async (req: Request): Promise<Response> => {
+    const headers = new Headers(req.headers);
+    const supplied = headers.get("x-request-id") || "";
+    const requestId = uuid.safeParse(supplied).success
+      ? supplied
+      : crypto.randomUUID();
+    headers.set("x-request-id", requestId);
+    req = new Request(req, { headers });
+    const started = performance.now();
+    let actor: string | null = null;
+    const path = new URL(req.url).pathname.split("/api/")[1] || "";
     if (req.method === "OPTIONS")
       return new Response(null, { headers: cors(req) });
     try {
-      const path = new URL(req.url).pathname.split("/api/")[1] || "";
+      if (path === "monitor/ready") {
+        const secret = Deno.env.get("MONITOR_SECRET");
+        if (
+          !secret ||
+          (await hash(req.headers.get("authorization") || "")) !==
+            (await hash(`Bearer ${secret}`))
+        )
+          return json(req, { error: "Unauthorized" }, 401);
+        if (req.method !== "GET")
+          return json(req, { error: "Method not allowed" }, 405);
+        try {
+          const result = readiness(
+            (await monitoring("operations", {
+              at: new Date(providers.now()).toISOString(),
+            })) as Operations,
+            providers.now(),
+          );
+          return json(req, result, result.status === "ready" ? 200 : 503);
+        } catch {
+          return json(
+            req,
+            { status: "unhealthy", reasons: ["database_unavailable"] },
+            503,
+          );
+        }
+      }
       const db = service();
       if (path === "weather" && req.method === "GET") {
         const run = check(
@@ -113,6 +150,7 @@ export function createApiHandler(providers: Providers = liveProviders) {
       if (authError || !user)
         throw new HttpError(401, "Please sign in to continue.");
       const uid = user.id;
+      actor = uid;
       const profile = check(
         await client.from("profiles").select("*").eq("id", uid).single(),
       );
@@ -169,9 +207,16 @@ export function createApiHandler(providers: Providers = liveProviders) {
           };
         });
       };
-      if ((path === "week-periods" || path === "week-periods/v2") && req.method === "GET") {
-        const periods = weekPeriodsSchema.parse(profile.week_periods ?? DEFAULT_WEEK_PERIODS);
-        return json(req, { periods: path === "week-periods" ? legacyPeriods(periods) : periods });
+      if (
+        (path === "week-periods" || path === "week-periods/v2") &&
+        req.method === "GET"
+      ) {
+        const periods = weekPeriodsSchema.parse(
+          profile.week_periods ?? DEFAULT_WEEK_PERIODS,
+        );
+        return json(req, {
+          periods: path === "week-periods" ? legacyPeriods(periods) : periods,
+        });
       }
       if (path === "account" && req.method === "GET") {
         const connection = await query("connection_get", { user_id: uid });
@@ -206,6 +251,48 @@ export function createApiHandler(providers: Providers = liveProviders) {
           throw new HttpError(403, "Administrator access required.");
         return json(req, check(await db.rpc("pilot_health")));
       }
+      if (
+        path === "admin/activity" ||
+        path === "admin/operations" ||
+        path === "admin/timeline"
+      ) {
+        if (profile.role !== "admin")
+          throw new HttpError(403, "Administrator access required.");
+        if (req.method !== "GET")
+          throw new HttpError(405, "Method not allowed.");
+        const params = new URL(req.url).searchParams;
+        const args =
+          path === "admin/timeline"
+            ? {
+                user_id: uuid.parse(params.get("user")),
+                before: params.get("before")
+                  ? z.coerce
+                      .number()
+                      .int()
+                      .positive()
+                      .parse(params.get("before"))
+                  : undefined,
+              }
+            : {
+                days: z.coerce
+                  .number()
+                  .int()
+                  .min(1)
+                  .max(30)
+                  .parse(params.get("days") || 7),
+              };
+        return json(
+          req,
+          await monitoring(
+            path === "admin/timeline"
+              ? "timeline"
+              : path === "admin/activity"
+                ? "activity"
+                : "operations",
+            args,
+          ),
+        );
+      }
       if (path === "admin/outings" && req.method === "GET") {
         if (profile.role !== "admin")
           throw new HttpError(403, "Administrator access required.");
@@ -239,6 +326,11 @@ export function createApiHandler(providers: Providers = liveProviders) {
       if (req.method !== "POST")
         throw new HttpError(405, "Method not allowed.");
       const input = await body(req);
+      if (path === "activity/observe") {
+        z.object({}).strict().parse(input);
+        await monitoring("observe", { user_id: uid });
+        return json(req, { observed: true });
+      }
       if (path === "bhc/attendance") {
         const parsed = z
           .object({
@@ -328,14 +420,29 @@ export function createApiHandler(providers: Providers = liveProviders) {
         return json(req, { deleted: true });
       }
       if (path === "week-periods" || path === "week-periods/v2") {
-        let { periods } = z.object({ periods: weekPeriodsSchema }).strict().parse(input);
+        let { periods } = z
+          .object({ periods: weekPeriodsSchema })
+          .strict()
+          .parse(input);
         if (path === "week-periods") {
           // Old clients do not know weekday restrictions; their edits must retain them.
-          const previous = weekPeriodsSchema.parse(profile.week_periods ?? DEFAULT_WEEK_PERIODS);
-          periods = periods.map(period => ({...period, days: previous.find(p => p.id === period.id)?.days ?? period.days}));
+          const previous = weekPeriodsSchema.parse(
+            profile.week_periods ?? DEFAULT_WEEK_PERIODS,
+          );
+          periods = periods.map((period) => ({
+            ...period,
+            days: previous.find((p) => p.id === period.id)?.days ?? period.days,
+          }));
         }
-        check(await db.from("profiles").update({ week_periods: periods }).eq("id", uid));
-        return json(req, { periods: path === "week-periods" ? legacyPeriods(periods) : periods });
+        check(
+          await db
+            .from("profiles")
+            .update({ week_periods: periods })
+            .eq("id", uid),
+        );
+        return json(req, {
+          periods: path === "week-periods" ? legacyPeriods(periods) : periods,
+        });
       }
       if (path === "settings") {
         const settings = z
@@ -662,6 +769,16 @@ export function createApiHandler(providers: Providers = liveProviders) {
       }
       throw new HttpError(404, "Not found.");
     } catch (error) {
+      if (
+        !(error instanceof z.ZodError) &&
+        (!(error instanceof HttpError) || error.status >= 500)
+      )
+        await observeFailure(
+          path,
+          requestId,
+          actor,
+          performance.now() - started,
+        );
       if (error instanceof z.ZodError)
         return json(
           req,

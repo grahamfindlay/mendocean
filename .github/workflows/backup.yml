@@ -36,3 +36,10 @@ jobs:
           path: backup/*.age
           retention-days: 7
           if-no-files-found: error
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Confirm uploaded backup to external monitor
+        env:
+          BACKUP_HEARTBEAT_URL: ${{ secrets.BACKUP_HEARTBEAT_URL }}
+        run: node scripts/backup-heartbeat.mjs

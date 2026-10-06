@@ -19,6 +19,7 @@ import {
 import { canLog, canSelectForLog } from "../shared/presentation";
 import { useClock } from "./useClock";
 import { clearDraft, draft, flush, stage } from "./outbox";
+import { track } from "./telemetry";
 export default function Logger({
   user,
   outings,
@@ -32,6 +33,7 @@ export default function Logger({
   initialOuting?: string;
   onSaved: (message: string) => void;
 }) {
+  const formSession = useRef(crypto.randomUUID());
   const now = useClock();
   const initial = outings.find((o) => o.id === initialOuting);
   const [selected, setSelected] = useState(
@@ -288,7 +290,26 @@ export default function Logger({
           Your unfinished draft was restored from this device.
         </p>
       )}
-      <form onSubmit={save} className="logger">
+      <form
+        onSubmit={save}
+        className="logger"
+        onFocusCapture={() =>
+          track(
+            "report_started",
+            {},
+            user,
+            `report-start:${formSession.current}`,
+          )
+        }
+        onChange={() =>
+          track(
+            "report_started",
+            {},
+            user,
+            `report-start:${formSession.current}`,
+          )
+        }
+      >
         <section className="form-card">
           <label>
             Which row?

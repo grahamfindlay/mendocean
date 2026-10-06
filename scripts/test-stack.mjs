@@ -20,7 +20,7 @@ const cli = join(root, "node_modules/.bin/supabase");
 const safeEnv = Object.fromEntries(
   Object.entries(process.env).filter(
     ([k]) =>
-      !/^(SUPABASE|VITE_|RESEND|BHC_|JOBS_|VAPID_|DATABASE_URL|PGPASSWORD|PGHOST|APP_URL|ALLOWED_ORIGINS|CLOUDFLARE)/.test(
+      !/^(SUPABASE|VITE_|RESEND|BHC_|JOBS_|VAPID_|DATABASE_URL|PGPASSWORD|PGHOST|APP_URL|ALLOWED_ORIGINS|CLOUDFLARE|POSTHOG|BETTER|MONITOR_|OWNER_|BACKUP_HEARTBEAT)/.test(
         k,
       ),
   ),
@@ -151,6 +151,13 @@ Deno.serve((req) => {
   return createJobsHandler(fixtureProviders, () => elapsed += 46000)(req);
 });\n`,
   );
+  mkdirSync(join(work, "supabase/functions/digest-fixture"));
+  writeFileSync(
+    join(work, "supabase/functions/digest-fixture/index.ts"),
+    `import { createJobsHandler } from '../jobs/handler.ts';
+import { fixtureProviders } from '../_shared/fixture-provider.ts';
+Deno.serve(createJobsHandler({ ...fixtureProviders, now: () => Date.parse('2026-10-05T13:05:00Z') }));\n`,
+  );
   writeFileSync(
     join(work, "supabase/config.toml"),
     `project_id = "${id}"
@@ -188,6 +195,9 @@ import_map = "./functions/deno.json"
 [functions.jobs-budget]
 verify_jwt = false
 import_map = "./functions/deno.json"
+[functions.digest-fixture]
+verify_jwt = false
+import_map = "./functions/deno.json"
 `,
   );
   console.log("Starting isolated Supabase stack (no hosted credentials).");
@@ -222,7 +232,7 @@ import_map = "./functions/deno.json"
   const gateway = ["darwin", "win32"].includes(process.platform)
     ? "host.docker.internal"
     : net[0].IPAM.Config[0].Gateway;
-  const functionEnv = `APP_URL=http://127.0.0.1:4175\nALLOWED_ORIGINS=http://127.0.0.1:4175\nJOBS_SECRET=${secret}\nBHC_ENCRYPTION_KEY=${randomBytes(32).toString("base64")}\nRESEND_API_KEY=synthetic\nEMAIL_FROM=Mendocean <test@example.test>\nFIXTURE_SECRET=${secret}\nFIXTURE_URL=http://${gateway}:54328\n`;
+  const functionEnv = `APP_URL=http://127.0.0.1:4175\nALLOWED_ORIGINS=http://127.0.0.1:4175\nJOBS_SECRET=${secret}\nMONITOR_SECRET=${secret}-monitor\nOWNER_DIGEST_SECRET=${secret}-digest\nOWNER_EMAIL=owner@example.test\nOWNER_DIGEST_ENABLED=true\nBHC_ENCRYPTION_KEY=${randomBytes(32).toString("base64")}\nRESEND_API_KEY=synthetic\nEMAIL_FROM=Mendocean <test@example.test>\nFIXTURE_SECRET=${secret}\nFIXTURE_URL=http://${gateway}:54328\n`;
   writeFileSync(join(work, "functions.env"), functionEnv, { mode: 0o600 });
   background(cli, [
     "functions",
@@ -277,13 +287,47 @@ import_map = "./functions/deno.json"
       },
     );
   }
+  // Real bundled SDK; source-map CLI is a dry run with synthetic credentials.
+  // This helper exists only in the disposable source copy.
+  const main = join(app, "src/main.tsx");
+  writeFileSync(
+    main,
+    readFileSync(main, "utf8") +
+      `\nwindow.__MONITORING_FIXTURE__ = () => { throw new Error("fixture-private-report fixture-secret fixture@example.test"); };\n`,
+  );
+  await run(
+    join(root, "node_modules/.bin/vite"),
+    ["build", "--outDir", "dist-telemetry"],
+    {
+      cwd: app,
+      env: {
+        ...buildEnv,
+        MENDOCEAN_BUILD_ID: id + "-telemetry",
+        VITE_TELEMETRY_ENABLED: "true",
+        VITE_POSTHOG_TOKEN: "phc_fixture_test_project_only",
+        POSTHOG_CLI_API_KEY: "fixture-only",
+        POSTHOG_CLI_PROJECT_ID: "1",
+        POSTHOG_CLI_HOST: "https://us.posthog.com",
+        POSTHOG_CLI_DRY_RUN: "true",
+      },
+    },
+  );
   releaseServer = await startReleaseServer(app, secret);
   await ready(env.TEST_APP_URL);
   if (!process.argv.includes("--updates-only")) {
     console.log("Running real-backend integration tests.");
     console.log(await run("npm", ["run", "test:integration"]));
     console.log("Running production-build browser journeys.");
-    console.log(await run("npm", ["run", "test:e2e:full"]));
+    const browserGrep = process.argv.indexOf("--browser-grep");
+    console.log(
+      await run("npm", [
+        "run",
+        "test:e2e:full",
+        ...(browserGrep >= 0
+          ? ["--", "--grep", process.argv[browserGrep + 1]]
+          : []),
+      ]),
+    );
   }
   console.log("Running real service-worker A → B → C upgrade journeys.");
   const grepIndex = process.argv.indexOf("--grep");

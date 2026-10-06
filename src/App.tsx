@@ -26,6 +26,7 @@ import Logger from "./Logger";
 import { Auth, Modal, SettingsForm, PlanForm } from "./Account";
 import { discard, flush, pending, type PendingReport } from "./outbox";
 import { startAppUpdates } from "./appUpdates";
+import { telemetryActor, telemetryView, telemetryVisit } from "./telemetry";
 import { UpdateBanner } from "./UpdateControls";
 import {
   DEFAULT_DESTINATION,
@@ -79,6 +80,7 @@ export interface AccountData {
   outings: Outing[];
   coaches: Coach[];
   profile: {
+    id: string;
     display_name: string;
     role: string;
     reminder_channel: string;
@@ -226,6 +228,7 @@ export default function App() {
     }
     if (!supabase) return;
     const updateUser = (next: User | null) => {
+      telemetryActor(next?.id ?? null);
       if (currentUser.current !== next?.id) {
         setAccount(null);
         setQueue([]);
@@ -259,6 +262,34 @@ export default function App() {
     );
     return () => data.subscription.unsubscribe();
   }, []);
+  useEffect(() => {
+    telemetryView(settings || authOpen ? "Account" : tab);
+  }, [tab, settings, authOpen, user?.id]);
+  useEffect(() => {
+    let observedAt = 0;
+    const observe = () => {
+      if (document.visibilityState !== "visible") return;
+      telemetryVisit();
+      if (
+        !user ||
+        previewMode ||
+        !navigator.onLine ||
+        Date.now() - observedAt < 15 * 60000
+      )
+        return;
+      observedAt = Date.now();
+      void api("activity/observe", {}, user.id).catch(() => {});
+    };
+    observe();
+    document.addEventListener("visibilitychange", observe);
+    window.addEventListener("focus", observe);
+    window.addEventListener("online", observe);
+    return () => {
+      document.removeEventListener("visibilitychange", observe);
+      window.removeEventListener("focus", observe);
+      window.removeEventListener("online", observe);
+    };
+  }, [user?.id]);
   useEffect(() => {
     void refresh();
   }, [refresh]);

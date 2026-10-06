@@ -37,3 +37,23 @@ Email-provider correction: hosted email login is enabled while global signup rem
 ## Test automation rollout
 
 The Docker Desktop stack and read-only live API/Auth/browser smoke checks pass. The testing pull request is #2, targeting main. Required-check activation and the post-merge smoke result are recorded in the pull request and final delivery report; see `TESTING.md` for exact coverage and limits.
+
+## Monitoring rollout — October 6, 2026
+
+The monitoring changes were reconciled in an isolated checkout from current `main`, preserving the newer History, boat-selection and lake-camera UI and the original working directory.
+
+Deployed and verified in Supabase project `exhoyifhvultmjryisce`:
+
+- Additive migration `202610050001_monitoring.sql`; the dry run identified it as the only pending migration. Existing migration history was preserved.
+- Compatible `api` and `jobs` functions with transactional activity, sanitized correlated diagnostics, dedicated readiness and owner-digest routes.
+- Independent monitor/digest secrets, verified approved administrator recipient, and a successful live read-only digest preview. Recovery copies are in the owner's ignored `.env.monitoring.local` with mode 0600; move a copy to the password manager.
+- GitHub digest/readiness credentials installed. Weekly digest enabled for Monday 8 AM America/Chicago. The client and server enforce the delivery window; first real acceptance/inbox receipt remains unverified. Preview does not send email.
+- Authenticated readiness added to the existing twice-daily production smoke workflow. This provides a baseline; the planned five-minute Better Stack checks still require an account/token and alert-delivery verification.
+
+The frontend release adds Account → Pilot administration → Activity and Operations, including the user timeline. Browser PostHog collection remains disabled. Cloudflare has the public production project token and US ingest host; the build deliberately requires a private upload credential before collection can be enabled. No public source maps are deployed.
+
+PostHog plugin configuration is verified: **Mendocean** organization, US project [Mendocean production](https://us.posthog.com/project/648250), America/Chicago timezone and Monday week start. IP removal is enabled; replay, autocapture, automatic exceptions, console/performance capture, web vitals, surveys and heatmaps are disabled. [Mendocean beta usage](https://us.posthog.com/project/648250/dashboard/2175542) has five saved, owner-excluded insights and nonoverlapping layouts. All five queries executed successfully; empty results reflect preactivation. Supported measures use native queries; consecutive-week overlap uses a bounded custom query. No billing settings or notifications were changed.
+
+Verified on the reconciled checkout: 105 unit/database tests, 49 real-backend integration tests, 79 preview browser cases, 49 production browser cases, 8 service-worker upgrade cases, 8 Python tests, TypeScript and Deno checks, a production build and zero audit vulnerabilities. Two preview, two production and two upgrade cases retain platform exclusions. Production tests include bundled SDK sanitation and blocked-provider behavior in Chromium, WebKit and mobile Chromium emulation. Email/provider fixtures do not establish production inbox placement or remote symbolication.
+
+Remaining account steps are a project-restricted PostHog upload key (`error_tracking:write` and `organization:read`), optional server query-read key, billing-limit review, separate-project symbolication check, error-notification verification, and Better Stack monitor/incident/recovery setup. Details are in [MONITORING.md](MONITORING.md). Backup activation/restore drill and real-device push checks remain the separate historical tasks above.

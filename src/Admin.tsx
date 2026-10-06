@@ -1,3 +1,4 @@
+import AdminActivity from "./AdminActivity";
 import { useEffect, useState } from "react";
 import { api } from "./client";
 import {
@@ -108,6 +109,7 @@ export default function Admin() {
   return (
     <details className="admin-tools">
       <summary>Pilot administration</summary>
+      <AdminActivity />
       {loading && <p role="status">Loading administration…</p>}
       {loadError && (
         <p className="alert" role="alert">

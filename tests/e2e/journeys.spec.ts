@@ -551,6 +551,37 @@ test("Scheduled forecasts remain chart-only when model contexts are available", 
   }
 });
 
+test("owner can inspect activity and operations while members cannot", async ({
+  page,
+}) => {
+  await sql.query("update profiles set role='admin' where id=$1", [actor.id]);
+  await loggedIn(page);
+  await page.getByRole("button", { name: "Account", exact: true }).click();
+  await page.getByText("Pilot administration", { exact: true }).click();
+  const monitoring = page.getByRole("region", {
+    name: "Activity and operations",
+  });
+  await expect(
+    monitoring.getByRole("heading", { name: "Activity", exact: true }),
+  ).toBeVisible();
+  await expect(monitoring.getByText(/approved accounts/)).toBeVisible();
+  await monitoring.getByLabel("Period").selectOption("30");
+  await expect(
+    monitoring.getByRole("button", { name: "Refresh", exact: true }),
+  ).toBeEnabled();
+  await expect(
+    monitoring.getByText("Last completed dispatch", { exact: true }),
+  ).toBeVisible();
+  expect((await api(actor, "admin/operations")).status).toBe(200);
+  await sql.query("update profiles set role='member' where id=$1", [actor.id]);
+  expect((await api(actor, "admin/operations")).status).toBe(403);
+  await page.reload();
+  await page.getByRole("button", { name: "Account", exact: true }).click();
+  await expect(
+    page.getByText("Pilot administration", { exact: true }),
+  ).toHaveCount(0);
+});
+
 test("production timeline offers quarter-hour inspection and selectable daily forecasts", async ({
   page,
 }) => {

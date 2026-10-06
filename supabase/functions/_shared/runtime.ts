@@ -46,7 +46,9 @@ export function cors(req: Request) {
     "Access-Control-Allow-Origin": allowed.includes(origin)
       ? origin
       : allowed[0],
-    "Access-Control-Allow-Headers": "authorization,apikey,content-type",
+    "Access-Control-Allow-Headers":
+      "authorization,apikey,content-type,x-request-id",
+    "Access-Control-Expose-Headers": "x-request-id",
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
     Vary: "Origin",
     "Cache-Control": "no-store",
@@ -55,7 +57,11 @@ export function cors(req: Request) {
 export function json(req: Request, data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...cors(req), "Content-Type": "application/json" },
+    headers: {
+      ...cors(req),
+      "Content-Type": "application/json",
+      "X-Request-ID": req.headers.get("x-request-id") || crypto.randomUUID(),
+    },
   });
 }
 export async function body(req: Request, max = 32768) {

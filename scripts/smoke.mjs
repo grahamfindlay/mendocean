@@ -70,7 +70,14 @@ for (const asset of release.assets) {
 const forecast = await get(backend + "/functions/v1/api/weather");
 if (!forecast.ok) throw new Error("weather-api: unavailable");
 validateForecast(await forecast.json());
-for (const path of ["account", "export"])
+for (const path of [
+  "account",
+  "export",
+  "admin/activity",
+  "admin/operations",
+  "admin/timeline",
+  "monitor/ready",
+])
   requireDenied((await get(backend + "/functions/v1/api/" + path)).status);
 for (const path of ["report", "push/test", "bhc/attendance"])
   requireDenied(
@@ -91,6 +98,15 @@ requireDenied(
     })
   ).status,
 );
+// Optional dedicated credential adds service health to the existing scheduled smoke.
+if (process.env.MONITOR_SECRET) {
+  const response = await get(backend + "/functions/v1/api/monitor/ready", {
+    headers: { Authorization: `Bearer ${process.env.MONITOR_SECRET}` },
+  });
+  const result = await response.json();
+  if (!response.ok || result.status !== "ready")
+    throw new Error("service-readiness: unhealthy");
+}
 // A public publishable key is needed for Auth settings, but no session/admin secret.
 const key = process.env.SMOKE_PUBLIC_KEY || publicConfig.supabasePublicKey;
 if (key) {

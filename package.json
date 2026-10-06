@@ -22,6 +22,7 @@
     "@supabase/supabase-js": "^2.116.0",
     "idb": "^8.0.3",
     "lucide-react": "^1.45.0",
+    "posthog-js": "^1.436.1",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router-dom": "^7.18.3",
@@ -30,6 +31,7 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "^1.63.0",
+    "@posthog/cli": "^0.18.9",
     "@types/node": "^22.20.2",
     "@types/pg": "8.15.6",
     "@types/react": "^19.3.0",

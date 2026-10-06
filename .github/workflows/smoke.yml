@@ -31,5 +31,6 @@ jobs:
         env:
           EXPECTED_SHA: ${{ inputs.expected_sha || github.event.deployment.sha || (github.event_name == 'push' && github.sha) }}
           SMOKE_PUBLIC_KEY: ${{ vars.SMOKE_PUBLIC_KEY }}
+          MONITOR_SECRET: ${{ secrets.MONITOR_SECRET }}
         run: node scripts/smoke.mjs
       - run: npx playwright test --config playwright.smoke.config.ts

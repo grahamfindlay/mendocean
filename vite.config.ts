@@ -1,4 +1,11 @@
-import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  readdirSync,
+  statSync,
+  unlinkSync,
+} from "node:fs";
+import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { defineConfig, type ResolvedConfig } from "vite";
@@ -12,12 +19,15 @@ const commit =
 const buildId =
   process.env.MENDOCEAN_BUILD_ID || commit + "-" + randomUUID().slice(0, 8);
 export default defineConfig({
+  build: { sourcemap: "hidden" },
   define: { "import.meta.env.VITE_APP_BUILD": JSON.stringify(buildId) },
   plugins: [
     react(),
     (() => {
       let output = "dist";
       let origin = "";
+      let analyticsOrigin = "";
+      let telemetryEnabled = false;
       return {
         name: "production-security-headers",
         apply: "build" as const,
@@ -25,6 +35,22 @@ export default defineConfig({
           output = resolve(config.root, config.build.outDir);
           const value = config.env.VITE_SUPABASE_URL;
           origin = value ? new URL(value).origin : "";
+          telemetryEnabled = config.env.VITE_TELEMETRY_ENABLED === "true";
+          const analytics =
+            config.env.VITE_POSTHOG_HOST || "https://us.i.posthog.com";
+          if (telemetryEnabled) {
+            if (
+              ![
+                "https://us.i.posthog.com",
+                "https://eu.i.posthog.com",
+              ].includes(analytics) ||
+              !config.env.VITE_POSTHOG_TOKEN
+            )
+              throw new Error(
+                "Telemetry requires a PostHog token and supported ingest host.",
+              );
+            analyticsOrigin = analytics;
+          }
         },
         transformIndexHtml() {
           return [
@@ -36,6 +62,70 @@ export default defineConfig({
           ];
         },
         closeBundle() {
+          // Injection changes JS. Complete it BEFORE computing precache hashes.
+          if (
+            telemetryEnabled ||
+            process.env.POSTHOG_SOURCEMAPS_UPLOAD === "true"
+          ) {
+            if (
+              !process.env.POSTHOG_CLI_API_KEY ||
+              !process.env.POSTHOG_CLI_PROJECT_ID
+            )
+              throw new Error(
+                "Telemetry builds require scoped PostHog source-map credentials.",
+              );
+            if (
+              process.env.POSTHOG_CLI_DRY_RUN === "true" &&
+              process.env.TEST_STACK !== "local-only"
+            )
+              throw new Error(
+                "Source-map dry runs are restricted to the isolated test harness.",
+              );
+            const uploadHost =
+              process.env.POSTHOG_CLI_HOST ||
+              (analyticsOrigin.includes("eu.")
+                ? "https://eu.posthog.com"
+                : "https://us.posthog.com");
+            if (
+              !["https://us.posthog.com", "https://eu.posthog.com"].includes(
+                uploadHost,
+              ) ||
+              (telemetryEnabled &&
+                uploadHost.includes("eu.") !== analyticsOrigin.includes("eu."))
+            )
+              throw new Error(
+                "Source-map upload host must match the PostHog ingest region.",
+              );
+            try {
+              execFileSync(
+                resolve("node_modules/.bin/posthog-cli"),
+                [
+                  "--host",
+                  uploadHost,
+                  "sourcemap",
+                  "process",
+                  "--directory",
+                  resolve(output, "assets"),
+                  "--release-name",
+                  "mendocean",
+                  "--release-version",
+                  buildId,
+                  "--delete-after",
+                ],
+                { timeout: 120000, stdio: "pipe" },
+              );
+            } catch {
+              throw new Error(
+                "PostHog source-map processing failed; deployment was stopped before generating release hashes.",
+              );
+            }
+          }
+          for (const file of readdirSync(resolve(output, "assets"), {
+            recursive: true,
+          })) {
+            if (String(file).endsWith(".map"))
+              unlinkSync(resolve(output, "assets", String(file)));
+          }
           writeFileSync(
             resolve(output, "build.json"),
             JSON.stringify({
@@ -87,7 +177,7 @@ export default defineConfig({
           );
           const path = resolve(output, "_headers");
           const headers = readFileSync(path, "utf8");
-          const policy = `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' ${origin} ${origin.replace("https:", "wss:")}; img-src 'self' data: blob:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`;
+          const policy = `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' ${origin} ${origin.replace("https:", "wss:")} ${analyticsOrigin}; img-src 'self' data: blob:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`;
           writeFileSync(
             path,
             headers + "\n/*\n  Content-Security-Policy: " + policy + "\n",

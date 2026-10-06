@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Download, X } from "lucide-react";
 import { api, supabase } from "./client";
+import { track, telemetryActor, captureFailure } from "./telemetry";
 import {
   BOAT_CLASSES,
   chicagoToISO,
@@ -85,10 +86,23 @@ export function Auth({
                   options: { shouldCreateUser: false },
                 });
             if (result.error) throw result.error;
-            if (sent) onSuccess();
-            else setSent(true);
+            if (sent) {
+              const id = "user" in result.data ? result.data.user?.id : null;
+              if (id) {
+                telemetryActor(id);
+                track("sign_in_completed", {}, id);
+              }
+              onSuccess();
+            } else setSent(true);
           } catch (e) {
             setError((e as Error).message);
+            if (!(
+              e &&
+              typeof e === "object" &&
+              "status" in e &&
+              Number(e.status) < 500
+            ))
+              captureFailure(e, "auth");
           } finally {
             setBusy(false);
           }
@@ -309,6 +323,7 @@ export function SettingsForm({
               ),
               reminders_paused: f.get("paused") === "on",
             });
+            track("reminder_preferences_changed", {}, account.profile.id);
             setMessage("Preferences saved.");
           });
         }}
@@ -592,6 +607,11 @@ export function SettingsForm({
               onClick={() =>
                 void run(async () => {
                   await api("bhc/disconnect", {});
+                  track(
+                    "bhc_connection_changed",
+                    { action: "disconnect" },
+                    account.profile.id,
+                  );
                   setMessage("Disconnected. Existing reports are preserved.");
                 })
               }
@@ -609,6 +629,11 @@ export function SettingsForm({
                 token,
                 club_id: club ? Number(club) : undefined,
               });
+              track(
+                "bhc_connection_changed",
+                { action: "connect" },
+                account.profile.id,
+              );
               setToken("");
               setMessage("Connected. Your practices are being imported.");
             });
@@ -674,6 +699,13 @@ export function SettingsForm({
         </p>
       )}
       {account?.profile.role === "admin" && <Admin />}
+      <p className="help">
+        Mendocean records account activity and save, sync, and reminder outcomes
+        to help keep the app working. When usage analytics is enabled, it also
+        collects feature-use events and sanitized errors. Sign-in codes, BHC
+        credentials, and private report contents are excluded. Session recording
+        is disabled.
+      </p>
       <hr />
       <button className="text-button" onClick={onSignOut}>
         Sign out

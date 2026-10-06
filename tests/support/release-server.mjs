@@ -24,7 +24,7 @@ export async function startReleaseServer(root, secret, port = 4175) {
       let body = "";
       for await (const chunk of req) body += chunk;
       const patch = JSON.parse(body);
-      if (!["a", "b", "c", "legacy"].includes(patch.release)) {
+      if (!["a", "b", "c", "legacy", "telemetry"].includes(patch.release)) {
         res.writeHead(400).end();
         return;
       }

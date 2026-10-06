@@ -17,12 +17,33 @@ import {
 import { syncBHC } from "../_shared/bhc.ts";
 import { sendReminder } from "../_shared/notifications.ts";
 import { localDateTime } from "../../../shared/domain.ts";
+import {
+  observeFailure,
+  optionalMonitoring,
+} from "../_shared/observability.ts";
+import { ownerDigest } from "../_shared/owner-digest.ts";
 export function createJobsHandler(
   providers: Providers = liveProviders,
   elapsed: () => number = () => performance.now(),
 ) {
   return async (req: Request): Promise<Response> => {
     try {
+      const digestSecret = Deno.env.get("OWNER_DIGEST_SECRET");
+      if (
+        req.method === "POST" &&
+        digestSecret &&
+        (await hash(req.headers.get("authorization") || "")) ===
+          (await hash(`Bearer ${digestSecret}`))
+      ) {
+        const input = await body(req, 2048);
+        if (
+          input.action !== "owner-digest" ||
+          typeof input.preview !== "boolean" ||
+          Object.keys(input).some((k) => !["action", "preview"].includes(k))
+        )
+          return json(req, { error: "Invalid digest request" }, 400);
+        return json(req, await ownerDigest(input.preview, providers));
+      }
       if (
         req.method !== "POST" ||
         (await hash(req.headers.get("authorization") || "")) !==
@@ -52,6 +73,7 @@ export function createJobsHandler(
         return json(req, { error: "Unknown action" }, 400);
       const started = elapsed();
       const now = new Date(providers.now());
+      await optionalMonitoring("tick_started", { at: now.toISOString() });
       const stamp = Math.floor(now.getTime() / 900000);
       await enqueue("weather", null, null, now, `weather:15m:${stamp}`);
       const local = localDateTime(now.toISOString());
@@ -67,6 +89,7 @@ export function createJobsHandler(
       const jobs = await query("claim");
       const results = [];
       for (const [index, job] of jobs.entries()) {
+        const jobStarted = performance.now();
         if (elapsed() - started > 45000) {
           check(
             await service().rpc("release_claims", {
@@ -95,6 +118,17 @@ export function createJobsHandler(
             await enrichOuting(job.outing_id, providers);
           else throw new Error("Unknown job type");
           await query("job_finish", { id: job.id, status: "done" });
+          console.info(
+            JSON.stringify({
+              severity: "info",
+              operation: job.kind,
+              stage: "complete",
+              job_id: job.id,
+              user_id: job.user_id,
+              outcome: "done",
+              duration_ms: Math.round(performance.now() - jobStarted),
+            }),
+          );
           results.push({ id: job.id, status: "done" });
         } catch (error) {
           const retry = job.attempts < 5;
@@ -110,10 +144,26 @@ export function createJobsHandler(
             ).toISOString(),
           });
           results.push({ id: job.id, status: retry ? "retry" : "failed" });
+          console.error(
+            JSON.stringify({
+              severity: retry ? "warning" : "error",
+              operation: job.kind,
+              stage:
+                error instanceof WeatherCollectionError ? error.stage : "run",
+              job_id: job.id,
+              user_id: job.user_id,
+              outcome: retry ? "retry" : "failed",
+              duration_ms: Math.round(performance.now() - jobStarted),
+            }),
+          );
         }
       }
+      await optionalMonitoring("tick_completed", {
+        at: new Date(providers.now()).toISOString(),
+      });
       return json(req, { results });
     } catch {
+      await observeFailure("dispatcher", crypto.randomUUID(), null, 0);
       return json(req, { error: "Job dispatch failed." }, 500);
     }
   };
