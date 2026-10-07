@@ -56,7 +56,7 @@ Verify BHC account identity on the server without adding another selection scree
 
 Distinguish authentication from practice import. After connection commit: **Connected to Mendota Rowing Club · Importing practices…**. Show actual progress stages, never a simulated percentage. Poll status only while setup/import is visible, with bounded polling and a recoverable delay message. A delayed import does not send the user back to password entry.
 
-After successful import: **Connected · Practices up to date**, with the last successful update. Label the expiry date **Renew connection by**. An empty schedule says **Connected · No upcoming practices found**. A partial or failed import stays visibly incomplete. Close the wizard only on user action; **View my rows** can take the user to their imported schedule.
+After successful import: **Connected · Practices up to date**, with the last successful update. Label the expiry date **Renew connection by**. An empty schedule says **Connected · No upcoming practices found**. A partial or failed import stays visibly incomplete. Close the wizard only on user action.
 
 ## Connection lifecycle
 

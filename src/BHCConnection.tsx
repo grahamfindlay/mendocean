@@ -81,13 +81,11 @@ export function BHCConnection({
   status,
   onUpdated,
   focusConnection = false,
-  onViewRows,
 }: {
   user: string;
   status: BHCConnectionStatus;
   onUpdated: () => void;
   focusConnection?: boolean;
-  onViewRows?: () => void;
 }) {
   const id = useId();
   const section = useRef<HTMLElement>(null);
@@ -297,11 +295,6 @@ export function BHCConnection({
                   onClick={() => void perform("sync")}
                 >
                   Refresh practices
-                </button>
-              )}
-              {status.state === "healthy" && onViewRows && (
-                <button className="button subtle" onClick={onViewRows}>
-                  View my rows
                 </button>
               )}
               <div className="card-actions">
