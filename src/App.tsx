@@ -173,6 +173,7 @@ export default function App() {
     setSelectedLineup(id);
     setTab("Lineups");
     const url = new URL(location.href);
+    url.searchParams.delete("log");
     url.searchParams.set("tab", "Lineups");
     url.searchParams.set("lineup", id);
     window.history.replaceState(null, "", url);
@@ -396,6 +397,7 @@ export default function App() {
     setSelectedLineup(undefined);
     const url = new URL(location.href);
     url.searchParams.delete("lineup");
+    url.searchParams.delete("log");
     url.searchParams.set("tab", name);
     window.history.replaceState(null, "", url);
     setEditing(undefined);

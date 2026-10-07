@@ -72,6 +72,12 @@ test("lineup links select the practice, prioritize own boat and highlight the se
   await expect(page.locator(".lineups-view")).not.toContainText(
     /Avg Weight|Avg Age|Weight Rating/,
   );
+  // An old logging destination must not override a newly selected lineup on reload.
+  await page.evaluate(() => {
+    const url = new URL(location.href);
+    url.searchParams.set("log", "previous-report");
+    window.history.replaceState(null, "", url);
+  });
   await page
     .getByRole("combobox", { name: "Practice", exact: true })
     .selectOption("first");
