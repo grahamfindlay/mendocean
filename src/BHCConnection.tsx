@@ -372,20 +372,33 @@ export function BHCConnection({
           {step === "key" && (
             <ol className="bhc-steps">
               <li>
-                Open your profile in BHC.
-                <p>
-                  <a
-                    className="button subtle"
-                    href="https://app.boathouseconnect.com/profile/myprofile"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Open BHC profile
-                  </a>
+                <a
+                  className="button subtle"
+                  href="https://app.boathouseconnect.com/profile/api"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open BHC API Keys
+                </a>
+                <p className="help">
+                  Sign in if needed. If BHC opens Dashboard, choose{" "}
+                  <strong>My Profile → API Keys</strong>.
                 </p>
               </li>
-              <li>Create an API token named Mendocean.</li>
-              <li>Copy it and return here.</li>
+              <li>
+                Select <strong>+</strong> to create a key.
+              </li>
+              <li>
+                Keep <strong>Token Type</strong> as{" "}
+                <strong>General API Token</strong>. Enter{" "}
+                <strong>Mendocean</strong> in <strong>Description</strong>,
+                then select <strong>Save</strong>.
+              </li>
+              <li>
+                Copy the new key at the bottom of the page. Return here, paste it
+                below, and select{" "}
+                <strong>{needsReconnect ? "Reconnect BHC" : "Connect BHC"}</strong>.
+              </li>
             </ol>
           )}
           <form onSubmit={(e) => void connect(e)}>
