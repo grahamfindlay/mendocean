@@ -244,7 +244,6 @@ export function SettingsForm({
   onSignOut,
   onAdministration,
   focusConnection,
-  onViewRows,
 }: {
   account: AccountData | null;
   onUpdated: () => void;
@@ -252,7 +251,6 @@ export function SettingsForm({
   onSignOut: () => void;
   onAdministration: () => void;
   focusConnection?: boolean;
-  onViewRows?: () => void;
 }) {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -586,7 +584,6 @@ export function SettingsForm({
         status={account.bhc}
         onUpdated={onUpdated}
         focusConnection={focusConnection}
-        onViewRows={onViewRows}
       />
       {account?.profile.role === "admin" && (
         <>
