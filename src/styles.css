@@ -1421,6 +1421,19 @@ button:hover:not(:disabled) {
 .chart-grid {
   stroke: #e0e3dc;
 }
+.chart-wind-minor-rule {
+  stroke-opacity: 0.5;
+}
+.chart-daylight {
+  pointer-events: none;
+}
+.chart-night-strip {
+  fill: #50647b;
+  fill-opacity: 0.22;
+}
+.chart-daylight-strip {
+  fill: #d9b66c;
+}
 .chart-cursor {
   stroke: #56645d;
   stroke-dasharray: 2 4;
@@ -1968,8 +1981,11 @@ button:hover:not(:disabled) {
 }
 .weather-chart svg .chart-now-label {
   fill: #a05219;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
+}
+.chart-now-label-background {
+  fill: #f8f5ec;
 }
 
 .wind-rose {

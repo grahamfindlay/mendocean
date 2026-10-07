@@ -9,6 +9,7 @@ import {
 import { weatherDescription } from "../shared/presentation";
 import { WindVector } from "./WindReading";
 import WeatherIcon from "./WeatherIcon";
+import ChartDaylight from "./ChartDaylight";
 
 export interface ChartWindow {
   id: string;
@@ -255,6 +256,13 @@ export default function WeatherChart({
   const windowDescription = (w: ChartWindow) =>
     `${w.label}: ${formatTime(new Date(w.start).toISOString())}–${formatTime(new Date(w.end).toISOString())}`;
   const cursor = Math.min(W - right, Math.max(left, x(h.time)));
+  // Put the label beside the live marker; flip inward at the right edge.
+  const nowOnLeft =
+    currentTime !== undefined && x(currentTime) > W - right - 42;
+  const nowLabelX =
+    currentTime === undefined
+      ? left
+      : x(currentTime) + (nowOnLeft ? -6 : 6);
   const finish = () => {
     pointer.current = null;
     setFrozen(null);
@@ -301,7 +309,7 @@ export default function WeatherChart({
       <svg
         ref={surface}
         className="chart-surface"
-        viewBox={`0 0 ${W} 440`}
+        viewBox={`0 0 ${W} 474`}
         role="slider"
         tabIndex={0}
         aria-label="Forecast time"
@@ -432,19 +440,25 @@ export default function WeatherChart({
         <text x={left} y="75">
           Wind • mph
         </text>
-        {Array.from({ length: windMax / 10 + 1 }, (_, i) => i * 10).map(
+        {Array.from({ length: windMax / 5 + 1 }, (_, i) => i * 5).map(
           (mph) => (
             <g key={mph} className="chart-wind-rule" data-mph={mph}>
               <line
-                className="chart-grid"
+                className={
+                  mph % 10 === 0
+                    ? "chart-grid"
+                    : "chart-grid chart-wind-minor-rule"
+                }
                 x1={left}
                 x2={W - right}
                 y1={225 - (mph / windMax) * 140}
                 y2={225 - (mph / windMax) * 140}
               />
-              <text x={W - right + 4} y={229 - (mph / windMax) * 140}>
-                {mph}
-              </text>
+              {mph % 10 === 0 && (
+                <text x={W - right + 4} y={229 - (mph / windMax) * 140}>
+                  {mph}
+                </text>
+              )}
             </g>
           ),
         )}
@@ -551,17 +565,19 @@ export default function WeatherChart({
                   {formatTime(new Date(currentTime).toISOString())}
                 </title>
               </line>
+              <rect
+                className="chart-now-label-background"
+                x={nowLabelX - (nowOnLeft ? 26 : 3)}
+                y="384"
+                width="29"
+                height="17"
+                rx="2"
+              />
               <text
                 className="chart-now-label"
-                x={x(currentTime)}
-                y="438"
-                textAnchor={
-                  x(currentTime) < left + 20
-                    ? "start"
-                    : x(currentTime) > W - right - 20
-                      ? "end"
-                      : "middle"
-                }
+                x={nowLabelX}
+                y="398"
+                textAnchor={nowOnLeft ? "end" : "start"}
               >
                 Now
               </text>
@@ -583,6 +599,7 @@ export default function WeatherChart({
             {formatTime(new Date(t).toISOString()).replace(":00", "")}
           </text>
         ))}
+        <ChartDaylight start={start} end={end} left={left} width={plotWidth} />
       </svg>
     </section>
   );
