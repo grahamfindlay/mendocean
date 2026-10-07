@@ -1,6 +1,6 @@
 # Published practice lineups
 
-Implemented locally on October 7, 2026. Not deployed or activated. Live BHC verification and physical iPhone checks remain release requirements.
+Implemented locally on October 7, 2026. Not deployed or activated. Live connected-account reads passed; ordinary-member permissions, coach draft/republish behavior and physical iPhone checks remain release requirements.
 
 ## Behavior
 
@@ -27,7 +27,13 @@ Delivery rechecks current attendance, credentials, connection revision, publicat
 
 `node scripts/bhc-lineup-contract.mjs` performs at most six read requests with a token supplied through `BHC_CONTRACT_TOKEN`. `BHC_CONTRACT_CLUB_ID` and `BHC_CONTRACT_PRACTICE_ID` can identify the test practice; `BHC_CONTRACT_PAST=true` checks recent/past practice listings. Output contains counts and fingerprints, never names, raw payloads or credential-bearing URLs. An optional `BHC_CONTRACT_BASELINE` file stores only these diagnostics to compare observations. The script does not publish/edit lineups, change attendance, send email, or establish that the token is an ordinary member's; verify account permissions separately.
 
-Privileged project credential retrieval was rejected by automatic approval review; explicit user approval was requested for read-only use. Live provider verification remains pending.
+### Live observations on October 7, 2026
+
+After explicit user approval, the existing encrypted BHC connection was retrieved with a single read-only SQL SELECT and decrypted in memory. No Supabase service-role API key was needed. Credentials, names and raw provider responses were neither printed nor saved. No attendance, lineup, application or notification changes were made.
+
+The connected account's identity and Mendota membership matched. Six BHC GET requests verified a previously attended, published practice: both metadata and detail returned `lineups_set=Yes`; normalization produced two named boats, nine named crew members, two assigned coaches and the user's own boat/seat. Actual fields matched the implementation: attendance has `custid`, `fname`, `lname`, `lineup_boat`, numeric-string seats or `coxswain`, and `lineup_side`; coaches use `boat_id` plus `custid`; equipment uses `boat_id`, `boat_name`, `boat_type`, `coxed` and `rigging`. Four further GET requests verified an upcoming unpublished practice with `lineups_set=No` in both responses and no assigned crew; normalization suppressed it.
+
+No upcoming attended published practice was available, so the published example came from past practices. These reads confirm visibility for this connected account, but the API did not establish that it has ordinary-member-only permissions. The unpublished example contained no draft assignments. It therefore does not prove suppression of assigned drafts, or the behavior of unpublished edits after first publication. Those controlled coach observations and physical iPhone checks remain pending. Keep the feature disabled until they pass.
 
 ## Release and real-device check
 

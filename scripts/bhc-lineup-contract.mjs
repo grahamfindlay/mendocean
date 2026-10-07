@@ -2,7 +2,12 @@
 // Output contains shape diagnostics only: no tokens, URLs, names or raw responses.
 import { readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { normalizeLineup, lineupSignatures } from "../shared/lineups.ts";
+import {
+  normalizeLineup,
+  lineupSignatures,
+  ownBoat,
+  ownSeat,
+} from "../shared/lineups.ts";
 const token = process.env.BHC_CONTRACT_TOKEN;
 if (!token)
   throw new Error(
@@ -48,6 +53,7 @@ try {
   const practices = list(
     await read("practices/getAthletePractices", {
       whitelabel_id: club,
+      custid: auth.custid,
       upcoming: process.env.BHC_CONTRACT_PAST !== "true",
     }),
   );
@@ -81,6 +87,9 @@ try {
     published: lineup.published,
     boat_count: lineup.boats.length,
     crew_count: lineup.boats.reduce((n, b) => n + b.seats.length, 0),
+    coach_count: lineup.boats.reduce((n, b) => n + b.coaches.length, 0),
+    own_boat_found: !!ownBoat(lineup),
+    own_seat_found: !!ownSeat(lineup),
     assignment: hash(signatures.assignment),
     crew: hash(signatures.crew),
   };
@@ -104,7 +113,7 @@ try {
   }
   console.log(JSON.stringify(diagnostics));
   console.log(
-    "Member-token read contract passed. Coach draft/republish semantics still require observed before/after checks.",
+    "Connected-account read contract passed. Ordinary-member permissions and coach draft/republish semantics still require verification.",
   );
 } catch (error) {
   console.error(error.message);
