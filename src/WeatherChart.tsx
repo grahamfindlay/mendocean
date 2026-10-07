@@ -77,6 +77,7 @@ export default function WeatherChart({
   const id = useId();
   const surface = useRef<SVGSVGElement>(null);
   const [W, setWidth] = useState(800);
+  const [mobile, setMobile] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [frozen, setFrozen] = useState<{
     samples: WeatherHour[];
@@ -92,12 +93,19 @@ export default function WeatherChart({
   useEffect(() => {
     const element = surface.current;
     if (!element) return;
-    const measure = () =>
+    const media = window.matchMedia("(max-width: 600px)");
+    const measure = () => {
       setWidth(Math.max(200, element.getBoundingClientRect().width));
+      setMobile(media.matches);
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
-    return () => observer.disconnect();
+    media.addEventListener("change", measure);
+    return () => {
+      observer.disconnect();
+      media.removeEventListener("change", measure);
+    };
   }, [
     samples.length > 0,
     !!domain,
@@ -203,11 +211,13 @@ export default function WeatherChart({
     });
     setSelected(data[nearest].time);
   };
-  // Short windows expose finer changes; wind is twice as dense as conditions.
+  // Short windows expose finer changes; mobile keeps conditions less dense.
   const hours = (end - start) / 3600000;
   const windStep = hours <= 4 ? 0.25 : hours <= 12 ? 0.5 : 1;
   const windCount = Math.max(2, Math.ceil(hours / windStep));
-  const weatherCount = Math.max(2, Math.ceil(hours / (windStep * 2)));
+  const weatherCount = mobile
+    ? Math.max(2, Math.ceil(hours / (windStep * 2)))
+    : windCount;
   const vectorScale = Math.min(1, plotWidth / windCount / 26);
   const weatherScale = Math.min(1, plotWidth / weatherCount / 21);
   const annotations = (count: number) =>
