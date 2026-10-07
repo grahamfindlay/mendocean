@@ -57,6 +57,164 @@ const row = (
   o: ReturnType<typeof import("../support/stack").outing>,
   changes = {},
 ) => report({ actual_start: o.starts_at, actual_end: o.ends_at, ...changes });
+test("BHC password connection validates membership/expiry and persists only an encrypted token", async () => {
+  await fixtures({
+    clubs: [
+      { whitelabel_id: 99, whitelabel_name: "Another club" },
+      { whitelabel_id: 1, whitelabel_name: "mendota" },
+    ],
+  });
+  const input = {
+    email: `fixture-${a.id}@example.test`,
+    password: "synthetic-password-only",
+    request_id: randomUUID(),
+  };
+  expect((await api(a, "bhc/connect-password", input)).status).toBe(200);
+  expect((await api(a, "bhc/connect-password", input)).status).toBe(200);
+  expect(
+    (await fixtures()).calls.filter((c: any) =>
+      c.path.endsWith("generateApiToken"),
+    ),
+  ).toHaveLength(1);
+  const connection = (await api(a, "account")).data.bhc;
+  expect(connection).toMatchObject({
+    connected: true,
+    state: "importing",
+    method: "password_exchange",
+    password_enabled: true,
+  });
+  expect(Date.parse(connection.expires_at)).toBeGreaterThan(Date.now());
+  const stored = (
+    await sql.query("select * from private.bhc_connections where user_id=$1", [
+      a.id,
+    ])
+  ).rows[0];
+  expect(stored.club_id).toBe("1");
+  expect(JSON.stringify(stored)).not.toContain(syntheticToken);
+  expect(JSON.stringify(stored)).not.toContain(input.password);
+  expect(JSON.stringify(stored)).not.toContain(input.email);
+  await tick();
+  expect((await api(a, "account")).data.bhc.state).toBe("healthy");
+  // Pinned numeric ID works even when BHC's name changes.
+  await fixtures({ clubs: [{ whitelabel_id: 1, whitelabel_name: "Renamed" }] });
+  await api(a, "bhc/sync", {});
+  await tick();
+  expect((await api(a, "account")).data.bhc.connected).toBe(true);
+  await api(a, "bhc/disconnect", {});
+});
+test("failed credential/membership/expiry checks preserve the existing BHC connection", async () => {
+  expect((await api(a, "bhc/connect", { token: syntheticToken })).status).toBe(
+    200,
+  );
+  await tick();
+  const previous = (
+    await sql.query(
+      "select ciphertext,revision,last_successful_sync_at from private.bhc_connections where user_id=$1",
+      [a.id],
+    )
+  ).rows[0];
+  const input = {
+    email: `fixture-${a.id}@example.test`,
+    password: "wrong-synthetic-password",
+  };
+  let response = await api(a, "bhc/connect-password", input);
+  expect(response.status).toBe(400);
+  expect(response.data.code).toBe("bhc_credentials");
+  await fixtures({
+    clubs: [{ whitelabel_id: 99, whitelabel_name: "Another club" }],
+  });
+  response = await api(a, "bhc/connect-password", {
+    ...input,
+    password: "synthetic-password-only",
+  });
+  expect(response.status).toBe(409);
+  expect(response.data.code).toBe("bhc_membership_missing");
+  await fixtures({
+    clubs: [{ whitelabel_id: 1, whitelabel_name: "mendota" }],
+    auth: "unknown",
+  });
+  response = await api(a, "bhc/connect-password", {
+    ...input,
+    password: "synthetic-password-only",
+  });
+  expect(response.status).toBe(502);
+  expect(response.data.code).toBe("bhc_unavailable");
+  const current = (
+    await sql.query(
+      "select ciphertext,revision,last_successful_sync_at from private.bhc_connections where user_id=$1",
+      [a.id],
+    )
+  ).rows[0];
+  expect(current).toEqual(previous);
+  await api(a, "bhc/disconnect", {});
+});
+test("revocation and expiry pause BHC writes/reminders; reconnect imports without replaying attendance", async () => {
+  const p = practice(990001);
+  await fixtures({ bhc: [p] });
+  await api(a, "bhc/connect", { token: syntheticToken });
+  await tick();
+  const outing = (await api(a, "account")).data.outings.find(
+    (o: any) => o.bhc_practice_id === p.practice_id,
+  );
+  await fixtures({ auth: "invalid" });
+  await enqueue("bhc_sync", a.id);
+  await tick();
+  expect((await api(a, "account")).data.bhc).toMatchObject({
+    connected: false,
+    state: "reconnect_required",
+  });
+  expect((await api(a, "bhc/sync", {})).data.code).toBe(
+    "bhc_reconnect_required",
+  );
+  const response = await api(a, "bhc/attendance", { outing_id: outing.id });
+  expect(response.status).toBe(409);
+  expect(response.data.code).toBe("bhc_reconnect_required");
+  await fixtures({ auth: null, calls: [] });
+  expect((await api(a, "bhc/connect", { token: syntheticToken })).status).toBe(
+    200,
+  );
+  await tick();
+  expect((await api(a, "account")).data.bhc.state).toBe("healthy");
+  expect(
+    (await fixtures()).calls.filter((c: any) =>
+      c.path.endsWith("setAttendance"),
+    ),
+  ).toHaveLength(0);
+  await sql.query(
+    "update private.bhc_connections set expires_at=now()-interval '1 second' where user_id=$1",
+    [a.id],
+  );
+  expect((await api(a, "account")).data.bhc.state).toBe("reconnect_required");
+  await api(a, "bhc/disconnect", {});
+});
+test("BHC outages stay transient, with safe errors and bounded password attempts", async () => {
+  await api(a, "bhc/connect", { token: syntheticToken });
+  await tick();
+  await fixtures({ failure: "malformed" });
+  await enqueue("bhc_sync", a.id);
+  await tick();
+  expect((await api(a, "account")).data.bhc).toMatchObject({
+    connected: true,
+    state: "temporary_error",
+  });
+  await fixtures({ failure: null, exchange: "invalid" });
+  for (let i = 0; i < 5; i++)
+    expect(
+      (
+        await api(a, "bhc/connect-password", {
+          email: `fixture-${a.id}@example.test`,
+          password: "wrong-synthetic-password",
+        })
+      ).status,
+    ).toBe(400);
+  const limited = await api(a, "bhc/connect-password", {
+    email: `fixture-${a.id}@example.test`,
+    password: "wrong-synthetic-password",
+  });
+  expect(limited.status).toBe(429);
+  expect(JSON.stringify(limited)).not.toContain("wrong-synthetic-password");
+  await api(a, "bhc/disconnect", {});
+});
 test("real Auth invitations and unsigned access boundaries", async () => {
   expect((await api(null, "account")).status).toBe(401);
   expect((await api({ ...a, token: "invalid" }, "account")).status).toBe(401);
@@ -308,17 +466,22 @@ test.each([
   [-10, 200],
   [10, 200],
   [16, 400],
-])("logging a row starting in %i minutes returns %i", async (minutes, status) => {
-  const starts = Date.now() + minutes * 60_000;
-  const o = await createOuting(a, {
-    starts_at: new Date(starts).toISOString(),
-    ends_at: new Date(starts + 90 * 60_000).toISOString(),
-  });
-  const response = await api(a, "report", { outing: o, report: row(o) });
-  expect(response.status).toBe(status);
-  expect((await sql.query("select id from reports where outing_id=$1", [o.id])).rowCount)
-    .toBe(status === 200 ? 1 : 0);
-});
+])(
+  "logging a row starting in %i minutes returns %i",
+  async (minutes, status) => {
+    const starts = Date.now() + minutes * 60_000;
+    const o = await createOuting(a, {
+      starts_at: new Date(starts).toISOString(),
+      ends_at: new Date(starts + 90 * 60_000).toISOString(),
+    });
+    const response = await api(a, "report", { outing: o, report: row(o) });
+    expect(response.status).toBe(status);
+    expect(
+      (await sql.query("select id from reports where outing_id=$1", [o.id]))
+        .rowCount,
+    ).toBe(status === 200 ? 1 : 0);
+  },
+);
 
 test.each(["wind_waves", "non_weather"])(
   "cancellation %s survives API validation and storage",
@@ -450,7 +613,7 @@ test("BHC malformed/invalid response is safe; failed sync unlocks and can recove
   expect(
     (await api(a, "bhc/connect", { token: "invalid-bhc-token-xxxxxxxx" }))
       .status,
-  ).toBe(502);
+  ).toBe(409);
   await api(a, "bhc/connect", { token: syntheticToken });
   await fixtures({ failure: "malformed" });
   await tick();

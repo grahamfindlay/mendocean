@@ -48,6 +48,16 @@ export async function user(approved = true): Promise<Actor> {
   return { id, email, token: signed.data.session.access_token, client };
 }
 export async function api(actor: Actor | null, path: string, body?: unknown) {
+  // Separate synthetic BHC athletes, as real users have distinct identities.
+  if (
+    actor &&
+    path === "bhc/connect" &&
+    body &&
+    typeof body === "object" &&
+    "token" in body &&
+    body.token === syntheticToken
+  )
+    body = { ...body, token: syntheticToken + "-" + actor.id };
   const r = await fetch(`${url}/functions/v1/api/${path}`, {
     method: body === undefined ? "GET" : "POST",
     headers: {
@@ -89,7 +99,11 @@ export async function fixtures(patch?: Record<string, unknown>) {
 }
 export async function resetJobs() {
   await sql.query("truncate private.jobs restart identity");
+  await sql.query("truncate private.bhc_connect_requests");
   await fixtures({
+    clubs: [{ whitelabel_id: 1, whitelabel_name: "mendota" }],
+    auth: null,
+    exchange: null,
     bhc: [],
     lineup: false,
     failure: null,

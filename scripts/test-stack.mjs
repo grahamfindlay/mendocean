@@ -232,7 +232,7 @@ import_map = "./functions/deno.json"
   const gateway = ["darwin", "win32"].includes(process.platform)
     ? "host.docker.internal"
     : net[0].IPAM.Config[0].Gateway;
-  const functionEnv = `APP_URL=http://127.0.0.1:4175\nALLOWED_ORIGINS=http://127.0.0.1:4175\nJOBS_SECRET=${secret}\nMONITOR_SECRET=${secret}-monitor\nOWNER_DIGEST_SECRET=${secret}-digest\nOWNER_EMAIL=owner@example.test\nOWNER_DIGEST_ENABLED=true\nBHC_ENCRYPTION_KEY=${randomBytes(32).toString("base64")}\nRESEND_API_KEY=synthetic\nEMAIL_FROM=Mendocean <test@example.test>\nFIXTURE_SECRET=${secret}\nFIXTURE_URL=http://${gateway}:54328\n`;
+  const functionEnv = `APP_URL=http://127.0.0.1:4175\nALLOWED_ORIGINS=http://127.0.0.1:4175\nJOBS_SECRET=${secret}\nMONITOR_SECRET=${secret}-monitor\nOWNER_DIGEST_SECRET=${secret}-digest\nOWNER_EMAIL=owner@example.test\nOWNER_DIGEST_ENABLED=true\nBHC_ENCRYPTION_KEY=${randomBytes(32).toString("base64")}\nBHC_MENDOTA_CLUB_ID=1\nBHC_PASSWORD_CONNECT_ENABLED=true\nRESEND_API_KEY=synthetic\nEMAIL_FROM=Mendocean <test@example.test>\nFIXTURE_SECRET=${secret}\nFIXTURE_URL=http://${gateway}:54328\n`;
   writeFileSync(join(work, "functions.env"), functionEnv, { mode: 0o600 });
   background(cli, [
     "functions",

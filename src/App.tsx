@@ -1,3 +1,5 @@
+import type { BHCConnectionStatus } from "../shared/bhcConnection";
+import { BHCNotice } from "./BHCConnection";
 import { scheduledAttendance } from "../shared/presentation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -91,11 +93,7 @@ export interface AccountData {
     reminder_channels?: string[];
     reminders_paused: boolean;
   };
-  bhc: {
-    connected: boolean;
-    last_sync: string | null;
-    last_error: string | null;
-  };
+  bhc: BHCConnectionStatus;
 }
 export default function App() {
   const { pathname } = useLocation();
@@ -149,6 +147,7 @@ export default function App() {
   const [settings, setSettings] = useState(
     new URLSearchParams(location.search).has("account"),
   );
+  const [focusBHC, setFocusBHC] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -500,6 +499,7 @@ export default function App() {
         authReady={authReady}
       >
         <main>
+          {tab === "Rows" && account && <BHCNotice status={account.bhc} onReconnect={()=>{setFocusBHC(true);setSettings(true);}}/>}
           {isForecast(tab) ? (
             weather ? (
               <ForecastView
@@ -703,12 +703,29 @@ export default function App() {
           now={now}
           onClose={() => setAttendanceOuting(undefined)}
           onRefresh={refresh}
+          onReconnect={() => {
+            setAttendanceOuting(undefined);
+            setFocusBHC(true);
+            setSettings(true);
+          }}
         />
       )}
       {settings && user && (
-        <Modal title="Your account" onClose={() => setSettings(false)}>
+        <Modal
+          title="Your account"
+          onClose={() => {
+            setSettings(false);
+            setFocusBHC(false);
+          }}
+        >
           <SettingsForm
             account={account}
+            focusConnection={focusBHC}
+            onViewRows={() => {
+              setSettings(false);
+              setFocusBHC(false);
+              setTab("Rows");
+            }}
             onExport={async () =>
               download(
                 "mendocean-my-data.json",
