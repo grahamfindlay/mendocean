@@ -2108,6 +2108,17 @@ button:hover:not(:disabled) {
 .header-actions a.button {
   text-decoration: none;
 }
+.site-header .header-actions {
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+.administration-link {
+  flex-shrink: 0;
+  text-decoration: none;
+}
+.administration-link:hover {
+  background: #e9efdf;
+}
 .admin-shell {
   max-width: 1440px;
   padding: 0 32px 48px;
@@ -2305,6 +2316,11 @@ button:hover:not(:disabled) {
   background: #e9efdf;
   font-weight: 600;
 }
+.admin-account-name,
+.admin-account-email,
+.admin-accounts-table .text-button {
+  overflow-wrap: anywhere;
+}
 .admin-accounts-table .text-button {
   text-align: left;
   padding: 0;
@@ -2413,8 +2429,7 @@ button:hover:not(:disabled) {
 }
 @media (max-width: 760px) {
   .site-header {
-    flex-wrap: wrap;
-    gap: 14px;
+    gap: 6px;
   }
   .admin-shell {
     padding: 0 16px 32px;

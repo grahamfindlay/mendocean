@@ -29,7 +29,11 @@ import {
 } from "../../../shared/reminders.ts";
 import { weatherFeatures } from "../_shared/weather.ts";
 import { monitoring, observeFailure } from "../_shared/observability.ts";
-import { readiness, type Operations } from "../../../shared/monitoring.ts";
+import {
+  readiness,
+  type ActivitySummary,
+  type Operations,
+} from "../../../shared/monitoring.ts";
 const uuid = z.string().uuid();
 export function createApiHandler(providers: Providers = liveProviders) {
   return async (req: Request): Promise<Response> => {
@@ -281,17 +285,30 @@ export function createApiHandler(providers: Providers = liveProviders) {
                   .max(30)
                   .parse(params.get("days") || 7),
               };
-        return json(
-          req,
-          await monitoring(
-            path === "admin/timeline"
-              ? "timeline"
-              : path === "admin/activity"
-                ? "activity"
-                : "operations",
-            args,
-          ),
+        const result = await monitoring(
+          path === "admin/timeline"
+            ? "timeline"
+            : path === "admin/activity"
+              ? "activity"
+              : "operations",
+          args,
         );
+        if (path === "admin/activity") {
+          const activity = result as ActivitySummary;
+          const identities = check(
+            await db.rpc("admin_account_emails", {
+              user_ids: activity.users.map((user) => user.id),
+            }),
+          ) as { id: string; email: string | null }[];
+          const emails = new Map(
+            identities.map((user) => [user.id, user.email]),
+          );
+          activity.users = activity.users.map((user) => ({
+            ...user,
+            email: emails.get(user.id) || null,
+          }));
+        }
+        return json(req, result);
       }
       if (path === "admin/outings" && req.method === "GET") {
         if (profile.role !== "admin")

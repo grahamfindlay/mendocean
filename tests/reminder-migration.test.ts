@@ -5,7 +5,7 @@ test("migration preserves exact preferences, sent history and in-flight provider
   const db = new PGlite();
   try {
     await db.exec(
-      "create role anon;create role authenticated;create role service_role bypassrls;create schema storage;create table storage.objects(bucket_id text,metadata jsonb);create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;",
+      "create role anon;create role authenticated;create role service_role bypassrls;create schema storage;create table storage.objects(bucket_id text,metadata jsonb);create schema auth;create table auth.users(id uuid primary key,email text);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;",
     );
     const migrations = readdirSync("supabase/migrations")
       .filter((n) => n.endsWith(".sql") && !n.includes("_storage"))
@@ -25,7 +25,7 @@ test("migration preserves exact preferences, sent history and in-flight provider
       crypto.randomUUID(),
     ];
     for (const [i, channel] of ["none", "email", "push"].entries()) {
-      await db.query("insert into auth.users values($1)", [users[i]]);
+      await db.query("insert into auth.users(id) values($1)", [users[i]]);
       await db.query(
         "update profiles set reminder_channel=$1,approved=true where id=$2",
         [channel, users[i]],

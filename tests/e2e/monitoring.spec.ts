@@ -5,6 +5,7 @@ import {
   cleanupUsers,
   localURL,
   secret,
+  sql,
   type Actor,
 } from "../support/stack";
 let actor: Actor;
@@ -48,6 +49,10 @@ test("real production SDK sanitizes private data and captures bundle frames; blo
       body: JSON.stringify({ status: 1, config: {} }),
     });
   });
+  await sql.query(
+    "update profiles set role='admin',display_name=$1 where id=$2",
+    ["Fixture Private Name", actor.id],
+  );
   const session = (await actor.client.auth.getSession()).data.session;
   const key = `sb-${new URL(localURL("TEST_SUPABASE_URL")).hostname.split(".")[0]}-auth-token`;
   await page.addInitScript(
@@ -73,6 +78,11 @@ test("real production SDK sanitizes private data and captures bundle frames; blo
     await expect
       .poll(() => events.some((e) => e.event === "app_opened"))
       .toBe(true);
+    await page.goto("/admin/accounts");
+    await expect(
+      page.getByRole("button", { name: "Fixture Private Name", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText(actor.email, { exact: true })).toBeVisible();
     await page.evaluate(() =>
       setTimeout(() => {
         (window as any).__MONITORING_FIXTURE__();
@@ -85,6 +95,8 @@ test("real production SDK sanitizes private data and captures bundle frames; blo
     expect(serialized).not.toContain("fixture-private-report");
     expect(serialized).not.toContain("fixture-secret");
     expect(serialized).not.toContain("fixture@example.test");
+    expect(serialized).not.toContain(actor.email);
+    expect(serialized).not.toContain("Fixture Private Name");
     expect(serialized).not.toContain("$current_url");
     const exception = events.find((e) => e.event === "$exception");
     expect(
@@ -98,6 +110,7 @@ test("real production SDK sanitizes private data and captures bundle frames; blo
     );
     await page.unroute("https://*.posthog.com/**");
     await page.route("https://*.posthog.com/**", (route) => route.abort());
+    await page.goto("/");
     await page.reload();
     await page.getByRole("button", { name: "Account", exact: true }).click();
     await expect(

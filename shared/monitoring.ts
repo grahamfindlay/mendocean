@@ -21,6 +21,7 @@ export interface Operations {
 export interface ActivityUser {
   id: string;
   display_name: string;
+  email: string | null;
   role: string;
   approved: boolean;
   invited_at: string;

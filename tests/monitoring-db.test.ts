@@ -15,7 +15,7 @@ const query = async (action: string, args = {}) =>
 beforeAll(async () => {
   db = new PGlite();
   await db.exec(
-    "create role anon;create role authenticated;create role service_role bypassrls;create schema storage;create table storage.objects(bucket_id text,metadata jsonb);create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;",
+    "create role anon;create role authenticated;create role service_role bypassrls;create schema storage;create table storage.objects(bucket_id text,metadata jsonb);create schema auth;create table auth.users(id uuid primary key,email text);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;",
   );
   for (const file of readdirSync("supabase/migrations")
     .filter((f) => f.endsWith(".sql") && !f.includes("_storage"))
@@ -26,7 +26,11 @@ beforeAll(async () => {
         "",
       ),
     );
-  await db.query("insert into auth.users values($1),($2),($3)", [A, B, OWNER]);
+  await db.query("insert into auth.users(id) values($1),($2),($3)", [
+    A,
+    B,
+    OWNER,
+  ]);
   await db.query(
     "update profiles set approved=true,role=case when id=$1 then 'admin' else 'member' end",
     [OWNER],
@@ -50,6 +54,36 @@ test("members/anonymous cannot read private observations or invoke the privilege
     await db.exec("reset role");
   }
 });
+test("account email lookup is restricted to the service role and requested accounts", async () => {
+  await db.query("update auth.users set email=$1 where id=$2", [
+    "pilot@example.test",
+    B,
+  ]);
+  for (const role of ["anon", "authenticated"]) {
+    await db.exec(`set role ${role}`);
+    await expect(
+      db.query("select * from public.admin_account_emails($1)", [[B]]),
+    ).rejects.toThrow("permission denied");
+    await db.exec("reset role");
+  }
+  await db.exec("set role service_role");
+  try {
+    expect(
+      (await db.query("select * from public.admin_account_emails($1)", [[B]]))
+        .rows,
+    ).toEqual([{ id: B, email: "pilot@example.test" }]);
+    expect(
+      (await db.query("select * from public.admin_account_emails($1)", [[]]))
+        .rows,
+    ).toEqual([]);
+  } finally {
+    await db.exec("reset role");
+  }
+  expect(JSON.stringify(await query("activity"))).not.toContain(
+    "pilot@example.test",
+  );
+});
+
 test("foreground observations throttle on the server and do not record supplied data", async () => {
   await query("observe", { user_id: A, notes: "secret" });
   await query("observe", { user_id: A });

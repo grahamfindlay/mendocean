@@ -8,6 +8,9 @@ import type {
 import { adminStamp, useAdminAction, useAdminData } from "./adminData";
 import { AdminActionStatus } from "./AdminTools";
 
+const accountName = (user: ActivityUser) =>
+  user.display_name.trim() || user.email || `Account ${user.id.slice(0, 8)}`;
+
 function InviteUser({ onInvited }: { onInvited: () => Promise<void> }) {
   const action = useAdminAction();
   const [email, setEmail] = useState("");
@@ -80,7 +83,10 @@ function AccountHistory({
           Close history
         </button>
       </div>
-      <h3>{user.display_name || `Account ${user.id.slice(0, 8)}`}</h3>
+      <h3 className="admin-account-name">{accountName(user)}</h3>
+      {user.email && user.display_name.trim() && (
+        <p className="help admin-account-email">{user.email}</p>
+      )}
       <label>
         Account ID for PostHog search
         <input
@@ -224,8 +230,11 @@ export default function AdminActivity() {
                             aria-pressed={selected === u.id}
                             onClick={() => setSelected(u.id)}
                           >
-                            {u.display_name || `Account ${u.id.slice(0, 8)}`}
+                            {accountName(u)}
                           </button>
+                          {u.email && u.display_name.trim() && (
+                            <small>{u.email}</small>
+                          )}
                           {u.role === "admin" && <small>Owner</small>}
                           {!u.approved && <small>Unapproved</small>}
                         </div>
