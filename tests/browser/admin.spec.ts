@@ -30,15 +30,12 @@ const health = (models: ReturnType<typeof model>[] = []) => ({
 async function mount(
   page: Page,
   reply: (path: string, body: any) => unknown | Promise<unknown>,
+  initialPath = "/admin/models",
 ) {
   await page.route("**/src/main.tsx", (route) =>
     route.fulfill({
       contentType: "application/javascript",
-      body: `import React from '/node_modules/.vite/deps/react.js';
-      import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';
-      import Admin from '/src/Admin.tsx';
-      import '/src/styles.css';
-      ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Admin));`,
+      body: `import '/tests/browser/admin-harness.tsx';`,
     }),
   );
   await page.route("**/src/client.ts", (route) =>
@@ -86,8 +83,8 @@ async function mount(
           : await reply(path, route.request().postDataJSON()),
     });
   });
-  await page.goto("/");
-  await page.getByText("Pilot administration", { exact: true }).click();
+  await page.goto(initialPath);
+  await expect(page.locator(".admin-sidebar")).toBeVisible();
 }
 
 test("loading and failed health never claim there are no models; retry recovers", async ({
@@ -105,15 +102,13 @@ test("loading and failed health never claim there are no models; retry recovers"
     }
     return [];
   });
-  await expect(page.getByText("Loading administration…")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Loading…" })).toBeVisible();
   await expect(page.getByText(/No trained models yet/)).toHaveCount(0);
   release();
   await expect(page.getByRole("alert")).toContainText("Unavailable");
   await expect(page.getByText(/No trained models yet/)).toHaveCount(0);
   failed = false;
-  await page
-    .getByRole("button", { name: "Retry loading administration" })
-    .click();
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
   await expect(page.getByText(/No trained models yet/)).toBeVisible();
 });
 
@@ -121,22 +116,26 @@ test("older rows can be corrected, existing times are prefilled, and changes req
   page,
 }) => {
   const posts: any[] = [];
-  await mount(page, (path, body) => {
-    if (path === "health")
-      return health([model("active", { status: "active" })]);
-    if (path === "admin/outings")
-      return Array.from({ length: 200 }, (_, i) => row(String(i)));
-    if (path === "admin/outings?offset=200")
-      return [
-        {
-          ...row("old", "Older practice"),
-          actual_starts_at: "2026-09-20T12:15:00Z",
-          actual_ends_at: "2026-09-20T13:15:00Z",
-        },
-      ];
-    posts.push({ path, body });
-    return {};
-  });
+  await mount(
+    page,
+    (path, body) => {
+      if (path === "health")
+        return health([model("active", { status: "active" })]);
+      if (path === "admin/outings")
+        return Array.from({ length: 200 }, (_, i) => row(String(i)));
+      if (path === "admin/outings?offset=200")
+        return [
+          {
+            ...row("old", "Older practice"),
+            actual_starts_at: "2026-09-20T12:15:00Z",
+            actual_ends_at: "2026-09-20T13:15:00Z",
+          },
+        ];
+      posts.push({ path, body });
+      return {};
+    },
+    "/admin/intervals",
+  );
   await page.getByRole("button", { name: "Load older rows" }).click();
   await page
     .getByRole("combobox", { name: "Row", exact: true })
@@ -144,14 +143,20 @@ test("older rows can be corrected, existing times are prefilled, and changes req
   await expect(page.getByLabel("Actual start · Madison")).toHaveValue(
     "2026-09-20T07:15",
   );
-  await expect(page.getByLabel("Actual end", { exact: true })).toHaveValue(
-    "2026-09-20T08:15",
-  );
-  await expect(page.getByText(/Scheduled:/)).toContainText("Current actual:");
-  await page.getByLabel("Actual end", { exact: true }).fill("2026-09-20T06:00");
+  await expect(
+    page.getByLabel("Actual end · Madison", { exact: true }),
+  ).toHaveValue("2026-09-20T08:15");
+  await expect(
+    page.getByRole("heading", { name: "Current times" }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Actual end · Madison", { exact: true })
+    .fill("2026-09-20T06:00");
   await page.getByRole("button", { name: "Save interval" }).click();
-  await expect(page.getByRole("alert")).toHaveText("End must be after start.");
-  await page.getByLabel("Actual end", { exact: true }).fill("2026-09-20T08:30");
+  await expect(page.getByRole("alert")).toHaveText("Actual end must be after actual start.");
+  await page
+    .getByLabel("Actual end · Madison", { exact: true })
+    .fill("2026-09-20T08:30");
   page.once("dialog", async (dialog) => {
     expect(dialog.message()).toContain("Older practice");
     expect(dialog.message()).toContain("learned model will be retired");
@@ -178,13 +183,17 @@ test("merge excludes the source and names both independent rows before submittin
   page,
 }) => {
   const posts: any[] = [];
-  await mount(page, (path, body) => {
-    if (path === "health") return health();
-    if (path === "admin/outings")
-      return [row("a", "Duplicate row"), row("b", "Kept row")];
-    posts.push({ path, body });
-    return {};
-  });
+  await mount(
+    page,
+    (path, body) => {
+      if (path === "health") return health();
+      if (path === "admin/outings")
+        return [row("a", "Duplicate row"), row("b", "Kept row")];
+      posts.push({ path, body });
+      return {};
+    },
+    "/admin/reconcile",
+  );
   await page
     .getByRole("combobox", { name: "Keep this row", exact: true })
     .selectOption("a");
@@ -202,12 +211,12 @@ test("merge excludes the source and names both independent rows before submittin
   await page
     .getByRole("combobox", { name: "Keep this row", exact: true })
     .selectOption("b");
-  page.once("dialog", async (dialog) => {
-    expect(dialog.message()).toContain("Duplicate row");
-    expect(dialog.message()).toContain("Kept row");
-    await dialog.accept();
-  });
-  await page.getByRole("button", { name: "Merge duplicate" }).click();
+  await page.getByRole("button", { name: "Review merge" }).click();
+  await expect(page.locator(".admin-merge-review")).toContainText(
+    "Duplicate row",
+  );
+  await expect(page.locator(".admin-merge-review")).toContainText("Kept row");
+  await page.getByRole("button", { name: "Confirm merge" }).click();
   await expect(page.getByText("Rows reconciled.")).toBeVisible();
   expect(posts).toEqual([
     { path: "outings/reconcile", body: { source: "a", target: "b" } },
@@ -233,9 +242,11 @@ test("only eligible current models can be approved and rollback requires confirm
   await expect(page.getByText(/Current forecasting method:/)).toContainText(
     "Learned model",
   );
-  const models = page.locator(".admin-tools > details");
+  const models = page
+    .locator(".admin-content .admin-panel")
+    .filter({ has: page.getByRole("button", { name: "Approve model" }) });
   await expect(models).toHaveCount(4);
-  for (let i = 0; i < 4; i++) await models.nth(i).locator("summary").click();
+
   const approve = page.getByRole("button", { name: "Approve model" });
   for (let i = 0; i < 3; i++) await expect(approve.nth(i)).toBeDisabled();
   await expect(approve.nth(3)).toBeEnabled();

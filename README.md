@@ -35,6 +35,7 @@ To connect a real project, copy `.env.example` to `.env.local`, supply the proje
 ```sh
 npm test
 npm run build
+npm run test:e2e:admin
 python3 -m unittest discover -s tests -p 'test_*.py'
 deno check --config supabase/functions/deno.json supabase/functions/api/index.ts supabase/functions/jobs/index.ts
 ```
@@ -46,3 +47,5 @@ Database tests execute the SQL migrations in embedded PostgreSQL (PGlite) and ex
 See [deployment instructions](docs/DEPLOYMENT.md), [implementation notes](docs/IMPLEMENTATION.md), and [pilot launch checks](docs/PILOT.md).
 
 The code has not been deployed to a hosted Supabase project or Cloudflare Pages yet. No real BHC token is committed, no pilot accounts have been created, and reminder sending is not enabled locally.
+
+Pilot administration is available at `/admin` with separate menu pages for activity and invitations, duplicate reconciliation, actual-time corrections, operations, and model review.

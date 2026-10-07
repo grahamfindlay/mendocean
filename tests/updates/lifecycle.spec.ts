@@ -194,8 +194,9 @@ test("first install, signed-out foreground A→B→C, no reload loop, coherent o
 }, info) => {
   const a = await release("a");
   let navigations = 0;
-  page.on("framenavigated", (f) => {
-    if (f === page.mainFrame()) navigations++;
+  // Count document requests, not same-document router history initialization.
+  page.on("request", (request) => {
+    if (request.isNavigationRequest() && request.frame() === page.mainFrame()) navigations++;
   });
   await page.goto("/");
   await controlled(page);

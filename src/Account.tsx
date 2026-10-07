@@ -9,7 +9,7 @@ import {
   formatDate,
   formatTime,
 } from "../shared/domain";
-import Admin from "./Admin";
+import { Link } from "react-router-dom";
 import { UpdateSettings } from "./UpdateControls";
 import { reminderChannels } from "../shared/reminders";
 import { pushEnvironment } from "./pushSupport";
@@ -228,7 +228,9 @@ export function PlanForm({
           ))}
         </select>
       </label>
-      <p className="help">Logging reminders follow your preferences in Account.</p>
+      <p className="help">
+        Logging reminders follow your preferences in Account.
+      </p>
       {error && <p className="alert">{error}</p>}
       <button className="button full" disabled={busy}>
         Save row
@@ -241,11 +243,13 @@ export function SettingsForm({
   onUpdated,
   onExport,
   onSignOut,
+  onAdministration,
 }: {
   account: AccountData | null;
   onUpdated: () => void;
   onExport: () => Promise<void>;
   onSignOut: () => void;
+  onAdministration: () => void;
 }) {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -377,13 +381,21 @@ export function SettingsForm({
       </form>
       <hr />
       <h3>Your data</h3>
-      <button className="text-button" disabled={busy} onClick={async () => {
-        setBusy(true);
-        setError("");
-        try { await onExport(); }
-        catch (e) { setError((e as Error).message); }
-        finally { setBusy(false); }
-      }}>
+      <button
+        className="text-button"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setError("");
+          try {
+            await onExport();
+          } catch (e) {
+            setError((e as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
         <Download size={16} />
         Export my data
       </button>
@@ -665,27 +677,13 @@ export function SettingsForm({
       {account?.profile.role === "admin" && (
         <>
           <hr />
-          <h3>Invite a pilot user</h3>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const f = new FormData(e.currentTarget);
-              void run(async () => {
-                await api("invite", { email: f.get("email") });
-                setMessage(
-                  "Account created. The person can request a sign-in code.",
-                );
-              });
-            }}
+          <Link
+            className="button subtle"
+            to="/admin"
+            onClick={onAdministration}
           >
-            <label>
-              Email
-              <input name="email" type="email" required />
-            </label>
-            <button className="button subtle" disabled={busy}>
-              Create invited account
-            </button>
-          </form>
+            Open administration
+          </Link>
         </>
       )}
       {message && (
@@ -698,7 +696,6 @@ export function SettingsForm({
           {error}
         </p>
       )}
-      {account?.profile.role === "admin" && <Admin />}
       <p className="help">
         Mendocean records account activity and save, sync, and reminder outcomes
         to help keep the app working. When usage analytics is enabled, it also

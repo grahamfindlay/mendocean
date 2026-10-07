@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:admin": "playwright test --config playwright.admin.config.ts",
     "test:db": "vitest run tests/database.test.ts",
     "typecheck": "tsc -b && tsc -p tsconfig.tools.json",
     "test:stack": "node scripts/test-stack.mjs",
