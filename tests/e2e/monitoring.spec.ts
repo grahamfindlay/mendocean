@@ -5,7 +5,7 @@ import {
   cleanupUsers,
   localURL,
   secret,
-  sql,
+  db,
   type Actor,
 } from "../support/stack";
 let actor: Actor;
@@ -49,10 +49,11 @@ test("real production SDK sanitizes private data and captures bundle frames; blo
       body: JSON.stringify({ status: 1, config: {} }),
     });
   });
-  await sql.query(
-    "update profiles set role='admin',display_name=$1 where id=$2",
-    ["Fixture Private Name", actor.id],
-  );
+  const { error: profileError } = await db
+    .from("profiles")
+    .update({ role: "admin", display_name: "Fixture Private Name" })
+    .eq("id", actor.id);
+  expect(profileError).toBeNull();
   const session = (await actor.client.auth.getSession()).data.session;
   const key = `sb-${new URL(localURL("TEST_SUPABASE_URL")).hostname.split(".")[0]}-auth-token`;
   await page.addInitScript(
