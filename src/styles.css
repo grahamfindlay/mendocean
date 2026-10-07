@@ -13,6 +13,55 @@
   --amber: #896016;
   --red: #a33e32;
 }
+.bhc-recommended {
+  margin: 20px 0;
+  padding: 18px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.bhc-recommended h4 {
+  margin: 12px 0;
+}
+.bhc-secret {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.bhc-secret input {
+  min-width: 0;
+  flex: 1;
+}
+.bhc-secret button {
+  min-width: 48px;
+  min-height: 44px;
+}
+.bhc-steps li {
+  margin-bottom: 12px;
+}
+.bhc-details {
+  margin: 20px 0;
+}
+.bhc-details div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  border-bottom: 1px solid var(--line);
+  padding: 12px 0;
+}
+.bhc-details dt {
+  color: var(--muted);
+}
+.bhc-details dd {
+  margin: 0;
+}
+.bhc-notice p {
+  margin: 8px 0;
+}
+.bhc-notice {
+  margin: 16px 0;
+}
 * {
   box-sizing: border-box;
 }

@@ -6,10 +6,9 @@ import {
   BOAT_CLASSES,
   chicagoToISO,
   localDateTime,
-  formatDate,
-  formatTime,
 } from "../shared/domain";
 import { Link } from "react-router-dom";
+import { BHCConnection } from "./BHCConnection";
 import { UpdateSettings } from "./UpdateControls";
 import { reminderChannels } from "../shared/reminders";
 import { pushEnvironment } from "./pushSupport";
@@ -244,18 +243,20 @@ export function SettingsForm({
   onExport,
   onSignOut,
   onAdministration,
+  focusConnection,
+  onViewRows,
 }: {
   account: AccountData | null;
   onUpdated: () => void;
   onExport: () => Promise<void>;
   onSignOut: () => void;
   onAdministration: () => void;
+  focusConnection?: boolean;
+  onViewRows?: () => void;
 }) {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const [token, setToken] = useState("");
-  const [club, setClub] = useState("");
   const [pushProgress, setPushProgress] = useState("");
   const [registered, setRegistered] = useState(false);
   const [deviceChecked, setDeviceChecked] = useState(false);
@@ -579,101 +580,14 @@ export function SettingsForm({
         </p>
       )}
       <hr />
-      <h3>Boathouse Connect</h3>
-      <p className="help">
-        Optional. Import your practices and planned lineups. Your app login is
-        separate.
-      </p>
-      {account?.bhc.connected ? (
-        <>
-          <p>
-            Connected
-            {account.bhc.last_sync
-              ? " · Synced " +
-                formatDate(account.bhc.last_sync) +
-                " " +
-                formatTime(account.bhc.last_sync)
-              : ""}
-          </p>
-          {account.bhc.last_error && (
-            <p className="alert">{account.bhc.last_error}</p>
-          )}
-          <div className="card-actions">
-            <button
-              className="button subtle"
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  await api("bhc/sync", {});
-                  setMessage(
-                    "Practice refresh queued. Check back in a few minutes.",
-                  );
-                })
-              }
-            >
-              Refresh practices
-            </button>
-            <button
-              className="text-button danger"
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  await api("bhc/disconnect", {});
-                  track(
-                    "bhc_connection_changed",
-                    { action: "disconnect" },
-                    account.profile.id,
-                  );
-                  setMessage("Disconnected. Existing reports are preserved.");
-                })
-              }
-            >
-              Disconnect
-            </button>
-          </div>
-        </>
-      ) : (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void run(async () => {
-              await api("bhc/connect", {
-                token,
-                club_id: club ? Number(club) : undefined,
-              });
-              track(
-                "bhc_connection_changed",
-                { action: "connect" },
-                account.profile.id,
-              );
-              setToken("");
-              setMessage("Connected. Your practices are being imported.");
-            });
-          }}
-        >
-          <label>
-            BHC API token
-            <input
-              type="password"
-              autoComplete="off"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              required
-            />
-          </label>
-          <label>
-            Club ID (only if you belong to multiple clubs)
-            <input
-              inputMode="numeric"
-              value={club}
-              onChange={(e) => setClub(e.target.value)}
-            />
-          </label>
-          <button className="button subtle" disabled={busy}>
-            Connect account
-          </button>
-        </form>
-      )}
+      <BHCConnection
+        key={account.profile.id}
+        user={account.profile.id}
+        status={account.bhc}
+        onUpdated={onUpdated}
+        focusConnection={focusConnection}
+        onViewRows={onViewRows}
+      />
       {account?.profile.role === "admin" && (
         <>
           <hr />

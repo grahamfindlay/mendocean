@@ -41,7 +41,9 @@ async function mount(
   await page.route("**/src/client.ts", (route) =>
     route.fulfill({
       contentType: "application/javascript",
-      body: `export async function api(path, body) {
+      body: `export const supabase = null;
+      export class ApiError extends Error { constructor(message, requestId, status, code) { super(message);this.requestId=requestId;this.status=status;this.code=code; } }
+      export async function api(path, body) {
       const response = await fetch('/__admin/' + path, { method: body === undefined ? 'GET' : 'POST', body: JSON.stringify(body) });
       const data = await response.json();
       if (data.error) throw new Error(data.error);

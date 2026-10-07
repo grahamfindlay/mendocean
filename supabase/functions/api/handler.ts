@@ -1,5 +1,9 @@
 import { canLog } from "../../../shared/presentation.ts";
-import { DEFAULT_WEEK_PERIODS, legacyPeriods, weekPeriodsSchema } from "../../../shared/weekPeriods.ts";
+import {
+  DEFAULT_WEEK_PERIODS,
+  legacyPeriods,
+  weekPeriodsSchema,
+} from "../../../shared/weekPeriods.ts";
 import { liveProviders, type Providers } from "../_shared/providers.ts";
 import { z } from "zod";
 import { sendTestPush } from "../_shared/notifications.ts";
@@ -15,11 +19,11 @@ import {
   json,
   query,
   scheduleReminder,
-  seal,
   service,
   userClient,
 } from "../_shared/runtime.ts";
-import { bhcGet, list } from "../_shared/bhc.ts";
+import { connectBHC, passwordBHCEnabled } from "../_shared/bhc-connection.ts";
+import { bhcStatus } from "../../../shared/bhcConnection.ts";
 import { manageAttendance } from "../_shared/attendance.ts";
 import { assess, assessmentCapabilities } from "../../../shared/model.ts";
 import {
@@ -226,8 +230,9 @@ export function createApiHandler(providers: Providers = liveProviders) {
         const connection = await query("connection_get", { user_id: uid });
         if (
           connection.user_id &&
-          (!connection.last_sync ||
-            Date.now() - Date.parse(connection.last_sync) > 15 * 60000)
+          connection.access_state === "active" &&
+          (!connection.last_attempt_at ||
+            Date.now() - Date.parse(connection.last_attempt_at) > 15 * 60000)
         )
           await enqueue(
             "bhc_sync",
@@ -236,17 +241,22 @@ export function createApiHandler(providers: Providers = liveProviders) {
             new Date(),
             `bhc:${uid}:${Math.floor(Date.now() / 900000)}`,
           );
+        const outings = await ownOutings();
         return json(req, {
           profile,
           push_devices: (await query("push_get", { user_id: uid })).length,
-          outings: await ownOutings(),
+          outings,
           coaches: check(
             await client.from("coaches").select("id,name").order("name"),
           ),
           bhc: {
-            connected: !!connection.user_id,
-            last_sync: connection.last_sync || null,
-            last_error: connection.last_error || null,
+            ...bhcStatus(connection, providers.now(), passwordBHCEnabled()),
+            upcoming_practices: outings.filter(
+              (o) =>
+                o.kind === "official" &&
+                o.bhc_club_id === connection.club_id &&
+                Date.parse(o.ends_at) > providers.now(),
+            ).length,
           },
         });
       }
@@ -342,7 +352,10 @@ export function createApiHandler(providers: Providers = liveProviders) {
         });
       if (req.method !== "POST")
         throw new HttpError(405, "Method not allowed.");
-      const input = await body(req);
+      const input = await body(
+        req,
+        path === "bhc/connect-password" ? 4096 : 32768,
+      );
       if (path === "activity/observe") {
         z.object({}).strict().parse(input);
         await monitoring("observe", { user_id: uid });
@@ -387,8 +400,16 @@ export function createApiHandler(providers: Providers = liveProviders) {
       if (path === "report") {
         const outing = outingSchema.parse(input.outing);
         const report = reportSchema.parse(input.report);
-        if (!canLog({ starts_at: report.actual_start || outing.starts_at }, Date.now()))
-          throw new HttpError(400, "Logging opens 15 minutes before the row starts.");
+        if (
+          !canLog(
+            { starts_at: report.actual_start || outing.starts_at },
+            Date.now(),
+          )
+        )
+          throw new HttpError(
+            400,
+            "Logging opens 15 minutes before the row starts.",
+          );
         if (outing.kind === "independent") {
           const m = check(
             await client
@@ -649,53 +670,52 @@ export function createApiHandler(providers: Providers = liveProviders) {
         check(await db.rpc("refresh_reminder_jobs", { uid }));
         return json(req, { saved: true });
       }
-      if (path === "bhc/connect") {
-        const parsed = z
-          .object({
-            token: z.string().trim().min(20).max(200),
-            club_id: z.number().int().positive().optional(),
-          })
-          .parse(input);
-        const auth = await bhcGet(
-          "authenticate/checkApiKey",
-          parsed.token,
-          {},
-          providers,
+      if (path === "bhc/connect" || path === "bhc/connect-password") {
+        const parsed =
+          path === "bhc/connect"
+            ? z
+                .object({
+                  token: z.string().trim().min(20).max(200),
+                  club_id: z.number().int().positive().optional(),
+                  request_id: uuid.optional(),
+                })
+                .strict()
+                .parse(input)
+            : z
+                .object({
+                  email: z.string().trim().email().max(254),
+                  password: z.string().min(1).max(1024),
+                  request_id: uuid.optional(),
+                })
+                .strict()
+                .parse(input);
+        return json(
+          req,
+          await connectBHC(
+            uid,
+            parsed.request_id || requestId,
+            parsed,
+            providers,
+          ),
         );
-        const custid = Number(auth.custid);
-        if (!custid)
-          throw new HttpError(400, "BHC did not recognize this token.");
-        const clubs = list(
-          await bhcGet("users/getAllWhitelabels", parsed.token, {}, providers),
-        );
-        const ids = clubs.map((c) => Number(c.whitelabel_id));
-        const club = parsed.club_id || (ids.length === 1 ? ids[0] : null);
-        if (!club || !ids.includes(club))
-          throw new HttpError(
-            400,
-            `Choose one of your BHC club IDs: ${ids.join(", ")}.`,
-          );
-        await query("connection_put", {
-          user_id: uid,
-          custid,
-          club_id: club,
-          ...(await seal(parsed.token)),
-        });
-        await enqueue(
-          "bhc_sync",
-          uid,
-          null,
-          new Date(),
-          `bhc-initial:${uid}:${Date.now()}`,
-          { initial: true },
-        );
-        return json(req, { connected: true });
       }
       if (path === "bhc/disconnect") {
         await query("connection_delete", { user_id: uid });
         return json(req, { disconnected: true });
       }
       if (path === "bhc/sync") {
+        const connection = await query("connection_get", { user_id: uid });
+        const status = bhcStatus(connection, providers.now());
+        if (!status.connected)
+          throw new HttpError(
+            409,
+            status.state === "membership_missing"
+              ? "Check your Mendota membership in BHC."
+              : "Reconnect Boathouse Connect to continue.",
+            status.state === "membership_missing"
+              ? "bhc_membership_missing"
+              : "bhc_reconnect_required",
+          );
         await enqueue(
           "bhc_sync",
           uid,
@@ -799,12 +819,20 @@ export function createApiHandler(providers: Providers = liveProviders) {
       if (error instanceof z.ZodError)
         return json(
           req,
-          { error: error.issues.map((i) => i.message).join(" ") },
+          {
+            error:
+              path === "bhc/connect-password"
+                ? "Check your BHC email and password."
+                : error.issues.map((i) => i.message).join(" "),
+          },
           400,
         );
       return json(
         req,
         {
+          ...(error instanceof HttpError && error.code
+            ? { code: error.code }
+            : {}),
           error:
             error instanceof HttpError
               ? error.message

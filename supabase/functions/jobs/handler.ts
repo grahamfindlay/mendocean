@@ -106,6 +106,7 @@ export function createJobsHandler(
               job.payload?.initial,
               job.payload?.after_id || 0,
               providers,
+              job.payload?.revision,
             );
           else if (job.kind === "reminder")
             await sendReminder(

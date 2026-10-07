@@ -10,6 +10,7 @@ export const EVENTS = [
   "report_upload_failed",
   "report_save_confirmed",
   "bhc_connection_changed",
+  "bhc_setup",
   "reminder_preferences_changed",
 ] as const;
 export type EventName = (typeof EVENTS)[number];
@@ -59,8 +60,14 @@ export function safeProperties(input: Properties): Properties {
     )
   )
     out.category = input.category;
-  if (["connect", "disconnect"].includes(String(input.action)))
+  if (
+    ["connect", "disconnect", "started", "failed"].includes(
+      String(input.action),
+    )
+  )
     out.action = input.action;
+  if (["provided_token", "password_exchange"].includes(String(input.method)))
+    out.method = input.method;
   if (
     ["render", "uncaught", "promise", "api", "auth", "upload"].includes(
       String(input.operation),

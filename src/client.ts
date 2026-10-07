@@ -6,6 +6,7 @@ export class ApiError extends Error {
     message: string,
     public status: number,
     public requestId: string,
+    public code?: string,
   ) {
     super(message);
   }
@@ -51,6 +52,7 @@ export async function api<T>(
       data.error || "Unable to complete this request.",
       response.status,
       requestId,
+      typeof data.code === "string" ? data.code : undefined,
     );
     if (response.status >= 500 && path !== "activity/observe")
       captureFailure(error, "api", requestId, session?.user.id ?? null);
