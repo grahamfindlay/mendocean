@@ -774,15 +774,18 @@ test("attendance changes persist in BHC, closed windows and uncertain sends stay
 test.describe("Week preference persistence", () => {
   test.use({serviceWorkers: "block"});
 test("Week periods save to the account, survive a new device, and retain choices on failure", async ({page, browser}) => {
-  await loggedIn(page);
+  // Preferences preload at sign-in, before opening the Week destination.
   await page.route('**/api/week-periods/v2', route => route.fulfill({status:503,json:{error:'Unavailable'}}));
+  await loggedIn(page);
   await page.getByRole('button',{name:'Week',exact:true}).click();
+  const status = page.locator('.week-preferences-status');
+  await expect(status.getByRole('alert')).toContainText('Could not load');
+  await expect(page.locator('.week-card, .week-periods')).toHaveCount(0);
+  await page.unroute('**/api/week-periods/v2');
+  await status.getByRole('button',{name:'Retry',exact:true}).click();
+  await expect(page.locator('.week-card')).toHaveCount(7);
   await page.getByText('Times of interest',{exact:true}).click();
   const editor = page.locator('.week-periods');
-  await expect(editor.getByRole('alert')).toContainText('Could not load');
-  await expect(editor.getByRole('button',{name:'Add period',exact:true})).toBeDisabled();
-  await page.unroute('**/api/week-periods/v2');
-  await editor.getByRole('button',{name:'Retry',exact:true}).click();
   await editor.getByRole('button',{name:'Add period',exact:true}).click();
   await editor.getByLabel('Period name').fill('Mid morning');
   await editor.getByLabel('Start time').fill('09:00');
