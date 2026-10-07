@@ -607,13 +607,6 @@ export function SettingsForm({
           {error}
         </p>
       )}
-      <p className="help">
-        Mendocean records account activity and save, sync, and reminder outcomes
-        to help keep the app working. When usage analytics is enabled, it also
-        collects feature-use events and sanitized errors. Sign-in codes, BHC
-        credentials, and private report contents are excluded. Session recording
-        is disabled.
-      </p>
       <hr />
       <button className="text-button" onClick={onSignOut}>
         Sign out
