@@ -16,6 +16,7 @@ import {
 } from "../_shared/weather.ts";
 import { syncBHC } from "../_shared/bhc.ts";
 import { sendReminder } from "../_shared/notifications.ts";
+import { lineupsEnabled, pollLineups, sendLineup } from "../_shared/lineups.ts";
 import { localDateTime } from "../../../shared/domain.ts";
 import {
   observeFailure,
@@ -86,7 +87,22 @@ export function createJobsHandler(
             now,
             `daily:${c.user_id}:${local.slice(0, 10)}`,
           );
-      const jobs = await query("claim");
+      if (lineupsEnabled()) {
+        for (const c of check(await service().rpc("lineup_poll_candidates")))
+          await enqueue(
+            "lineup_poll",
+            c.user_id,
+            null,
+            now,
+            `lineup-poll:${c.user_id}:${c.revision}:${Math.floor(now.getTime() / 300000)}`,
+            { revision: c.revision },
+          );
+      }
+      const jobs = (await query("claim")).sort(
+        (a: { kind: string }, b: { kind: string }) =>
+          Number(b.kind === "lineup_poll" || b.kind === "bhc_sync") -
+          Number(a.kind === "lineup_poll" || a.kind === "bhc_sync"),
+      );
       const results = [];
       for (const [index, job] of jobs.entries()) {
         const jobStarted = performance.now();
@@ -107,6 +123,14 @@ export function createJobsHandler(
               job.payload?.after_id || 0,
               providers,
               job.payload?.revision,
+            );
+          else if (job.kind === "lineup_poll")
+            await pollLineups(job.user_id, job.payload.revision, providers);
+          else if (job.kind === "lineup_notify")
+            await sendLineup(
+              job.payload.event_id,
+              job.payload.channel,
+              providers,
             );
           else if (job.kind === "reminder")
             await sendReminder(

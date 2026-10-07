@@ -89,6 +89,8 @@ New reports can accumulate between weekly fits; edits and deletions retire an ac
 
 ## BHC connection rollout
 
+Published lineup rollout and its provider/device release checks are documented in [LINEUPS.md](LINEUPS.md). Keep `BHC_LINEUPS_ENABLED=false` until those checks pass.
+
 The guided API-key flow and optional password exchange are implemented in [the connection plan](BHC_CONNECTION_PLAN.md). Deploy migration `202610070001_bhc_connection.sql`, then the `api` and `jobs` functions, then the frontend. Keep `BHC_PASSWORD_CONNECT_ENABLED=false` initially; it defaults to disabled when unset. This flag controls new password exchanges; existing generated tokens continue to validate normally.
 
 Pin Mendota once before member rollout. Either set the verified numeric `BHC_MENDOTA_CLUB_ID` in function secrets, or have a Mendocean administrator connect a BHC account with exactly one membership whose name contains `mendota` (case insensitive). That first match is pinned in `private.bhc_settings`; subsequent connections check the numeric ID even if BHC renames the club. Regular members cannot configure it. Do not use synthetic fixture ID `1` in production. A conflicting environment ID is rejected instead of overwriting the pinned value. Existing connections to another club become membership problems when configuration is pinned, preserving all outings and reports.

@@ -165,27 +165,50 @@ export function startFixtures(secret, port = 54328) {
         if (url.pathname === "/users/getAllWhitelabels")
           return reply(200, state.clubs);
         if (url.pathname === "/equipment/getAllBoats")
-          return reply(200, [
-            { boat_id: 7, boat_type: 2, rigging: "sculling" },
-          ]);
+          return reply(
+            200,
+            state.boats || [
+              {
+                boat_id: 7,
+                boat_name: "Fixture double",
+                boat_type: 2,
+                rigging: "sculling",
+              },
+            ],
+          );
         if (url.pathname === "/practices/getAthletePractices")
           return reply(
             200,
-            url.searchParams.get("upcoming") === "true" ? state.bhc : [],
+            url.searchParams.get("upcoming") === "true"
+              ? state.bhc.map((p) => ({ lineups_set: "No", ...p }))
+              : [],
           );
-        if (url.pathname === "/practices/getPractices")
+        if (url.pathname === "/practices/getPractices") {
+          if (state.failure === "lineup_read_failure") return reply(503, {});
+          const meta = state.bhc.find(
+            (p) =>
+              String(p.practice_id) === url.searchParams.get("practice_id"),
+          );
           return reply(200, [
             {
+              lineups_set: meta?.lineups_set || "No",
+              ...state.detail,
               attendance: [
                 {
                   custid,
+                  fname: "Fixture rower",
+                  attendance_plan:
+                    meta?.current_attendance_status || "Attending",
                   lineup_boat: state.lineup ? 7 : null,
                   lineup_seat: "2",
+                  ...state.own_assignment,
                 },
+                ...(state.crew || []),
               ],
               assigned_coaches: [{ custid: 90, fname: "Charlie" }],
             },
           ]);
+        }
         return reply(500, { error: "Unexpected BHC path" });
       }
       if (

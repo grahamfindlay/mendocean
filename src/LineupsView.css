@@ -1,0 +1,116 @@
+.lineups-view {
+  max-width: 900px;
+  margin: 0 auto;
+}
+.lineups-view .section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.lineup-practice {
+  margin: 24px 0;
+}
+.lineup-practice p {
+  margin: 8px 0;
+}
+.lineup-assignment {
+  font-weight: 700;
+}
+.lineup-boat {
+  border: 1px solid var(--line, #cbd5d1);
+  border-radius: 16px;
+  padding: 20px;
+  min-width: 0;
+}
+.lineup-own-boat {
+  border: 2px solid var(--accent, #126b55);
+}
+.lineup-boat h2 {
+  margin: 0 0 18px;
+  font-size: 1.15rem;
+  overflow-wrap: anywhere;
+}
+.lineup-kicker {
+  display: block;
+  font-size: 0.8rem;
+  margin-bottom: 6px;
+}
+.lineup-class {
+  font-weight: 400;
+  font-size: 0.9rem;
+}
+.lineup-seats {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.lineup-seats li {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--line, #cbd5d1);
+}
+.lineup-seat-label,
+.lineup-side {
+  font-size: 0.85rem;
+}
+.lineup-side {
+  text-transform: capitalize;
+}
+.lineup-athlete {
+  overflow-wrap: anywhere;
+}
+.lineup-you {
+  background: #e4f4e9;
+  color: #12362a;
+  border-radius: 8px;
+  font-weight: 600;
+}
+.lineup-you-label {
+  display: inline-block;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  margin-left: 8px;
+  padding: 2px 5px;
+  font-size: 0.75rem;
+}
+.lineup-coaches {
+  margin: 18px 0 0;
+}
+.lineup-other {
+  margin-top: 24px;
+}
+.lineup-other summary {
+  padding: 12px 0;
+  cursor: pointer;
+  font-weight: 600;
+}
+.lineup-boat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+.lineup-plan {
+  margin-top: 24px;
+}
+.lineup-plan p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 480px) {
+  .lineup-boat {
+    padding: 14px;
+  }
+  .lineup-seats li {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 6px;
+  }
+  .lineup-side {
+    grid-column: 2;
+  }
+}

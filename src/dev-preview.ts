@@ -22,6 +22,10 @@ export async function previewAPI(path: string, body: any) {
   if (path === "account")
     return {
       outings,
+      lineups: JSON.parse(
+        localStorage.getItem("mendocean-preview-lineups") || "[]",
+      ),
+      lineups_enabled: localStorage.getItem("mendocean-preview-bhc") === "true",
       push_devices: 0,
       coaches: COACH_NAMES.map((name, i) => ({
         name,
@@ -34,7 +38,11 @@ export async function previewAPI(path: string, body: any) {
         reminder_channel: "none",
         reminders_paused: false,
       },
-      bhc: { connected: false, last_sync: null, last_error: null },
+      bhc: {
+        connected: localStorage.getItem("mendocean-preview-bhc") === "true",
+        last_sync: null,
+        last_error: null,
+      },
     };
   if (path === "report") {
     let outing = outings.find((o) => o.id === body.outing.id);

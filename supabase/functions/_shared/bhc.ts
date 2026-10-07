@@ -4,6 +4,7 @@ import { check, enqueue, query, service } from "./runtime.ts";
 export { bhcGet, list } from "./bhc-client.ts";
 import { bhcGet, list } from "./bhc-client.ts";
 import { validateBHCConnection, recordBHCFailure } from "./bhc-connection.ts";
+import { saveLineup } from "./lineups.ts";
 export async function syncBHC(
   uid: string,
   initial = false,
@@ -120,6 +121,16 @@ export async function syncBHC(
         }),
       );
       if (!outingId) return;
+      await saveLineup(
+        uid,
+        connection.revision,
+        outingId,
+        meta,
+        detail,
+        connection.custid,
+        boats,
+        !initial,
+      );
       for (const due of syncTimes(p))
         await enqueue(
           "bhc_sync",

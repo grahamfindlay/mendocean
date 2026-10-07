@@ -2,11 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Download, X } from "lucide-react";
 import { api, supabase } from "./client";
 import { track, telemetryActor, captureFailure } from "./telemetry";
-import {
-  BOAT_CLASSES,
-  chicagoToISO,
-  localDateTime,
-} from "../shared/domain";
+import { BOAT_CLASSES, chicagoToISO, localDateTime } from "../shared/domain";
 import { Link } from "react-router-dom";
 import { BHCConnection } from "./BHCConnection";
 import { UpdateSettings } from "./UpdateControls";
@@ -327,6 +323,14 @@ export function SettingsForm({
                 (c) => f.get(c) === "on",
               ),
               reminders_paused: f.get("paused") === "on",
+              ...(account.lineups_enabled
+                ? {
+                    lineup_channels: ["email", "push"].filter(
+                      (c) => f.get(`lineup-${c}`) === "on",
+                    ),
+                    lineup_changes: f.get("lineup-changes"),
+                  }
+                : {}),
             });
             track("reminder_preferences_changed", {}, account.profile.id);
             setMessage("Preferences saved.");
@@ -376,6 +380,45 @@ export function SettingsForm({
           />
           Pause all logging reminders
         </label>
+        {account.lineups_enabled && (
+          <fieldset className="reminder-choices">
+            <legend>Lineup notifications</legend>
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                name="lineup-email"
+                defaultChecked={account.profile.lineup_channels?.includes(
+                  "email",
+                )}
+              />
+              Email with your full boat lineup
+            </label>
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                name="lineup-push"
+                defaultChecked={account.profile.lineup_channels?.includes(
+                  "push",
+                )}
+              />
+              Push for lineup publications and changes
+            </label>
+            <label>
+              Notify me about
+              <select
+                name="lineup-changes"
+                defaultValue={account.profile.lineup_changes || "crew"}
+              >
+                <option value="crew">My assignment and my crew</option>
+                <option value="assignment">Only my assignment</option>
+              </select>
+            </label>
+            <p className="help">
+              Separate from logging reminders. Email is optional; BHC may also
+              send its own emails. Push needs a registered device below.
+            </p>
+          </fieldset>
+        )}
         <button className="button" disabled={busy}>
           Save preferences
         </button>
@@ -404,7 +447,8 @@ export function SettingsForm({
       <UpdateSettings />
       <hr />
       <h3>Push on this device</h3>
-      {reminderChannels(account.profile).includes("push") &&
+      {(reminderChannels(account.profile).includes("push") ||
+        account.profile.lineup_channels?.includes("push")) &&
         account.push_devices === 0 && (
           <p className="alert">
             Push is selected, but no device is registered. Enable push on a
