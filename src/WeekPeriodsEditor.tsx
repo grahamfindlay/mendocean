@@ -25,7 +25,7 @@ export default function WeekPeriodsEditor({
 }: {
   preferences: ReturnType<typeof useWeekPeriods>;
 }) {
-  const { periods, loading, ready, saving, error, save, retry } = preferences;
+  const { periods, ready, saving, error, save } = preferences;
   const [draft, setDraft] = useState<WeekPeriod | null>(null);
   const [validation, setValidation] = useState("");
   function edit(period: WeekPeriod) {
@@ -36,13 +36,7 @@ export default function WeekPeriodsEditor({
     <details className="week-periods">
       <summary>Times of interest</summary>
       <p>All times are in Madison time.</p>
-      {loading && <p role="status">Loading your periods…</p>}
       {error && <p role="alert">{error}</p>}
-      {!ready && !loading && (
-        <button type="button" onClick={retry}>
-          Retry
-        </button>
-      )}
       <fieldset disabled={!ready || saving}>
         <legend className="sr-only">Periods shown on Week cards</legend>
         {sortPeriods(periods).map((period) => (

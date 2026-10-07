@@ -21,6 +21,7 @@ import {
   type Report,
 } from "../shared/domain";
 import ForecastView, { type ForecastSelection } from "./ForecastView";
+import { WeekPeriodsProvider } from "./WeekPeriodsProvider";
 import HistoryView from "./HistoryView";
 import AttendanceEditor from "./AttendanceEditor";
 import { useClock } from "./useClock";
@@ -493,182 +494,188 @@ export default function App() {
           {error}
         </div>
       )}
-      <main>
-        {isForecast(tab) ? (
-          weather ? (
-            <ForecastView
-              now={now}
-              selection={forecastSelection}
-              attendance={forecastAttendance}
-              onAttendanceChange={setForecastAttendance}
-              onAttendance={setAttendanceOuting}
-              userId={user?.id}
-              weather={weather}
-              tab={tab}
-              outings={account?.outings || []}
-              onSchedule={() => setPlanned(true)}
-              onSignIn={() => setAuthOpen(true)}
-              renderRowActions={(o) =>
-                o.kind === "independent" && o.owner_id === user?.id ? (
-                  <button
-                    className="icon-button"
-                    aria-label="Share independent row"
-                    title="Copy invitation link"
-                    disabled={busy}
-                    onClick={() => shareRow(o)}
-                  >
-                    <Share size={18} />
-                  </button>
-                ) : null
-              }
-            />
-          ) : (
-            <section className="empty-state">
-              <h1>
-                {weatherError
-                  ? "Weather is unavailable."
-                  : "Checking the wind…"}
-              </h1>
-              <p>
-                {weatherError ||
-                  "Getting the latest conditions at James Madison Park."}
-              </p>
-              {weatherError && (
-                <button className="button" onClick={refreshWeather}>
-                  <RefreshCw size={16} />
-                  Try again
-                </button>
-              )}
-            </section>
-          )
-        ) : !user ? (
-          <section className="empty-state">
-            <h1>How was the water?</h1>
-            <p>
-              Your reports help build better wind-wave models and rowing
-              forecasts. Logging takes less than 10 seconds. Receive optional
-              reminders to log after each scheduled row.
-            </p>
-            <button className="button" onClick={() => setAuthOpen(true)}>
-              Sign in <ArrowUpRight size={16} />
-            </button>
-            <p className="help">The pilot is invitation-only.</p>
-          </section>
-        ) : tab === "Log" ? (
-          <Logger
-            key={
-              (account ? "ready:" : "loading:") +
-              (editing?.report.id || selectedOuting || "new")
-            }
-            user={user.id}
-            outings={account?.outings || []}
-            editing={editing}
-            initialOuting={
-              account?.outings.some(
-                (o) => o.id === selectedOuting && canSelectForLog(o, now),
-              )
-                ? selectedOuting
-                : undefined
-            }
-            onSaved={(m) => {
-              setMessage(
-                previewMode ? "Sample report saved only on this device." : m,
-              );
-              if (!editing) setRowFilters(NO_FILTERS);
-              setEditing(undefined);
-              setSelectedOuting(undefined);
-              setTab("History");
-              void refresh();
-            }}
-          />
-        ) : (
-          <>
-            {!!queue.length && (
-              <section className="form-card">
-                <h2>On this device · {queue.length} pending</h2>
-                <p>These reports have not reached the server.</p>
-                {queue.map((q) => (
-                  <div className="queue-row" key={q.key}>
-                    <div>
-                      <b>{q.outing.title}</b>
-                      <p>{q.error || "Waiting for a connection."}</p>
-                    </div>
-                    <button
-                      className="button subtle"
-                      onClick={() =>
-                        void act(async () => {
-                          if (
-                            confirm(
-                              "Discard this unsent report from this device?",
-                            )
-                          ) {
-                            await discard(q.key);
-                            await refresh();
-                          }
-                        })
-                      }
-                    >
-                      Discard
-                    </button>
-                  </div>
-                ))}
-                <button
-                  className="button"
-                  disabled={busy}
-                  onClick={() =>
-                    void act(async () => {
-                      await flush(user.id);
-                      await refresh();
-                    })
-                  }
-                >
-                  Retry upload
-                </button>
-              </section>
-            )}
-            {account ? (
-              <HistoryView
-                outings={account.outings}
-                queued={queue.map((q) => q.outing.id)}
-                profile={account.profile}
-                onRefresh={() => void act(refresh)}
+      <WeekPeriodsProvider
+        key={authReady ? (user ? `user:${user.id}` : "guest") : "pending"}
+        userId={user?.id}
+        authReady={authReady}
+      >
+        <main>
+          {isForecast(tab) ? (
+            weather ? (
+              <ForecastView
                 now={now}
-                user={user.id}
-                filters={rowFilters}
-                onFilters={setRowFilters}
-                busy={busy}
-                onSettings={() => setSettings(true)}
-                onLog={(o) => {
-                  setSelectedOuting(o.id);
-                  setTab("Log");
-                }}
-                onEdit={(outing, report) => {
-                  setEditing({ outing, report });
-                  setTab("Log");
-                }}
-                onDelete={(report) =>
-                  void act(async () => {
-                    if (
-                      confirm(
-                        "Delete your report? Other people’s reports will stay.",
-                      )
-                    ) {
-                      await api("report/delete", {
-                        id: report.id,
-                        version: report.version,
-                      });
-                      await refresh();
-                    }
-                  })
+                selection={forecastSelection}
+                attendance={forecastAttendance}
+                onAttendanceChange={setForecastAttendance}
+                onAttendance={setAttendanceOuting}
+                userId={user?.id}
+                weather={weather}
+                tab={tab}
+                outings={account?.outings || []}
+                onSchedule={() => setPlanned(true)}
+                onSignIn={() => setAuthOpen(true)}
+                renderRowActions={(o) =>
+                  o.kind === "independent" && o.owner_id === user?.id ? (
+                    <button
+                      className="icon-button"
+                      aria-label="Share independent row"
+                      title="Copy invitation link"
+                      disabled={busy}
+                      onClick={() => shareRow(o)}
+                    >
+                      <Share size={18} />
+                    </button>
+                  ) : null
                 }
-                onShare={shareRow}
               />
             ) : (
-              <p role="status">Loading your history…</p>
-            )}
-          </>
-        )}
-      </main>
+              <section className="empty-state">
+                <h1>
+                  {weatherError
+                    ? "Weather is unavailable."
+                    : "Checking the wind…"}
+                </h1>
+                <p>
+                  {weatherError ||
+                    "Getting the latest conditions at James Madison Park."}
+                </p>
+                {weatherError && (
+                  <button className="button" onClick={refreshWeather}>
+                    <RefreshCw size={16} />
+                    Try again
+                  </button>
+                )}
+              </section>
+            )
+          ) : !user ? (
+            <section className="empty-state">
+              <h1>How was the water?</h1>
+              <p>
+                Your reports help build better wind-wave models and rowing
+                forecasts. Logging takes less than 10 seconds. Receive optional
+                reminders to log after each scheduled row.
+              </p>
+              <button className="button" onClick={() => setAuthOpen(true)}>
+                Sign in <ArrowUpRight size={16} />
+              </button>
+              <p className="help">The pilot is invitation-only.</p>
+            </section>
+          ) : tab === "Log" ? (
+            <Logger
+              key={
+                (account ? "ready:" : "loading:") +
+                (editing?.report.id || selectedOuting || "new")
+              }
+              user={user.id}
+              outings={account?.outings || []}
+              editing={editing}
+              initialOuting={
+                account?.outings.some(
+                  (o) => o.id === selectedOuting && canSelectForLog(o, now),
+                )
+                  ? selectedOuting
+                  : undefined
+              }
+              onSaved={(m) => {
+                setMessage(
+                  previewMode ? "Sample report saved only on this device." : m,
+                );
+                if (!editing) setRowFilters(NO_FILTERS);
+                setEditing(undefined);
+                setSelectedOuting(undefined);
+                setTab("History");
+                void refresh();
+              }}
+            />
+          ) : (
+            <>
+              {!!queue.length && (
+                <section className="form-card">
+                  <h2>On this device · {queue.length} pending</h2>
+                  <p>These reports have not reached the server.</p>
+                  {queue.map((q) => (
+                    <div className="queue-row" key={q.key}>
+                      <div>
+                        <b>{q.outing.title}</b>
+                        <p>{q.error || "Waiting for a connection."}</p>
+                      </div>
+                      <button
+                        className="button subtle"
+                        onClick={() =>
+                          void act(async () => {
+                            if (
+                              confirm(
+                                "Discard this unsent report from this device?",
+                              )
+                            ) {
+                              await discard(q.key);
+                              await refresh();
+                            }
+                          })
+                        }
+                      >
+                        Discard
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    className="button"
+                    disabled={busy}
+                    onClick={() =>
+                      void act(async () => {
+                        await flush(user.id);
+                        await refresh();
+                      })
+                    }
+                  >
+                    Retry upload
+                  </button>
+                </section>
+              )}
+              {account ? (
+                <HistoryView
+                  outings={account.outings}
+                  queued={queue.map((q) => q.outing.id)}
+                  profile={account.profile}
+                  onRefresh={() => void act(refresh)}
+                  now={now}
+                  user={user.id}
+                  filters={rowFilters}
+                  onFilters={setRowFilters}
+                  busy={busy}
+                  onSettings={() => setSettings(true)}
+                  onLog={(o) => {
+                    setSelectedOuting(o.id);
+                    setTab("Log");
+                  }}
+                  onEdit={(outing, report) => {
+                    setEditing({ outing, report });
+                    setTab("Log");
+                  }}
+                  onDelete={(report) =>
+                    void act(async () => {
+                      if (
+                        confirm(
+                          "Delete your report? Other people’s reports will stay.",
+                        )
+                      ) {
+                        await api("report/delete", {
+                          id: report.id,
+                          version: report.version,
+                        });
+                        await refresh();
+                      }
+                    })
+                  }
+                  onShare={shareRow}
+                />
+              ) : (
+                <p role="status">Loading your history…</p>
+              )}
+            </>
+          )}
+        </main>
+      </WeekPeriodsProvider>
       <footer>
         <span>
           Inspired by{" "}
