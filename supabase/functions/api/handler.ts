@@ -23,6 +23,10 @@ import {
   userClient,
 } from "../_shared/runtime.ts";
 import { connectBHC, passwordBHCEnabled } from "../_shared/bhc-connection.ts";
+import {
+  runQueuedBHCSync,
+  type BackgroundTask,
+} from "../_shared/bhc-background.ts";
 import { bhcStatus } from "../../../shared/bhcConnection.ts";
 import { manageAttendance } from "../_shared/attendance.ts";
 import { assess, assessmentCapabilities } from "../../../shared/model.ts";
@@ -39,7 +43,12 @@ import {
   type Operations,
 } from "../../../shared/monitoring.ts";
 const uuid = z.string().uuid();
-export function createApiHandler(providers: Providers = liveProviders) {
+export function createApiHandler(
+  providers: Providers = liveProviders,
+  background: BackgroundTask = () => {},
+) {
+  const startImport = (uid: string) =>
+    background(() => runQueuedBHCSync(uid, providers));
   return async (req: Request): Promise<Response> => {
     const headers = new Headers(req.headers);
     const supplied = headers.get("x-request-id") || "";
@@ -239,8 +248,10 @@ export function createApiHandler(providers: Providers = liveProviders) {
             uid,
             null,
             new Date(),
-            `bhc:${uid}:${Math.floor(Date.now() / 900000)}`,
+            `bhc:${uid}:${connection.revision}:${Math.floor(Date.now() / 900000)}`,
+            { revision: connection.revision },
           );
+        if (connection.import_status === "pending") startImport(uid);
         const outings = await ownOutings();
         return json(req, {
           profile,
@@ -689,15 +700,14 @@ export function createApiHandler(providers: Providers = liveProviders) {
                 })
                 .strict()
                 .parse(input);
-        return json(
-          req,
-          await connectBHC(
-            uid,
-            parsed.request_id || requestId,
-            parsed,
-            providers,
-          ),
+        const result = await connectBHC(
+          uid,
+          parsed.request_id || requestId,
+          parsed,
+          providers,
         );
+        startImport(uid);
+        return json(req, result);
       }
       if (path === "bhc/disconnect") {
         await query("connection_delete", { user_id: uid });
@@ -721,8 +731,10 @@ export function createApiHandler(providers: Providers = liveProviders) {
           uid,
           null,
           new Date(),
-          `bhc:${uid}:${Math.floor(Date.now() / 900000)}`,
+          `bhc-refresh:${uid}:${connection.revision}:${requestId}`,
+          { revision: connection.revision },
         );
+        startImport(uid);
         return json(req, { queued: true });
       }
       if (path === "outings/reconcile") {
