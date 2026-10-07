@@ -1,18 +1,18 @@
 # Boathouse Connect connection plan
 
-Implemented in the working tree, October 6, 2026. Deployment and real-provider verification remain separate release steps. See [deployment](DEPLOYMENT.md#bhc-connection-rollout).
+Guided setup deployed October 7, 2026. Live password exchange verified the same day; see [deployment](DEPLOYMENT.md#bhc-connection-rollout) for the observed responses and expiry.
 
 Recommend an API key created in the user's BHC profile, while offering connection with BHC email and password as a visible alternative. Replace the unexplained key and club ID fields with guided setup, automatic Mendota Rowing Club membership matching, accurate connection status, and direct reconnection. Both paths remain optional; Mendocean sign-in and rowing logs work independently.
 
 ## Provider capabilities and release prerequisites
 
-BHC documents `authenticate/generateApiToken` for exchanging email and password for a token, `authenticate/checkApiKey` for validation and expiry metadata, and user-supplied tokens from My Profile. Password-generated tokens last six months and become invalid after an email or password change. Profile-created tokens are documented as valid until manually deleted. No refresh-token flow is documented. These are documented capabilities, not a tested production password exchange. [BHC authentication documentation](https://app.boathouseconnect.com/home/apidocs/1).
+BHC documents `authenticate/generateApiToken` for exchanging email and password for a token, `authenticate/checkApiKey` for validation and expiry metadata, and user-supplied tokens from My Profile. Its documentation says password-generated tokens last six months and become invalid after an email or password change. The live exchange on October 7, 2026 returned a 365-day expiry instead. Always use the returned expiry timestamp and avoid promising a fixed duration. Profile-created tokens are documented as valid until manually deleted. No refresh-token flow is documented. [BHC authentication documentation](https://app.boathouseconnect.com/home/apidocs/1).
 
-Before enabling password connection, verify the exchange request format, invalid-credential responses, expiry timestamp semantics, token rejection responses, and any multi-factor or account restrictions with BHC. BHC explicitly recommends profile-created tokens and describes password exchange as short-term access; confirm that recurring six-month use by Mendocean is supported. If it is unsupported, ship the guided profile flow and keep the password feature disabled rather than building around undocumented behavior.
+Before enabling password connection, verify the exchange request format, invalid-credential responses, expiry timestamp semantics and token rejection responses with BHC. These checks passed in the deliberate live test on October 7, 2026. BHC recommends profile-created tokens; retain that recommendation and renew password-generated access through an explicit user sign-in when the returned token expires. The live test establishes this account's behavior, not every account restriction or multi-factor configuration.
 
 Verify the My Profile link and exact token creation labels on a signed-in BHC account, on desktop and mobile, before writing illustrated instructions. Public docs identify My Profile, but don't establish its current signed-in UI. Confirm whether login preserves the destination. If the deep link does not, link to BHC login and give a reliable route to My Profile. Instructions must use BHC's actual labels and explain that "API token" is the term to look for.
 
-Implementation and tests use an isolated local Supabase stack and synthetic upstream responses. Production BHC credentials, attendance, notifications and deployed services have not been changed.
+Automated tests use an isolated local Supabase stack and synthetic upstream responses. The deliberate live password test generated and removed its own BHC tokens, verified Mendota membership, expiry metadata and rejection after deletion, and did not change Mendocean connections, practices, attendance or notifications. Email/password-change invalidation remains documented behavior; no real account credential was changed for testing.
 
 ## Setup and user-facing copy
 
@@ -24,7 +24,7 @@ Keep the Boathouse Connect section in Account. Heading: **Integrate with Boathou
 
 Use the heading **Integrate with Boathouse Connect**, without a separate BOATHOUSE CONNECT eyebrow. Benefit: "Import your practices and manage attendance." Give the API key route visual priority and a **Recommended** label. Title: **Connect using an API key**. Description: "Stays connected until you revoke the API key." Action: **Use an API key**.
 
-Keep **Use BHC email and password instead** visible immediately below it. Description: "Requires reconnecting every six months, or if your BHC email or password changes." Keep **Maybe later** at the bottom, without additional optional-login explanatory copy. Do not hide the alternative or require a failed API key attempt first.
+Keep **Use BHC email and password instead** visible immediately below it. Description: "Requires reconnecting when the connection expires, or if your BHC email or password changes." Keep **Maybe later** at the bottom, without additional optional-login explanatory copy. Do not hide the alternative or require a failed API key attempt first.
 
 ### API key route
 
@@ -36,7 +36,7 @@ Copy describes importing practices and managing attendance. Do not claim the BHC
 
 ### Password route
 
-Title: **Connect with your BHC login**. Fields: **BHC email** and **BHC password**, with Show/Hide. Keep these labels distinct from Mendocean sign-in. Include: "We use your password to connect to BHC and don't save it." Renewal copy: "Requires reconnecting every six months, or if your BHC email or password changes."
+Title: **Connect with your BHC login**. Fields: **BHC email** and **BHC password**, with Show/Hide. Keep these labels distinct from Mendocean sign-in. Include: "We use your password to connect to BHC and don't save it." Renewal copy: "Requires reconnecting when the connection expires, or if your BHC email or password changes."
 
 Use a native form with `autocomplete="username"` and `autocomplete="current-password"`, but verify password-manager behavior across the separate Mendocean and BHC origins; autofill may require manual selection. Don't prefill Mendocean's email as if it were known to be the BHC email. Offer **Use an API key instead** and a verified BHC password-reset link. Clear the password on completion, close, route change, and session change. No request is made until the user submits.
 

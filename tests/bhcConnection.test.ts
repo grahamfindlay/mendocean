@@ -42,10 +42,24 @@ test("provider expiry uses seconds, distinguishes invalid access from malformed 
   expect(
     tokenMetadata({ custid: 123, expires: now / 1000 + 3600 }, now)?.expires_at,
   ).toBe("2026-10-07T13:00:00.000Z");
+  expect(
+    tokenMetadata({ custid: 123, expires: now / 1000 + 365 * 86400 }, now)?.expires_at,
+  ).toBe("2027-10-07T12:00:00.000Z");
   expect(tokenMetadata({ custid: 123 }, now)?.expires_at).toBeNull();
   expect(
     tokenMetadata({ custid: 123, expires: 0 }, now)?.expires_at,
   ).toBeNull();
+});
+test("the live invalid-token envelope requires reconnection; unrelated provider errors stay transient", () => {
+  const rejection = {
+    status: "error",
+    message: "Token was not found, or is expired. Do not attempt to re-use this token.",
+    token_id: null,
+    custid: null,
+    expires: 0,
+  };
+  expect(tokenMetadata(rejection, now)).toBeNull();
+  expect(() => tokenMetadata({ ...rejection, message: "Service unavailable" }, now)).toThrow();
 });
 test("connection state separates expiry, transient outages, initial import and successful updates", () => {
   const connection = {
