@@ -13,8 +13,8 @@ const defaults = [
   {
     id: "evening",
     label: "Evening",
-    start: "18:00",
-    end: "19:30",
+    start: "17:45",
+    end: "19:15",
     enabled: true,
     days: [0, 1, 2, 3, 4, 5, 6],
   },
