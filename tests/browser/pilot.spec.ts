@@ -590,7 +590,7 @@ test("quarter-hour charts inspect real samples and preserve minute-specific fore
   }
   await expect(cards.first().locator(".practice-window")).toHaveCount(2);
   await expect(cards.first()).toContainText("Early morning 5:30 AM – 7:00 AM");
-  await expect(cards.first()).toContainText("Evening 6:00 PM – 7:30 PM");
+  await expect(cards.first()).toContainText("Evening 5:45 PM – 7:15 PM");
   // A time range split across lines reads as two times; found on the live site.
   await expect(cards.first().locator(".window-time").first()).toHaveCSS(
     "white-space",
@@ -1032,8 +1032,12 @@ test("scheduled filters, card-driven days, and accessible full-day inspection", 
   );
   await expect(page.locator(".weather-chart")).toHaveAttribute("aria-label", /Oct 21/);
   await cards.first().click();
-  for (const width of [320, 375, 390, 430, 768, 1280]) {
+  for (const width of [320, 375, 390, 430, 600, 601, 768, 1280]) {
     await page.setViewportSize({ width, height: 1000 });
+    await expect(page.locator(".chart-surface .wind-vector")).toHaveCount(24);
+    await expect(page.locator(".chart-surface .weather-icon")).toHaveCount(
+      width <= 600 ? 12 : 24,
+    );
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
       .toBe(width);

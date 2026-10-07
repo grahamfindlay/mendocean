@@ -87,7 +87,6 @@ export default function ForecastView({
       {tab === "Week" && (
         <ForecastWeek
           key={userId || "guest"}
-          userId={userId}
           weather={weather}
           days={days}
           day={day}

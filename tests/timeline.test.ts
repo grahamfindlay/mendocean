@@ -16,6 +16,7 @@ import {
 import { forecastSamples } from "../shared/presentation";
 import {
   chicagoToISO,
+  directionLabel,
   localDateTime,
   type Forecast,
   type WeatherHour,
@@ -188,7 +189,7 @@ test("practice windows summarize the two rowing intervals and stay honest outsid
   expect(past[0].summary.samples).toBe(0);
   expect(past[0].summary.wind).toBeNull();
   expect(past[0].summary.status).toBe("unavailable");
-  // Evening on the 15th runs 23:00Z to 00:30Z and is covered even though the
+  // Evening on the 15th runs 22:45Z to 00:15Z and is covered even though the
   // interval crosses midnight UTC.
   expect(past[1].summary.covered).toBe(true);
   // A day past the provider's horizon reports nothing rather than borrowing
@@ -220,6 +221,174 @@ const windowOf = (
   ...weather,
   hours,
   quarter_hours: quarter,
+});
+test("hourly session summaries clip outside peaks and classify only in-window conditions", () => {
+  const startOfDay = Date.parse(chicagoToISO("2026-10-08T17:00"));
+  const readings = [
+    { wind: 6, gust: 9, direction: 275, temperature: 64, code: 95 },
+    { wind: 4, gust: 4, direction: 247, temperature: 60, code: 3 },
+    { wind: 5, gust: 5, direction: 234, temperature: 56, code: 3 },
+    { wind: 5, gust: 5, direction: 229, temperature: 55, code: 95 },
+  ];
+  const forecast = windowOf(
+    readings.map((h, i) => sample(startOfDay + i * 3600000, h)),
+  );
+  const start = startOfDay + 45 * 60000;
+  const end = startOfDay + 135 * 60000;
+  const original = structuredClone(forecast);
+  const s = summarizeWindow(forecast, start, end);
+  expect(s.covered).toBe(true);
+  expect(s.samples).toBe(4);
+  expect(s.wind).toEqual({ min: 4, max: 5 });
+  expect(s.gust).toBe(5.25);
+  expect(Math.round(s.gust!)).toBe(5);
+  expect(s.temperature).toEqual({ min: 55.75, max: 61 });
+  expect(s.status).toBe("favorable");
+  expect(directionLabel(s.direction!.bearing)).toBe("WSW");
+  expect(s.codes).toEqual([3]);
+  // The chart still receives the actual outside samples, including the G9 peak.
+  expect(windowSamples(forecast, start, end).samples).toEqual(forecast.hours);
+  expect(forecast).toEqual(original);
+});
+test("short windows and point summaries interpolate both boundaries within one hour", () => {
+  const forecast = windowOf([
+    sample(base, { wind: 2, gust: 4, temperature: 50, direction: 180 }),
+    sample(base + 3600000, {
+      wind: 10,
+      gust: 20,
+      temperature: 70,
+      direction: 180,
+    }),
+  ]);
+  const s = summarizeWindow(forecast, base + 15 * 60000, base + 45 * 60000);
+  expect(s.covered).toBe(true);
+  expect(s.samples).toBe(2);
+  expect(s.wind).toEqual({ min: 4, max: 8 });
+  expect(s.gust).toBe(16);
+  expect(s.temperature).toEqual({ min: 55, max: 65 });
+  expect(s.status).toBe("favorable");
+  const point = summarizeWindow(forecast, base + 30 * 60000, base + 30 * 60000);
+  expect(point.covered).toBe(true);
+  expect(point.samples).toBe(1);
+  expect(point.wind).toEqual({ min: 6, max: 6 });
+  expect(point.gust).toBe(12);
+});
+test("quarter-hour session boundaries keep actual values and interior gust peaks", () => {
+  const quarter = Array.from({ length: 9 }, (_, i) =>
+    sample(
+      base + i * 900000,
+      {
+        wind: i === 0 || i === 8 ? 20 : 4,
+        gust: i === 0 || i === 8 ? 30 : i === 4 ? 7 : 4,
+        direction: 230,
+        temperature: i === 0 || i === 8 ? 80 : 60,
+      },
+      15,
+    ),
+  );
+  const forecast = windowOf([sample(base + 3600000, { gust: 99 })], quarter);
+  const s = summarizeWindow(forecast, base + 15 * 60000, base + 105 * 60000);
+  expect(s.covered).toBe(true);
+  expect(s.samples).toBe(7);
+  expect(s.wind).toEqual({ min: 4, max: 4 });
+  expect(s.gust).toBe(7);
+  expect(s.temperature).toEqual({ min: 60, max: 60 });
+  expect(s.status).toBe("favorable");
+});
+test("boundary estimates use adjacent samples across the quarter-hour to hourly transition", () => {
+  const forecast = windowOf(
+    [sample(base + 3600000, { wind: 10, gust: 16, direction: 230 })],
+    [sample(base + 45 * 60000, { wind: 4, gust: 4, direction: 230 }, 15)],
+  );
+  const s = summarizeWindow(forecast, base + 50 * 60000, base + 55 * 60000);
+  expect(s.covered).toBe(true);
+  expect(s.samples).toBe(2);
+  expect(s.wind).toEqual({ min: 6, max: 8 });
+  expect(s.gust).toBe(12);
+  expect(s.status).toBe("favorable");
+});
+test("boundary directions interpolate along the shortest turn across north", () => {
+  for (const directions of [
+    [350, 10],
+    [10, 350],
+    [710, -350],
+  ]) {
+    const forecast = windowOf(
+      directions.map((direction, i) =>
+        sample(base + i * 3600000, { direction, wind: 4 }),
+      ),
+    );
+    const point = summarizeWindow(
+      forecast,
+      base + 30 * 60000,
+      base + 30 * 60000,
+    );
+    expect(point.direction!.bearing).toBeCloseTo(0);
+    expect(point.status).toBe("favorable");
+  }
+  const opposite = windowOf([
+    sample(base, { direction: 90 }),
+    sample(base + 3600000, { direction: 270 }),
+  ]);
+  expect(
+    summarizeWindow(opposite, base + 30 * 60000, base + 30 * 60000).direction,
+  ).toBeNull();
+});
+test("summary boundaries do not bridge missing intervals or extrapolate past the horizon", () => {
+  const forecast = windowOf(
+    [],
+    [sample(base, {}, 15), sample(base + 30 * 60000, {}, 15)],
+  );
+  const gap = summarizeWindow(forecast, base + 10 * 60000, base + 20 * 60000);
+  expect(gap.covered).toBe(false);
+  expect(gap.samples).toBe(0);
+  expect(gap.wind).toBeNull();
+  expect(gap.gust).toBeNull();
+  expect(gap.status).toBe("unavailable");
+  const hourly = windowOf([sample(base), sample(base + 3600000)]);
+  const outside = summarizeWindow(hourly, base - 30 * 60000, base - 15 * 60000);
+  expect(outside.covered).toBe(false);
+  expect(outside.samples).toBe(0);
+  const partial = summarizeWindow(hourly, base - 30 * 60000, base + 30 * 60000);
+  expect(partial.covered).toBe(false);
+  expect(partial.samples).toBe(2);
+  expect(partial.wind).toEqual({ min: 7, max: 7 });
+  for (const [start, end] of [
+    [NaN, base],
+    [base, NaN],
+    [base + 1, base],
+  ]) {
+    expect(summarizeWindow(hourly, start, end).samples).toBe(0);
+  }
+});
+test("boundary interpolation preserves null and non-finite fields without hiding known interior values", () => {
+  const forecast = windowOf([
+    sample(base, { wind: null, gust: null, temperature: NaN, direction: null }),
+    sample(base + 3600000, {
+      wind: 4,
+      gust: 5,
+      temperature: 60,
+      direction: 230,
+    }),
+    sample(base + 7200000, {
+      wind: NaN,
+      gust: NaN,
+      temperature: null,
+      direction: NaN,
+    }),
+  ]);
+  const point = summarizeWindow(forecast, base + 30 * 60000, base + 30 * 60000);
+  expect(point.wind).toBeNull();
+  expect(point.gust).toBeNull();
+  expect(point.temperature).toBeNull();
+  expect(point.direction).toBeNull();
+  expect(point.status).toBe("unavailable");
+  const s = summarizeWindow(forecast, base + 30 * 60000, base + 90 * 60000);
+  expect(s.wind).toEqual({ min: 4, max: 4 });
+  expect(s.gust).toBe(5);
+  expect(s.temperature).toEqual({ min: 60, max: 60 });
+  expect(s.direction!.bearing).toBeCloseTo(230);
+  expect(s.status).toBe("favorable");
 });
 test("summaries report sampled extremes rather than averaging mixed intervals", () => {
   // One brief 15-minute gust spike among calm hours must survive the summary.
