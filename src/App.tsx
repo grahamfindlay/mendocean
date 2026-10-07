@@ -176,7 +176,7 @@ export default function App() {
     url.searchParams.delete("log");
     url.searchParams.set("tab", "Lineups");
     url.searchParams.set("lineup", id);
-    window.history.replaceState(null, "", url);
+    window.history.replaceState(window.history.state, "", url);
   };
   const updatePosition = useRef({});
   updatePosition.current = {
@@ -399,7 +399,7 @@ export default function App() {
     url.searchParams.delete("lineup");
     url.searchParams.delete("log");
     url.searchParams.set("tab", name);
-    window.history.replaceState(null, "", url);
+    window.history.replaceState(window.history.state, "", url);
     setEditing(undefined);
     setSelectedOuting(undefined);
     setTab(name);
