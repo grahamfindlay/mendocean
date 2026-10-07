@@ -112,7 +112,6 @@ test("real production SDK sanitizes private data and captures bundle frames; blo
     await page.unroute("https://*.posthog.com/**");
     await page.route("https://*.posthog.com/**", (route) => route.abort());
     await page.goto("/");
-    await page.reload();
     await page.getByRole("button", { name: "Account", exact: true }).click();
     await expect(
       page.getByRole("heading", { name: "Your account", exact: true }),

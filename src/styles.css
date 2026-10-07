@@ -63,6 +63,7 @@ button:disabled {
   border-bottom: 1px solid var(--line);
 }
 .wordmark {
+  flex-shrink: 0;
   display: inline-block;
   text-decoration: none;
   font-size: 30px;
@@ -2428,8 +2429,9 @@ button:hover:not(:disabled) {
   }
 }
 @media (max-width: 760px) {
-  .site-header {
-    gap: 6px;
+  .site-header,
+  .site-header .header-actions {
+    gap: 0;
   }
   .admin-shell {
     padding: 0 16px 32px;
