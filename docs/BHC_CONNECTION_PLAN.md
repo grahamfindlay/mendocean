@@ -10,7 +10,7 @@ BHC documents `authenticate/generateApiToken` for exchanging email and password 
 
 Before enabling password connection, verify the exchange request format, invalid-credential responses, expiry timestamp semantics and token rejection responses with BHC. These checks passed in the deliberate live test on October 7, 2026. BHC recommends profile-created tokens; retain that recommendation and renew password-generated access through an explicit user sign-in when the returned token expires. The live test establishes this account's behavior, not every account restriction or multi-factor configuration.
 
-Verify the My Profile link and exact token creation labels on a signed-in BHC account, on desktop and mobile, before writing illustrated instructions. Public docs identify My Profile, but don't establish its current signed-in UI. Confirm whether login preserves the destination. If the deep link does not, link to BHC login and give a reliable route to My Profile. Instructions must use BHC's actual labels and explain that "API token" is the term to look for.
+The owner's October 7 screenshots and a signed-in Safari check confirm the direct API Keys URL and creation labels. Signed-out requests show Login; the owner's sign-in landed on Dashboard, so include the fallback My Profile → API Keys. Browser tests cover returning to Mendocean at desktop and 320px mobile widths in Chromium and WebKit. Physical-device BHC navigation remains unverified; do not invent mobile-specific menu instructions.
 
 Automated tests use an isolated local Supabase stack and synthetic upstream responses. The deliberate live password test generated and removed its own BHC tokens, verified Mendota membership, expiry metadata and rejection after deletion, and did not change Mendocean connections, practices, attendance or notifications. Email/password-change invalidation remains documented behavior; no real account credential was changed for testing.
 
@@ -28,7 +28,14 @@ Keep **Use BHC email and password instead** visible immediately below it. Descri
 
 ### API key route
 
-Show three short steps: open My Profile in BHC, create a dedicated token named Mendocean, and copy it back here. Use the actual BHC labels once verified. The implementation includes text instructions. Add an annotated image after verifying the signed-in BHC UI, with all private account information redacted. Open BHC in a separate tab so returning does not restart setup. Preserve only the selected route when returning to the app, never a secret in navigation or persistent browser storage.
+Show four short steps:
+
+1. **Open BHC API Keys**, linking to `https://app.boathouseconnect.com/profile/api`. Sign in if needed; if BHC opens Dashboard, choose **My Profile → API Keys**.
+2. Select **+** to create a key.
+3. Keep **Token Type** as **General API Token**. Enter **Mendocean** in **Description**, then select **Save**.
+4. Copy the new key at the bottom of the page. Return here, paste it below, and select **Connect BHC** (or **Reconnect BHC** during renewal).
+
+Open BHC in a separate tab so returning does not restart setup. Keep an entered key only in the open form's memory, never in navigation or persistent browser storage, and clear it when setup closes. The guide uses text instructions; do not publish the owner's screenshots containing real keys and account details.
 
 Title: **Connect using an API key**. Label the field **BHC API key**, with help: "BHC calls this an API token." Mask the value; offer Show/Hide and ordinary paste. Trim surrounding whitespace, accept the provider's verified token format, and return a specific validation message. Don't ask for broad clipboard permission or read the clipboard automatically. Provide the alternate password route on this screen too.
 
