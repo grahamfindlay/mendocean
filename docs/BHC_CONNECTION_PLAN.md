@@ -24,7 +24,7 @@ Keep the Boathouse Connect section in Account. Heading: **Integrate with Boathou
 
 Use the heading **Integrate with Boathouse Connect**, without a separate BOATHOUSE CONNECT eyebrow. Benefit: "Import your practices and manage attendance." Give the API key route visual priority and a **Recommended** label. Title: **Connect using an API key**. Description: "Stays connected until you revoke the API key." Action: **Use an API key**.
 
-Keep **Use BHC email and password instead** visible immediately below it. Description: "Requires reconnecting when the token expires, or if your BHC email or password changes." Keep **Maybe later** at the bottom, without additional optional-login explanatory copy. Do not hide the alternative or require a failed API key attempt first.
+Keep **Use BHC email and password instead** visible immediately below it. Description: "Requires reconnecting when the connection expires, or if your BHC email or password changes." Keep **Maybe later** at the bottom, without additional optional-login explanatory copy. Do not hide the alternative or require a failed API key attempt first.
 
 ### API key route
 
@@ -36,7 +36,7 @@ Copy describes importing practices and managing attendance. Do not claim the BHC
 
 ### Password route
 
-Title: **Connect with your BHC login**. Fields: **BHC email** and **BHC password**, with Show/Hide. Keep these labels distinct from Mendocean sign-in. Include: "We use your password to connect to BHC and don't save it." Renewal copy: "Requires reconnecting when the token expires, or if your BHC email or password changes."
+Title: **Connect with your BHC login**. Fields: **BHC email** and **BHC password**, with Show/Hide. Keep these labels distinct from Mendocean sign-in. Include: "We use your password to connect to BHC and don't save it." Renewal copy: "Requires reconnecting when the connection expires, or if your BHC email or password changes."
 
 Use a native form with `autocomplete="username"` and `autocomplete="current-password"`, but verify password-manager behavior across the separate Mendocean and BHC origins; autofill may require manual selection. Don't prefill Mendocean's email as if it were known to be the BHC email. Offer **Use an API key instead** and a verified BHC password-reset link. Clear the password on completion, close, route change, and session change. No request is made until the user submits.
 
