@@ -141,6 +141,17 @@ try {
       join(work, `supabase/functions/${name}/index.ts`),
       `import { create${name === "api" ? "Api" : "Jobs"}Handler } from './handler.ts';\nimport { fixtureProviders } from '../_shared/fixture-provider.ts';\nDeno.serve(create${name === "api" ? "Api" : "Jobs"}Handler(fixtureProviders));\n`,
     );
+  // A separate composition root exercises production background execution
+  // without making the existing explicit-tick fixtures race their assertions.
+  mkdirSync(join(work, "supabase/functions/api-background"));
+  writeFileSync(
+    join(work, "supabase/functions/api-background/index.ts"),
+    `import { createApiHandler } from '../api/handler.ts';
+import { fixtureProviders } from '../_shared/fixture-provider.ts';
+import { edgeBackground } from '../_shared/bhc-background.ts';
+const handler = createApiHandler(fixtureProviders, edgeBackground);
+Deno.serve(req => handler(new Request(req.url.replace('/api-background/', '/api/'), req)));\n`,
+  );
   mkdirSync(join(work, "supabase/functions/jobs-budget"));
   writeFileSync(
     join(work, "supabase/functions/jobs-budget/index.ts"),
@@ -186,6 +197,11 @@ subject = "Your Mendocean sign-in code"
 content_path = "./supabase/templates/magic_link.html"
 [analytics]
 enabled = false
+[edge_runtime]
+policy = "per_worker"
+[functions.api-background]
+verify_jwt = false
+import_map = "./functions/deno.json"
 [functions.api]
 verify_jwt = false
 import_map = "./functions/deno.json"

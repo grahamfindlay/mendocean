@@ -227,6 +227,125 @@ test("BHC setup recommends an API key, clears secrets, and reconnects without di
   );
   await page.getByRole("button", { name: "Close", exact: true }).click();
 });
+test("BHC import polling keeps push status and modal scroll stable and continues after the delay notice", async ({
+  page,
+}) => {
+  const endpoint = "https://web.push.apple.com/" + crypto.randomUUID();
+  await api(actor, "push", {
+    subscription: {
+      endpoint,
+      keys: { auth: "synthetic", p256dh: "synthetic" },
+    },
+  });
+  await api(actor, "settings", {
+    display_name: "Synthetic",
+    reminder_channels: ["push"],
+    reminders_paused: false,
+  });
+  await page.addInitScript((endpoint) => {
+    (window as any).__pushDeviceChecks = 0;
+    Object.defineProperty(navigator, "standalone", {
+      configurable: true,
+      get: () => true,
+    });
+    Object.defineProperty(window, "Notification", {
+      configurable: true,
+      value: class {
+        static permission = "granted";
+      },
+    });
+    Object.defineProperty(window, "PushManager", {
+      configurable: true,
+      value: class {},
+    });
+    Object.defineProperty(ServiceWorkerRegistration.prototype, "pushManager", {
+      configurable: true,
+      get: () => ({
+        getSubscription: async () => {
+          ++(window as any).__pushDeviceChecks;
+          return { endpoint };
+        },
+      }),
+    });
+  }, endpoint);
+  await loggedIn(page);
+  await page.clock.install();
+  await page.getByRole("button", { name: "Account", exact: true }).click();
+  await expect(
+    page.getByText("This device is registered for push.", { exact: true }),
+  ).toBeVisible();
+  const connection = page.getByRole("region", {
+    name: "Boathouse Connect integration",
+  });
+  await connection
+    .getByRole("button", { name: "Connect Boathouse Connect", exact: true })
+    .click();
+  await connection
+    .getByRole("button", { name: "Use an API key", exact: true })
+    .click();
+  await connection
+    .getByLabel("BHC API key", { exact: true })
+    .fill(syntheticToken + "-" + actor.id);
+  await connection
+    .getByRole("button", { name: "Connect BHC", exact: true })
+    .click();
+  await expect(
+    connection.getByText("Connected. Importing practices…", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    connection.getByText("BHC API key", { exact: true }),
+  ).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  const firstRefresh = page.waitForResponse(
+    (r) => r.url().endsWith("/api/account") && r.ok(),
+  );
+  await page.clock.fastForward(4000);
+  await firstRefresh;
+  await connection.scrollIntoViewIfNeeded();
+  const position = await page
+    .getByRole("dialog")
+    .evaluate((el) => el.scrollTop);
+  for (let i = 0; i < 3; i++) {
+    const refreshed = page.waitForResponse(
+      (r) => r.url().endsWith("/api/account") && r.ok(),
+    );
+    await page.clock.fastForward(4000);
+    await refreshed;
+    await expect(
+      page.getByText("Checking this device…", { exact: true }),
+    ).toHaveCount(0);
+    expect(await page.getByRole("dialog").evaluate((el) => el.scrollTop)).toBe(
+      position,
+    );
+  }
+  expect(await page.evaluate(() => (window as any).__pushDeviceChecks)).toBe(1);
+  // Move beyond the former 80-second polling cutoff while the worker is delayed.
+  for (let i = 0; i < 18; i++) {
+    const refreshed = page.waitForResponse(
+      (r) => r.url().endsWith("/api/account") && r.ok(),
+    );
+    await page.clock.fastForward(4000);
+    await refreshed;
+  }
+  await expect(
+    connection.getByText(/The import is taking longer/),
+  ).toBeVisible();
+  await tick();
+  const refreshed = page.waitForResponse(
+    (r) => r.url().endsWith("/api/account") && r.ok(),
+  );
+  await page.clock.fastForward(4000);
+  await refreshed;
+  await expect(
+    connection.getByText("Connected · No upcoming practices found", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(connection.getByText(/The import is taking longer/)).toHaveCount(
+    0,
+  );
+  expect(await page.evaluate(() => (window as any).__pushDeviceChecks)).toBe(1);
+});
 test("real invited email OTP succeeds and an invalid code is rejected", async ({
   page,
 }) => {

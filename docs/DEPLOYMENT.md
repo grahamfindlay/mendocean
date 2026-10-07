@@ -59,6 +59,8 @@ Administration → Accounts & activity (`/admin/accounts`) lets the administrato
 
 Create two Supabase Vault entries: `mendocean_project_url` and `mendocean_jobs_secret`. The second must match the Edge Function’s `JOBS_SECRET`. Run `supabase/setup_cron.sql` once. It schedules a dispatcher every five minutes; each queued action has its own due time and deduplication key. Re-running the named schedule updates the same cron job.
 
+BHC setup and manual refresh also start the account's durable queued import immediately with an API background task. Apply `202610070002_bhc_immediate_import.sql` before deploying the API and jobs functions. Account status reads resume pending import pages; the five-minute dispatcher remains the fallback for interrupted work. The immediate runner claims only that account's BHC jobs, retains connection revision checks, and never dispatches reminder jobs. A busy connection lease defers work rather than falsely marking the job done. Local background-task testing needs `[edge_runtime] policy = "per_worker"`; see [Supabase background tasks](https://supabase.com/docs/guides/functions/background-tasks).
+
 Run a first dispatch, then confirm that public weather appears and that scheduled invocations succeed. The dispatcher fetches weather every 15 minutes, polls BHC daily during the 16:00 Madison hour, and runs deadline/start/end refreshes already in the queue.
 
 Reference: [Supabase scheduling with Cron, pg_net and Vault](https://supabase.com/docs/guides/functions/schedule-functions).

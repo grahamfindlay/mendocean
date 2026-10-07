@@ -2,11 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Download, X } from "lucide-react";
 import { api, supabase } from "./client";
 import { track, telemetryActor, captureFailure } from "./telemetry";
-import {
-  BOAT_CLASSES,
-  chicagoToISO,
-  localDateTime,
-} from "../shared/domain";
+import { BOAT_CLASSES, chicagoToISO, localDateTime } from "../shared/domain";
 import { Link } from "react-router-dom";
 import { BHCConnection } from "./BHCConnection";
 import { UpdateSettings } from "./UpdateControls";
@@ -259,6 +255,8 @@ export function SettingsForm({
   const [registered, setRegistered] = useState(false);
   const [deviceChecked, setDeviceChecked] = useState(false);
   const push = pushEnvironment();
+  const pushUser = account?.profile.id;
+  const pushDevices = account?.push_devices;
   useEffect(() => {
     let active = true;
     setDeviceChecked(false);
@@ -267,7 +265,7 @@ export function SettingsForm({
       !push.supported ||
       push.permission !== "granted" ||
       (push.ios && !push.installed) ||
-      !account
+      !pushUser
     ) {
       setDeviceChecked(true);
       return;
@@ -278,9 +276,13 @@ export function SettingsForm({
       .then(async (subscription) => {
         if (!subscription) return false;
         return (
-          await api<{ registered: boolean }>("push/status", {
-            endpoint: subscription.endpoint,
-          })
+          await api<{ registered: boolean }>(
+            "push/status",
+            {
+              endpoint: subscription.endpoint,
+            },
+            pushUser,
+          )
         ).registered;
       })
       .then((value) => {
@@ -295,7 +297,14 @@ export function SettingsForm({
     return () => {
       active = false;
     };
-  }, [account, push.supported, push.permission, push.ios, push.installed]);
+  }, [
+    pushUser,
+    pushDevices,
+    push.supported,
+    push.permission,
+    push.ios,
+    push.installed,
+  ]);
   const [pushAction, setPushAction] = useState<"enable" | "test" | null>(null);
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);

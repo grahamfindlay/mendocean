@@ -107,6 +107,7 @@ export function BHCConnection({
   const [message, setMessage] = useState("");
   const [polling, setPolling] = useState(false);
   const [delay, setDelay] = useState(false);
+  const [pollStopped, setPollStopped] = useState(false);
   const refresh = useRef(onUpdated);
   refresh.current = onUpdated;
   const needsReconnect = status.state === "reconnect_required";
@@ -127,22 +128,27 @@ export function BHCConnection({
     setStep(next);
   }
   useEffect(() => {
-    if (delay || (!polling && status.state !== "importing")) return;
+    if (pollStopped || (!polling && status.state !== "importing")) return;
     let count = 0;
     const timer = setInterval(() => {
       refresh.current();
-      if (++count >= 20) {
+      ++count;
+      if (count === 20) setDelay(true);
+      // The durable worker may need a five-minute dispatch plus import pages.
+      // Keep checking after the delay notice rather than freezing the status.
+      if (count >= 150) {
         clearInterval(timer);
         setPolling(false);
-        setDelay(true);
+        setPollStopped(true);
       }
     }, 4000);
     return () => clearInterval(timer);
-  }, [polling, status.state, delay]);
+  }, [polling, status.state, pollStopped]);
   useEffect(() => {
-    if (status.state === "healthy") {
+    if (status.state && status.state !== "importing") {
       setPolling(false);
       setDelay(false);
+      setPollStopped(false);
       setMessage("");
     }
   }, [status.state, status.last_sync]);
@@ -167,6 +173,7 @@ export function BHCConnection({
         user,
       );
       setDelay(false);
+      setPollStopped(false);
       setPolling(true);
       route("status");
       setMessage("Connected. Importing practices…");
@@ -198,8 +205,12 @@ export function BHCConnection({
       if (action === "sync") {
         setMessage("Practice refresh queued.");
         setDelay(false);
+        setPollStopped(false);
         setPolling(true);
       } else {
+        setPolling(false);
+        setDelay(false);
+        setPollStopped(false);
         route("status");
         track("bhc_connection_changed", { action: "disconnect" }, user);
       }
@@ -391,13 +402,16 @@ export function BHCConnection({
               <li>
                 Keep <strong>Token Type</strong> as{" "}
                 <strong>General API Token</strong>. Enter{" "}
-                <strong>Mendocean</strong> in <strong>Description</strong>,
-                then select <strong>Save</strong>.
+                <strong>Mendocean</strong> in <strong>Description</strong>, then
+                select <strong>Save</strong>.
               </li>
               <li>
-                Copy the new key at the bottom of the page. Return here, paste it
-                below, and select{" "}
-                <strong>{needsReconnect ? "Reconnect BHC" : "Connect BHC"}</strong>.
+                Copy the new key at the bottom of the page. Return here, paste
+                it below, and select{" "}
+                <strong>
+                  {needsReconnect ? "Reconnect BHC" : "Connect BHC"}
+                </strong>
+                .
               </li>
             </ol>
           )}
@@ -475,8 +489,8 @@ export function BHCConnection({
                   We use your password to connect to BHC and don't save it.
                 </p>
                 <p className="help">
-                  Requires reconnecting when the connection expires, or if your BHC email
-                  or password changes.
+                  Requires reconnecting when the connection expires, or if your
+                  BHC email or password changes.
                 </p>
               </>
             )}
@@ -522,11 +536,15 @@ export function BHCConnection({
           </a>
         </p>
       )}
-      {message && (
-        <p className="notice" role="status">
-          {message}
-        </p>
-      )}
+      {message &&
+        !(
+          message === "Connected. Importing practices…" &&
+          status.state === "importing"
+        ) && (
+          <p className="notice" role="status">
+            {message}
+          </p>
+        )}
       {delay && (
         <p role="status">
           The import is taking longer than expected. You can keep using
