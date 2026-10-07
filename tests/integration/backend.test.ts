@@ -120,6 +120,8 @@ test("failed credential/membership/expiry checks preserve the existing BHC conne
   let response = await api(a, "bhc/connect-password", input);
   expect(response.status).toBe(400);
   expect(response.data.code).toBe("bhc_credentials");
+  expect(JSON.stringify(response.data)).not.toContain(input.email);
+  expect(JSON.stringify(response.data)).not.toContain(input.password);
   await fixtures({
     clubs: [{ whitelabel_id: 99, whitelabel_name: "Another club" }],
   });

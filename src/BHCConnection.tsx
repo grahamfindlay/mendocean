@@ -346,7 +346,7 @@ export function BHCConnection({
           </button>
           <p className="help">
             {status.password_enabled
-              ? "Requires reconnecting every six months, or if your BHC email or password changes."
+              ? "Requires reconnecting when the token expires, or if your BHC email or password changes."
               : "Password connection is currently unavailable."}
           </p>
           <button className="text-button" onClick={() => route("status")}>
@@ -462,7 +462,7 @@ export function BHCConnection({
                   We use your password to connect to BHC and don't save it.
                 </p>
                 <p className="help">
-                  Requires reconnecting every six months, or if your BHC email
+                  Requires reconnecting when the token expires, or if your BHC email
                   or password changes.
                 </p>
               </>

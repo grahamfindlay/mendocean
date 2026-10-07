@@ -23,6 +23,16 @@ export function tokenMetadata(raw: unknown, now: number) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw))
     throw new Error("Unexpected authentication response");
   const value = raw as Record<string, unknown>;
+  // Verified live: rejected tokens return HTTP 200 with this error envelope.
+  // Other provider errors remain transient rather than invalidating a connection.
+  if (
+    value.status === "error" &&
+    value.custid === null &&
+    value.token_id === null &&
+    value.message ===
+      "Token was not found, or is expired. Do not attempt to re-use this token."
+  )
+    return null;
   const custid = Number(value.custid);
   if (!Number.isSafeInteger(custid) || custid <= 0)
     throw new Error("Unexpected authentication response");
