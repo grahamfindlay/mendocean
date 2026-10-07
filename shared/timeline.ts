@@ -54,7 +54,7 @@ export function dayBounds(day: string): [number, number] {
     Date.parse(chicagoToISO(next + "T00:00")),
   ];
 }
-/** Include actual boundary samples, with explicit partial-coverage status. No extrapolation. */
+/** Plotting context: retain surrounding samples to bracket the window. No extrapolation. */
 export function windowSamples(weather: Forecast, start: number, end: number) {
   const all = timelineSamples(weather);
   if (!Number.isFinite(start) || !Number.isFinite(end) || end < start)
@@ -88,6 +88,64 @@ export function windowSamples(weather: Forecast, start: number, end: number) {
     );
   return { samples, covered };
 }
+
+/** Clip summary values to the same straight segments drawn by the chart. */
+function boundedSummarySamples(
+  samples: WeatherHour[],
+  start: number,
+  end: number,
+) {
+  const boundary = (time: number): WeatherHour | null => {
+    const index = samples.findIndex((h) => stamp(h) >= time);
+    const after = samples[index];
+    if (!after) return null;
+    if (stamp(after) === time) return after;
+    const before = samples[index - 1];
+    if (!before) return null;
+    const gap = stamp(after) - stamp(before);
+    if (gap > Math.max(sampleMinutes(before), sampleMinutes(after)) * 60000)
+      return null;
+    const fraction = (time - stamp(before)) / gap;
+    const interpolate = (a: number | null, b: number | null) =>
+      a !== null && b !== null && Number.isFinite(a) && Number.isFinite(b)
+        ? a + (b - a) * fraction
+        : null;
+    let direction: number | null = null;
+    if (
+      before.direction !== null &&
+      after.direction !== null &&
+      Number.isFinite(before.direction) &&
+      Number.isFinite(after.direction)
+    ) {
+      const turn =
+        ((((after.direction - before.direction + 540) % 360) + 360) % 360) -
+        180;
+      // Opposite bearings do not identify a unique direction of rotation.
+      if (Math.abs(turn) !== 180)
+        direction = (((before.direction + turn * fraction) % 360) + 360) % 360;
+    }
+    return {
+      time: new Date(time).toISOString(),
+      wind: interpolate(before.wind, after.wind),
+      gust: interpolate(before.gust, after.gust),
+      temperature: interpolate(before.temperature, after.temperature),
+      direction,
+      // Conditions are categorical; use the closer endpoint, never interpolate codes.
+      code: fraction < 0.5 ? before.code : after.code,
+      probability: null,
+      precipitation: null,
+      visibility: null,
+    };
+  };
+  const clipped = samples.filter((h) => stamp(h) >= start && stamp(h) <= end);
+  const first = boundary(start);
+  const last = end === start ? null : boundary(end);
+  if (first && (!clipped.length || stamp(clipped[0]) !== start))
+    clipped.unshift(first);
+  if (last && (!clipped.length || stamp(clipped.at(-1)!) !== end))
+    clipped.push(last);
+  return clipped;
+}
 export function forecastDays(weather: Forecast, now: number) {
   const today = localDateTime(new Date(now).toISOString()).slice(0, 10);
   return [
@@ -101,7 +159,7 @@ export function forecastDays(weather: Forecast, now: number) {
 /**
  * Each selected period on a Madison calendar day, summarized.
  *
- * `end` is exclusive of nothing -- `summarizeWindow` brackets the interval --
+ * Both boundaries are included, with estimates between actual samples,
  * but a window whose bounds fall outside the forecast horizon returns an
  * uncovered summary rather than being dropped, so a short provider response
  * shows as unknown instead of silently shortening the week.
@@ -160,7 +218,7 @@ function extremes(values: (number | null)[]) {
 export interface WindowSummary {
   /** False when the interval is gapped, unbracketed or outside the horizon. */
   covered: boolean;
-  /** How many provider samples the summary rests on. Zero means nothing is known. */
+  /** In-window samples plus estimated boundary values. Zero means nothing is known. */
   samples: number;
   wind: { min: number; max: number } | null;
   gust: number | null;
@@ -173,19 +231,22 @@ export interface WindowSummary {
   codes: number[];
 }
 /**
- * Summarize a requested interval from the samples that actually cover it.
+ * Summarize only the requested interval, estimating its boundaries when needed.
  *
  * Extremes and ranges only. A window can mix 15- and 60-minute samples, so an
  * unweighted mean would silently weight the near term four to one; a mean that
- * is genuinely wanted later must be time-weighted by `sampleMinutes`. Every
- * figure is a sampled extreme, not a continuous bound over the interval.
+ * is wanted later must be time-weighted by `sampleMinutes`.
+ * Outside samples supply boundary estimates, never their full extrema or status.
+ * Figures are forecast estimates, not continuous bounds over actual conditions.
  */
 export function summarizeWindow(
   weather: Forecast,
   start: number,
   end: number,
 ): WindowSummary {
-  const { samples, covered } = windowSamples(weather, start, end);
+  const context = windowSamples(weather, start, end);
+  const samples = boundedSummarySamples(context.samples, start, end);
+  const covered = context.covered;
   const bearings = samples
     .map((h) => h.direction)
     .filter((d): d is number => d !== null && Number.isFinite(d));
