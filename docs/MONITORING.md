@@ -82,3 +82,12 @@ For incidents, inspect the fixed readiness reason, open Supabase job/log views, 
 `npm test` covers privacy, identity transitions, clock/DST windows, SQL permissions, observation throttling, summary exclusions, queue eligibility, digest lease/retry behavior, pagination and retention. The isolated stack adds real Auth/RPC gates, report retries, heartbeat writes, digest preview/delivery to fixture Resend, production SDK sanitation with intercepted analytics, blocked-provider behavior, owner/member UI and installed-app upgrades. The disposable telemetry build contains a test-only crash fixture and dry-run source-map processing; neither exists in the deployed source.
 
 Real source-map symbolication, the five dashboard queries, and Better Stack incident/recovery processing have been verified with the connected accounts. Owner inbox receipt, error notification destination setup and billing limits remain separate acceptance items; no account plan was changed.
+
+### Administrator account identities
+
+Administration → Accounts & activity shows each saved display name and email address;
+accounts without a name use their email as the label. The account ID remains in the
+activity detail view for diagnostic searches. Identity lookup is restricted to the
+service role and is invoked only after the API verifies administrator access. Emails
+are read from Auth on demand, rather than copied to activity or analytics records;
+the response uses `Cache-Control: no-store`.

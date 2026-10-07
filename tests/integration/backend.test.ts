@@ -96,7 +96,24 @@ test("monitoring routes enforce owner, member, monitor and digest boundaries", a
   try {
     const owner = await api(a, "admin/activity");
     expect(owner.status).toBe(200);
-    expect(owner.data.users.some((u: any) => u.id === b.id)).toBe(true);
+    expect(owner.data.users.find((u: any) => u.id === b.id)).toMatchObject({
+      email: b.email,
+      display_name: "",
+    });
+    expect(
+      owner.data.users.find((u: any) => u.id === unapproved.id),
+    ).toMatchObject({ email: unapproved.email, approved: false });
+    expect(
+      (await b.client.rpc("admin_account_emails", { user_ids: [a.id] })).error,
+    ).toBeTruthy();
+    expect(
+      (await publicClient().rpc("admin_account_emails", { user_ids: [a.id] }))
+        .error,
+    ).toBeTruthy();
+    expect((await api(b, "account")).data).not.toHaveProperty("users");
+    expect(JSON.stringify((await api(b, "account")).data)).not.toContain(
+      a.email,
+    );
     expect((await api(a, `admin/timeline?user=${b.id}`)).status).toBe(200);
     expect((await api(a, "admin/activity?days=31")).status).toBe(400);
   } finally {

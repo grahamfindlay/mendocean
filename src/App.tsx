@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Settings,
   Share,
+  Shield,
   X,
 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
@@ -413,8 +414,13 @@ export default function App() {
         {user ? (
           <div className="header-actions">
             {account?.profile.role === "admin" && (
-              <Link className="button subtle" to="/admin">
-                Administration
+              <Link
+                className="icon-button administration-link"
+                to="/admin"
+                aria-label="Administration"
+                title="Administration"
+              >
+                <Shield size={18} aria-hidden="true" />
               </Link>
             )}
             <button className="button subtle" onClick={() => setSettings(true)}>

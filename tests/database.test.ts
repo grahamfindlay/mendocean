@@ -15,7 +15,7 @@ const admin = async (sql: string, params: unknown[] = []) => {
 beforeAll(async () => {
   db = new PGlite();
   await db.exec(
-    "create role anon;create role authenticated;create role service_role bypassrls;create schema storage;create table storage.objects(bucket_id text,metadata jsonb);create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;",
+    "create role anon;create role authenticated;create role service_role bypassrls;create schema storage;create table storage.objects(bucket_id text,metadata jsonb);create schema auth;create table auth.users(id uuid primary key,email text);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;",
   );
   for (const name of readdirSync("supabase/migrations")
     .filter((n) => n.endsWith(".sql") && !n.includes("_storage"))
@@ -26,7 +26,7 @@ beforeAll(async () => {
         "",
       ),
     );
-  await admin("insert into auth.users values($1),($2)", [ALICE, BOB]);
+  await admin("insert into auth.users(id) values($1),($2)", [ALICE, BOB]);
   await admin("update public.profiles set approved=true");
 });
 afterAll(async () => {
@@ -260,7 +260,7 @@ describe("actual PostgreSQL permissions and transactions", () => {
   });
   it("blocks an uninvited Auth user even if hosted signup were accidentally enabled", async () => {
     const stranger = crypto.randomUUID();
-    await admin("insert into auth.users values($1)", [stranger]);
+    await admin("insert into auth.users(id) values($1)", [stranger]);
     await expect(
       as(stranger, "select public.create_outing($1)", [
         {

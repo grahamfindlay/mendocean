@@ -578,6 +578,9 @@ test("owner can inspect activity and operations while members cannot", async ({
   await openPage("Accounts & activity");
   const monitoring = page.getByRole("region", { name: "Account activity" });
   await expect(monitoring.getByText(/approved accounts/)).toBeVisible();
+  await expect(
+    monitoring.getByRole("button", { name: actor.email, exact: true }),
+  ).toBeVisible();
   await monitoring.getByLabel("Period").selectOption("30");
   await expect(
     monitoring.getByRole("button", { name: "Refresh", exact: true }),
@@ -589,6 +592,9 @@ test("owner can inspect activity and operations while members cannot", async ({
   expect((await api(actor, "admin/operations")).status).toBe(200);
   await sql.query("update profiles set role='member' where id=$1", [actor.id]);
   expect((await api(actor, "admin/operations")).status).toBe(403);
+  const deniedIdentities = await api(actor, "admin/activity");
+  expect(deniedIdentities.status).toBe(403);
+  expect(deniedIdentities.data).not.toHaveProperty("users");
   await page.reload();
   await expect(
     page.getByRole("heading", { name: "Administrator access required" }),

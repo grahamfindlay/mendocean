@@ -1,5 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 const OWNER = "10000000-0000-4000-8000-000000000001";
+const UNNAMED_EMAIL =
+  "a.very.long.address.for.a.pilot.without.a.display.name@example.test";
 const MEMBER = "10000000-0000-4000-8000-000000000002";
 const SOURCE = "20000000-0000-4000-8000-000000000001";
 const TARGET = "20000000-0000-4000-8000-000000000002";
@@ -56,6 +58,9 @@ async function fixture(
   const monitoringUser = (id: string, name: string, role: string) => ({
     id,
     display_name: name,
+    email: name
+      ? `${name.toLowerCase().replaceAll(" ", ".")}@example.test`
+      : UNNAMED_EMAIL,
     role,
     approved: true,
     invited_at: "2026-10-01T12:00:00Z",
@@ -123,6 +128,19 @@ async function fixture(
           users: [
             monitoringUser(OWNER, "Graham Findlay", "admin"),
             monitoringUser(MEMBER, "Pilot Rower", "member"),
+            monitoringUser(
+              "10000000-0000-4000-8000-000000000004",
+              "",
+              "member",
+            ),
+            {
+              ...monitoringUser(
+                "10000000-0000-4000-8000-000000000005",
+                "",
+                "member",
+              ),
+              email: null,
+            },
             ...(invited
               ? [
                   monitoringUser(
@@ -272,6 +290,91 @@ test("admin area offers deep links, back/forward, and responsive account activit
   await expect(
     page.getByRole("link", { name: "Administration", exact: true }),
   ).toBeVisible();
+});
+
+test("account identities show names and emails with safe fallbacks", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.goto("/admin/accounts");
+  const row = page.getByRole("row").filter({
+    has: page.getByRole("button", { name: "Pilot Rower", exact: true }),
+  });
+  await expect(
+    row.getByText("pilot.rower@example.test", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Pilot Rower", exact: true }).click();
+  const history = page.getByRole("region", {
+    name: "Observed activity history",
+  });
+  await expect(
+    history.getByRole("heading", { name: "Pilot Rower", exact: true }),
+  ).toBeVisible();
+  await expect(
+    history.getByText("pilot.rower@example.test", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: UNNAMED_EMAIL, exact: true }).click();
+  await expect(
+    history.getByRole("heading", { name: UNNAMED_EMAIL, exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Account 10000000", exact: true }),
+  ).toBeVisible();
+  await fits(page);
+});
+
+test("admin icon keeps the mobile header in the same row as a member's header", async ({
+  page,
+  context,
+}, info) => {
+  await fixture(page);
+  const member = await context.newPage();
+  await fixture(member, "member");
+  for (const width of [360, 375, 390, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    await member.setViewportSize({ width, height: 844 });
+    await page.goto("/");
+    await member.goto("/");
+    const admin = page.getByRole("link", {
+      name: "Administration",
+      exact: true,
+    });
+    await expect(admin).toBeVisible();
+    await expect(admin).toHaveAttribute("title", "Administration");
+    await expect(admin).toHaveText("");
+    await expect(
+      member.getByRole("link", { name: "Administration", exact: true }),
+    ).toHaveCount(0);
+    const layout = async (target: Page) => {
+      await expect(
+        target.getByRole("button", { name: "Account", exact: true }),
+      ).toBeVisible();
+      return target.locator(".site-header").evaluate((header) => {
+        const brand = header
+          .querySelector(".wordmark")!
+          .getBoundingClientRect();
+        const actions = header
+          .querySelector(".header-actions")!
+          .getBoundingClientRect();
+        const account = header.querySelector("button")!.getBoundingClientRect();
+        return {
+          height: header.getBoundingClientRect().height,
+          sameRow: account.top < brand.bottom && account.bottom > brand.top,
+          fits: actions.left >= brand.right,
+        };
+      });
+    };
+    const ownerHeader = await layout(page);
+    const memberHeader = await layout(member);
+    expect(ownerHeader.sameRow).toBe(true);
+    expect(ownerHeader.fits).toBe(true);
+    expect(ownerHeader.height).toBeCloseTo(memberHeader.height, 0);
+    await fits(page);
+  }
+  await page.screenshot({
+    path: `test-results/admin/header-${info.project.name}.png`,
+  });
+  await member.close();
 });
 
 test("duplicate merge needs review and confirmation and keeps API conflicts visible", async ({
