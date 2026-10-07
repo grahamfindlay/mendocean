@@ -197,15 +197,19 @@ test("reconnection baselines, declines and disconnect prevent obsolete notificat
 
 test("temporary lineup failures retain the saved crew and recover without changing full-import state", async () => {
   await poll({ bhc: [{ ...practice, lineups_set: "Yes" }] });
-  await tick();
+  await sql.query(
+    "update private.lineup_snapshots set checked_at=now()-interval '20 minutes' where user_id=$1",
+    [actor.id],
+  );
   await poll({ failure: "lineup_read_failure" });
   const failed = (await api(actor, "account")).data;
   expect(failed.lineups).toHaveLength(1);
   expect(failed.bhc.lineup_error).toContain("could not be checked");
   expect(failed.bhc.state).toBe("healthy");
+  expect((await fixtures()).deliveries).toHaveLength(0);
   await fixtures({ failure: null });
   await sql.query(
-    "update private.jobs set due_at=now()-interval '1 second' where kind='lineup_poll' and user_id=$1 and status='pending'",
+    "update private.jobs set due_at=now()-interval '1 second' where kind in ('lineup_poll','lineup_notify') and user_id=$1 and status='pending'",
     [actor.id],
   );
   await tick();
@@ -213,4 +217,5 @@ test("temporary lineup failures retain the saved crew and recover without changi
   expect(recovered.lineups).toHaveLength(1);
   expect(recovered.bhc.lineup_error).toBeNull();
   expect(recovered.bhc.state).toBe("healthy");
+  expect((await fixtures()).deliveries).toHaveLength(2);
 });

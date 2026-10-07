@@ -683,9 +683,7 @@ export default function App() {
                   previewMode ? "Sample report saved only on this device." : m,
                 );
                 if (!editing) setRowFilters(NO_FILTERS);
-                setEditing(undefined);
-                setSelectedOuting(undefined);
-                setTab("History");
+                navigate("History");
                 void refresh();
               }}
             />

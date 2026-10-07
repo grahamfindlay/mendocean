@@ -297,6 +297,10 @@ test("declines, expired credentials, stale data and disconnect suppress delivery
   await db.query(
     "update private.lineup_snapshots set checked_at=now()-interval '20 minutes'",
   );
+  expect(await rpc("lineup_reserve", [event, "push"])).toMatchObject({
+    allowed: false,
+    retry: true,
+  });
   expect(
     await rpc("lineup_delivery_active", [event, "email", lease.token, null]),
   ).toBe(false);

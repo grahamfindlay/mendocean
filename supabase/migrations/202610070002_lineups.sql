@@ -96,7 +96,7 @@ create function private.lineup_delivery_allowed(event uuid,target_channel text) 
  and c.revoked_at is null and c.access_state='active' and (c.expires_at is null or c.expires_at>now())
  and c.revision=e.connection_revision and l.connection_revision=c.revision and m.bhc_revision=c.revision and c.club_id=o.bhc_club_id
  and m.attendance='attending' and l.version=e.version and l.snapshot->>'published'='true'
- and l.checked_at>now()-interval '15 minutes' and now()<o.starts_at+interval '30 minutes')
+ and now()<o.starts_at+interval '30 minutes')
 $$;
 create function public.lineup_reserve(event uuid,target_channel text) returns jsonb language plpgsql security definer set search_path='' as $$
 declare d private.lineup_deliveries; e private.lineup_events; used integer; token uuid:=gen_random_uuid();
@@ -105,6 +105,8 @@ begin
  if not private.lineup_delivery_allowed(event,target_channel) then return '{"allowed":false}';end if;
  select * into d from private.lineup_deliveries where event_id=event and channel=target_channel for update;
  if not found or d.sent_at is not null then return '{"allowed":false}';end if;
+ -- Temporary lack of freshness delays delivery; it must not consume the event permanently.
+ if exists(select 1 from private.lineup_events fresh_event join private.lineup_snapshots l on l.user_id=fresh_event.user_id and l.outing_id=fresh_event.outing_id where fresh_event.id=event and l.checked_at<=now()-interval '15 minutes') then return '{"allowed":false,"retry":true}';end if;
  if d.locked_until>now() then return '{"allowed":false,"retry":true}';end if;
  if d.reserved_at<now()-interval '24 hours' then return '{"allowed":false}';end if;
  if target_channel='email' and d.reserved_at is null then
@@ -119,6 +121,7 @@ begin
 end $$;
 create function public.lineup_delivery_active(event uuid,target_channel text,token uuid,target_endpoint text default null) returns boolean language sql stable security definer set search_path='' as $$
  select private.lineup_delivery_allowed(event,target_channel) and exists(select 1 from private.lineup_deliveries where event_id=event and channel=target_channel and lease_token=token and locked_until>now() and sent_at is null)
+ and exists(select 1 from private.lineup_events e join private.lineup_snapshots l on l.user_id=e.user_id and l.outing_id=e.outing_id where e.id=event and l.checked_at>now()-interval '15 minutes')
  and (target_endpoint is null or exists(select 1 from private.push_subscriptions p join private.lineup_events e on e.user_id=p.user_id where e.id=event and p.endpoint=target_endpoint))
 $$;
 create function public.lineup_prepare_email(event uuid,token uuid,message jsonb) returns jsonb language sql security definer set search_path='' as $$
