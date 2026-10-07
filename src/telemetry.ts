@@ -21,6 +21,7 @@ const screens = [
   "History",
   "Log",
   "Account",
+  "Administration",
 ];
 type Properties = Record<string, unknown>;
 interface Sink {

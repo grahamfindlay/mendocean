@@ -4,7 +4,7 @@ Backend monitoring is deployed, the PostHog dashboard is configured, and the Mon
 
 ## What is collected
 
-Account → Pilot administration contains Activity and Operations. Activity shows observed users, report contributions, BHC status, reminder problems and a paginated history. Supabase records report changes inside the same transaction as the report. Replayed submission IDs do not create extra records. Foreground observations are throttled for 15 minutes on the server. Background syncs and failures do not make users appear active. Owner activity is excluded from summary usage counts.
+Administration at `/admin` has separate Accounts & activity and Operations pages. Accounts & activity shows observed users, report contributions, BHC status, reminder problems and a paginated history, and provides pilot invitations. Supabase records report changes inside the same transaction as the report. Replayed submission IDs do not create extra records. Foreground observations are throttled for 15 minutes on the server. Background syncs and failures do not make users appear active. Owner activity is excluded from summary usage counts.
 
 PostHog receives explicit semantic events and sanitized exceptions through `src/telemetry.ts`. Identity uses the Supabase UUID. The adapter resets identity at initialization, account switches and sign-out. Events allow only fixed categories, screen, build, schema version, booleans, opaque IDs and the configured public ingest token required by PostHog. Top-level person metadata is stripped too. Exception messages are fixed; frames retain app bundle positions and source-map chunk IDs while dropping raw messages, variables, context and provider URLs. Frames include a fixed `function: "?"` and `in_app: true` so PostHog can parse them without receiving raw function names. Autocapture, replay, page URL collection, campaign/referrer persistence, surveys, automatic exceptions, feature flags and geolocation enrichment are disabled. Telemetry failures do not gate the app. Confirmed upload events use bounded local deduplication across reloads; database records remain authoritative.
 
@@ -38,7 +38,7 @@ supabase functions deploy jobs --no-verify-jwt
 
 The rollout was reconciled in an isolated managed checkout from current remote main, preserving the original local changes. The missing `202609200002_admin_model_health.sql` was recovered unchanged from remote Git; it was already applied in production. Do not mark that migration reverted or change production history to accommodate an outdated checkout.
 
-Backend monitoring does not require the PostHog flag. Open Account → Pilot administration as an approved administrator. Confirm members receive 403 for `admin/activity`, `admin/operations` and `admin/timeline`; anonymous requests receive 401. Verify a normal report retry leaves one authoritative created event and that BHC/reminder outcomes appear without private contents. The existing public weather route remains public.
+Backend monitoring does not require the PostHog flag. Open Administration → Accounts & activity or Operations as an approved administrator, using the header link or `/admin`. Confirm members receive 403 for `admin/activity`, `admin/operations` and `admin/timeline`; anonymous requests receive 401. Verify a normal report retry leaves one authoritative created event and that BHC/reminder outcomes appear without private contents. The existing public weather route remains public.
 
 ## External service monitor
 

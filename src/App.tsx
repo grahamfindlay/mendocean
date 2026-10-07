@@ -1,5 +1,7 @@
 import { scheduledAttendance } from "../shared/presentation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import Admin from "./Admin";
 import {
   ArrowUpRight,
   Check,
@@ -94,6 +96,10 @@ export interface AccountData {
   };
 }
 export default function App() {
+  const { pathname } = useLocation();
+  const administration =
+    pathname === "/admin" || pathname.startsWith("/admin/");
+  const [authReady, setAuthReady] = useState(previewMode || !supabase);
   const now = useClock();
   const [resume] = useState(readUpdatePosition);
   const [forecastAttendance, setForecastAttendance] = useState<string[]>([
@@ -200,6 +206,7 @@ export default function App() {
     }
   }, [user]);
   useEffect(() => {
+    if (administration) return;
     refreshWeather();
     const timer = setInterval(refreshWeather, 5 * 60000);
     const onReturn = () => {
@@ -216,7 +223,7 @@ export default function App() {
       window.removeEventListener("focus", onReturn);
       document.removeEventListener("visibilitychange", onReturn);
     };
-  }, [refreshWeather]);
+  }, [refreshWeather, administration]);
   useEffect(() => {
     if (previewMode) {
       currentUser.current = "10000000-0000-4000-8000-000000000001";
@@ -253,18 +260,29 @@ export default function App() {
       }
       currentUser.current = next?.id ?? null;
       setUser(next);
+      setAuthReady(true);
     };
     void supabase.auth
       .getSession()
-      .then(({ data }) => updateUser(data.session?.user ?? null));
+      .then(({ data }) => updateUser(data.session?.user ?? null))
+      .catch((e) => {
+        setError(e.message);
+        setAuthReady(true);
+      });
     const { data } = supabase.auth.onAuthStateChange((_event, session) =>
       updateUser(session?.user ?? null),
     );
     return () => data.subscription.unsubscribe();
   }, []);
   useEffect(() => {
-    telemetryView(settings || authOpen ? "Account" : tab);
-  }, [tab, settings, authOpen, user?.id]);
+    telemetryView(
+      settings || authOpen
+        ? "Account"
+        : administration
+          ? "Administration"
+          : tab,
+    );
+  }, [tab, settings, authOpen, user?.id, administration]);
   useEffect(() => {
     let observedAt = 0;
     const observe = () => {
@@ -329,24 +347,63 @@ export default function App() {
       setBusy(false);
     }
   };
-  const shareRow = (o: Outing) => void act(async () => {
-    const result = await api<{ url: string }>("share", { outing_id: o.id });
-    await navigator.clipboard.writeText(result.url);
-    setMessage("Invitation link copied. It expires in seven days and requires an invited account.");
-  });
+  const shareRow = (o: Outing) =>
+    void act(async () => {
+      const result = await api<{ url: string }>("share", { outing_id: o.id });
+      await navigator.clipboard.writeText(result.url);
+      setMessage(
+        "Invitation link copied. It expires in seven days and requires an invited account.",
+      );
+    });
   function navigate(name: string) {
     setEditing(undefined);
     setSelectedOuting(undefined);
     setTab(name);
     setError("");
   }
+  if (administration)
+    return (
+      <>
+        <Admin
+          key={user?.id || "signed-out"}
+          account={account}
+          signedIn={!!user}
+          authReady={authReady}
+          accountError={error}
+          onRetry={() => {
+            setError("");
+            void refresh();
+          }}
+          onSignIn={() => setAuthOpen(true)}
+          onSignOut={() =>
+            void act(async () => {
+              await supabase?.auth.signOut();
+            })
+          }
+        />
+        {authOpen && (
+          <Auth
+            onClose={() => setAuthOpen(false)}
+            onSuccess={() => setAuthOpen(false)}
+          />
+        )}
+      </>
+    );
   return (
     <div className="app-shell">
       <UpdateBanner />
       <header className="site-header">
-        <a className="wordmark" href="/" aria-label="Mendocean — Lake Mendota / Madison, WI">
+        <a
+          className="wordmark"
+          href="/"
+          aria-label="Mendocean — Lake Mendota / Madison, WI"
+        >
           <div className="wordmark-name" aria-hidden="true">
-            <svg className="wordmark-icon" viewBox="10 16 44 32" focusable="false">
+            <svg
+              className="wordmark-icon"
+              viewBox="10 16 44 32"
+              focusable="false"
+            >
               <path d="M10 47 C12 29 18 15 29 17 C25 21 24 28 29 34 C33 21 42 15 52 18 C45 23 46 35 54 47 L43 47 C39 41 37 35 38 29 C34 33 33 39 32 44 L25 44 C20 38 19 33 20 29 C17 35 17 42 17 47 Z" />
             </svg>
             endocean
@@ -354,10 +411,17 @@ export default function App() {
           <span>LAKE MENDOTA / MADISON, WI</span>
         </a>
         {user ? (
-          <button className="button subtle" onClick={() => setSettings(true)}>
-            <Settings size={16} />
-            Account
-          </button>
+          <div className="header-actions">
+            {account?.profile.role === "admin" && (
+              <Link className="button subtle" to="/admin">
+                Administration
+              </Link>
+            )}
+            <button className="button subtle" onClick={() => setSettings(true)}>
+              <Settings size={16} />
+              Account
+            </button>
+          </div>
         ) : (
           <button className="button subtle" onClick={() => setAuthOpen(true)}>
             Sign in <ArrowUpRight size={16} />
@@ -438,12 +502,19 @@ export default function App() {
               outings={account?.outings || []}
               onSchedule={() => setPlanned(true)}
               onSignIn={() => setAuthOpen(true)}
-              renderRowActions={(o) => o.kind === "independent" && o.owner_id === user?.id ? (
-                <button className="icon-button" aria-label="Share independent row"
-                  title="Copy invitation link" disabled={busy} onClick={() => shareRow(o)}>
-                  <Share size={18} />
-                </button>
-              ) : null}
+              renderRowActions={(o) =>
+                o.kind === "independent" && o.owner_id === user?.id ? (
+                  <button
+                    className="icon-button"
+                    aria-label="Share independent row"
+                    title="Copy invitation link"
+                    disabled={busy}
+                    onClick={() => shareRow(o)}
+                  >
+                    <Share size={18} />
+                  </button>
+                ) : null
+              }
             />
           ) : (
             <section className="empty-state">
@@ -468,9 +539,9 @@ export default function App() {
           <section className="empty-state">
             <h1>How was the water?</h1>
             <p>
-              Your reports help build better wind-wave models and rowing forecasts.
-              Logging takes less than 10 seconds. Receive optional reminders to log
-              after each scheduled row.
+              Your reports help build better wind-wave models and rowing
+              forecasts. Logging takes less than 10 seconds. Receive optional
+              reminders to log after each scheduled row.
             </p>
             <button className="button" onClick={() => setAuthOpen(true)}>
               Sign in <ArrowUpRight size={16} />
@@ -625,7 +696,13 @@ export default function App() {
         <Modal title="Your account" onClose={() => setSettings(false)}>
           <SettingsForm
             account={account}
-            onExport={async () => download("mendocean-my-data.json", JSON.stringify(await api("export"), null, 2))}
+            onExport={async () =>
+              download(
+                "mendocean-my-data.json",
+                JSON.stringify(await api("export"), null, 2),
+              )
+            }
+            onAdministration={() => setSettings(false)}
             onUpdated={() => void refresh()}
             onSignOut={() =>
               void act(async () => {

@@ -565,29 +565,36 @@ test("owner can inspect activity and operations while members cannot", async ({
 }) => {
   await sql.query("update profiles set role='admin' where id=$1", [actor.id]);
   await loggedIn(page);
-  await page.getByRole("button", { name: "Account", exact: true }).click();
-  await page.getByText("Pilot administration", { exact: true }).click();
-  const monitoring = page.getByRole("region", {
-    name: "Activity and operations",
-  });
-  await expect(
-    monitoring.getByRole("heading", { name: "Activity", exact: true }),
-  ).toBeVisible();
+  await page.getByRole("link", { name: "Administration", exact: true }).click();
+  const openPage = async (name: string) => {
+    await expect(page.locator(".admin-sidebar")).toBeVisible();
+    const toggle = page.getByRole("button", { name: /^Menu ·/ });
+    if (await toggle.isVisible()) await toggle.click();
+    await page
+      .getByRole("navigation", { name: "Administration", exact: true })
+      .getByRole("link", { name, exact: true })
+      .click();
+  };
+  await openPage("Accounts & activity");
+  const monitoring = page.getByRole("region", { name: "Account activity" });
   await expect(monitoring.getByText(/approved accounts/)).toBeVisible();
   await monitoring.getByLabel("Period").selectOption("30");
   await expect(
     monitoring.getByRole("button", { name: "Refresh", exact: true }),
   ).toBeEnabled();
+  await openPage("Operations");
   await expect(
-    monitoring.getByText("Last completed dispatch", { exact: true }),
+    page.getByText("Last completed dispatch", { exact: true }),
   ).toBeVisible();
   expect((await api(actor, "admin/operations")).status).toBe(200);
   await sql.query("update profiles set role='member' where id=$1", [actor.id]);
   expect((await api(actor, "admin/operations")).status).toBe(403);
   await page.reload();
-  await page.getByRole("button", { name: "Account", exact: true }).click();
   await expect(
-    page.getByText("Pilot administration", { exact: true }),
+    page.getByRole("heading", { name: "Administrator access required" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "Administration", exact: true }),
   ).toHaveCount(0);
 });
 

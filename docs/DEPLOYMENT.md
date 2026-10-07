@@ -53,7 +53,7 @@ Create Graham’s user in Supabase Authentication. Then, using that user’s UUI
 update public.profiles set role = 'admin', approved = true where id = 'USER_UUID';
 ```
 
-The app’s Account screen lets the administrator create additional invited accounts without sending unsolicited invitation emails. Invitees can request their own sign-in code. BHC tokens are connected separately by each user through Account.
+Administration → Accounts & activity (`/admin/accounts`) lets the administrator create additional invited accounts without sending unsolicited invitation emails. Invitees can request their own sign-in code. BHC tokens are connected separately by each user through Account.
 
 ## 5. Scheduled jobs
 
