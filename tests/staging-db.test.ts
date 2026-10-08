@@ -20,10 +20,72 @@ beforeAll(async () => {
   await db.query("insert into auth.users(id) values($1),($2)", [ALICE, BOB]);
   await db.exec("update profiles set approved=true,reminder_channel='email'");
   await db.exec(readFileSync("scripts/staging/fixtures.sql", "utf8"));
+  await db.exec(readFileSync("scripts/staging/attendance-fixture.sql", "utf8"));
   await db.query(
     "insert into private.staging_environment(owner_id) values($1)",
     [ALICE],
   );
+});
+test("attendance staging fixture is upcoming with an open deadline and no lineup history, preserving the existing practice", async () => {
+  await db.query("select public.staging_fixture($1)", [ALICE]);
+  const before = (
+    await db.query(
+      "select * from public.outings where bhc_practice_id=900000003",
+    )
+  ).rows;
+  await expect(
+    db.query("select public.staging_attendance_fixture($1)", [BOB]),
+  ).rejects.toThrow("Staging owner required");
+  const { rows } = await db.query<{ r: any }>(
+    "select public.staging_attendance_fixture($1) r",
+    [ALICE],
+  );
+  expect(Date.parse(rows[0].r.deadline)).toBeGreaterThan(Date.now());
+  expect(Date.parse(rows[0].r.starts_at)).toBeGreaterThan(
+    Date.parse(rows[0].r.deadline),
+  );
+  expect(
+    (
+      await db.query(
+        "select * from private.lineup_snapshots where outing_id=$1",
+        [rows[0].r.outing_id],
+      )
+    ).rows,
+  ).toEqual([]);
+  expect(
+    (
+      await db.query("select * from private.lineup_events where outing_id=$1", [
+        rows[0].r.outing_id,
+      ])
+    ).rows,
+  ).toEqual([]);
+  expect(
+    (
+      await db.query(
+        "select * from public.outings where bhc_practice_id=900000003",
+      )
+    ).rows,
+  ).toEqual(before);
+  expect(
+    (
+      await db.query<{ r: boolean }>(
+        "select has_function_privilege('authenticated','public.staging_attendance_fixture(uuid)','execute') r",
+      )
+    ).rows[0].r,
+  ).toBe(false);
+  await db.query(
+    "update public.outing_members set attendance='declined' where outing_id=$1",
+    [rows[0].r.outing_id],
+  );
+  await db.query("select public.staging_attendance_fixture($1)", [ALICE]);
+  expect(
+    (
+      await db.query<{ attendance: string }>(
+        "select attendance from public.outing_members where outing_id=$1",
+        [rows[0].r.outing_id],
+      )
+    ).rows[0].attendance,
+  ).toBe("declined");
 });
 afterAll(async () => {
   await db?.close();

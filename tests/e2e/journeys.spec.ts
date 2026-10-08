@@ -1094,3 +1094,132 @@ test("Week periods save to the account, survive a new device, and retain choices
 });
 
 });
+
+async function attendanceRosterPage(page: Page) {
+  const now = Math.floor(Date.now() / 1000);
+  await fixtures({
+    failure: null,
+    bhc: [
+      {
+        practice_id: Math.floor(Math.random() * 100000000) + 400000000,
+        name: "Attendance roster fixture",
+        start_time: now + 86400,
+        end_time: now + 90000,
+        attendance_window_start: now - 3600,
+        attendance_window_end: now + 3600,
+        set_attendance_allowed: true,
+        current_attendance_status: "Unknown",
+        lineups_set: "No",
+      },
+    ],
+    crew: [
+      {
+        custid: 501,
+        fname: "Zoe",
+        lname: "Reed",
+        attendance_plan: "Attending",
+        lineup_boat: null,
+      },
+      {
+        custid: 502,
+        fname: "Alex",
+        lname: "Morgan",
+        attendance_plan: "Attending",
+        lineup_boat: null,
+      },
+      { custid: 503, fname: "Declined", attendance_plan: "Not Attending" },
+    ],
+  });
+  expect(
+    (await api(actor, "bhc/connect", { token: syntheticToken })).status,
+  ).toBe(200);
+  await tick();
+  await session(page);
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Scheduled rows", exact: true })
+    .click();
+  await page.getByRole("checkbox", { name: "Unknown", exact: true }).check();
+}
+
+test("attendance roster loads only on expansion inside the modal and refreshes without selecting a forecast", async ({
+  page,
+}) => {
+  await attendanceRosterPage(page);
+  let reads = 0;
+  page.on("request", (r) => {
+    if (r.url().endsWith("/api/bhc/attendance-roster")) reads++;
+  });
+  const selected = await page
+    .locator('.row-card[aria-pressed="true"]')
+    .allTextContents();
+  // Safari does not focus a button on pointer clicks; establish the keyboard
+  // origin explicitly before checking the modal's focus restoration.
+  await page.getByRole("button", { name: "Practice attendance: Unknown" }).focus();
+  await page
+    .getByRole("button", { name: "Practice attendance: Unknown" })
+    .press("Enter");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByLabel("Your attendance")).toBeVisible();
+  const details = dialog.locator(".attendance-roster");
+  await expect(details).not.toHaveAttribute("open");
+  expect(reads).toBe(0);
+  await details.locator("summary").click();
+  await expect(details.getByRole("listitem")).toHaveText([
+    "Alex Morgan",
+    "Zoe Reed",
+  ]);
+  await expect(details.locator("summary")).toHaveText(
+    "Who else is attending (2)",
+  );
+  expect(reads).toBe(1);
+  await details.locator("summary").click();
+  await expect(
+    details.getByRole("list", { name: "Other attendees" }),
+  ).toBeHidden();
+  await details.locator("summary").click();
+  await expect(details.getByRole("listitem")).toHaveCount(2);
+  expect(reads).toBe(1);
+  expect(await dialog.evaluate((e) => e.scrollWidth <= e.clientWidth + 1)).toBe(
+    true,
+  );
+  await fixtures({ crew: [] });
+  await details.getByRole("button", { name: "Refresh attendees" }).click();
+  await expect(
+    details.getByText("No one else is marked attending in BHC."),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
+  expect(await page.locator('.row-card[aria-pressed="true"]').allTextContents()).toEqual(selected);
+  await expect(
+    page.getByRole("button", { name: "Practice attendance: Unknown" }),
+  ).toBeFocused();
+});
+
+test("a roster failure offers retry while saving attendance still works", async ({
+  page,
+}) => {
+  await attendanceRosterPage(page);
+  await page
+    .getByRole("button", { name: "Practice attendance: Unknown" })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByLabel("Your attendance")).toBeVisible();
+  await fixtures({ failure: "lineup_read_failure" });
+  const details = dialog.locator(".attendance-roster");
+  await details.locator("summary").click();
+  await expect(details.getByRole("alert")).toContainText(
+    "temporarily unavailable",
+  );
+  await expect(details.getByRole("listitem")).toHaveCount(0);
+  await dialog.getByLabel("Your attendance").selectOption("attending");
+  await dialog.getByRole("button", { name: "Save attendance in BHC" }).click();
+  await expect(
+    dialog.getByText("Attendance updated in BHC.", { exact: true }),
+  ).toBeVisible();
+  await fixtures({ failure: null });
+  await details.getByRole("button", { name: "Try again" }).click();
+  await expect(details.getByRole("listitem")).toHaveText([
+    "Alex Morgan",
+    "Zoe Reed",
+  ]);
+});

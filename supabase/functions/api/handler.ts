@@ -31,6 +31,7 @@ import {
 import { bhcStatus } from "../../../shared/bhcConnection.ts";
 import { lineupsEnabled } from "../_shared/lineups.ts";
 import { manageAttendance } from "../_shared/attendance.ts";
+import { readAttendanceRoster } from "../_shared/attendance-roster.ts";
 import { assess, assessmentCapabilities } from "../../../shared/model.ts";
 import {
   reminderBlock,
@@ -382,6 +383,11 @@ export function createApiHandler(
         z.object({}).strict().parse(input);
         await monitoring("observe", { user_id: uid });
         return json(req, { observed: true });
+      }
+      if (path === "bhc/attendance-roster") {
+        const parsed = z.object({ outing_id: uuid }).strict().parse(input);
+        await member(parsed.outing_id);
+        return json(req, await readAttendanceRoster(uid, parsed.outing_id, providers));
       }
       if (path === "bhc/attendance") {
         const parsed = z
