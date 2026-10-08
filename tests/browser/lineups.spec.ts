@@ -1,4 +1,10 @@
 import { test, expect } from "@playwright/test";
+import { normalizeLineup, lineupEmail } from "../../shared/lineups";
+import {
+  scenarioAttendance,
+  scenarioBoats,
+  longRowerName,
+} from "../../supabase/functions/staging-test/scenarios";
 test("lineup links select the practice, prioritize own boat and highlight the seat on phones", async ({
   page,
 }, testInfo) => {
@@ -179,4 +185,111 @@ test("Lineups navigation is hidden without a BHC integration", async ({
       .getByRole("navigation", { name: "Main navigation" })
       .getByRole("button", { name: "Lineups", exact: true }),
   ).toHaveCount(0);
+});
+
+test("both crews and the longest MRC name fit one line at phone widths", async ({
+  page,
+}, testInfo) => {
+  const starts = Math.floor(Date.now() / 1000) + 3600;
+  const meta = {
+    name: "Masters Recreational",
+    start_time: starts,
+    end_time: starts + 5400,
+    lineups_set: "Yes",
+  };
+  const lineup = {
+    ...normalizeLineup(
+      meta,
+      {
+        lineups_set: "Yes",
+        attendance: scenarioAttendance("publish", 900000002, null),
+      },
+      900000002,
+      scenarioBoats,
+    ),
+    outing_id: "long-name",
+    checked_at: new Date().toISOString(),
+  };
+  await page.addInitScript((lineup) => {
+    localStorage.setItem("mendocean-preview-bhc", "true");
+    localStorage.setItem("mendocean-preview-lineups", JSON.stringify([lineup]));
+  }, lineup);
+  await page.goto("/?preview=1&tab=Lineups&lineup=long-name");
+  await expect(page.locator(".lineup-boat").first()).toContainText("River");
+  await page.getByText("Other boats (1)", { exact: true }).click();
+  await expect(page.locator(".lineup-boat").last()).toContainText("Cedar");
+  await expect(page.getByText(longRowerName, { exact: true })).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  const fits = () =>
+    page
+      .locator(".lineup-athlete, .lineup-seat-label > span")
+      .evaluateAll((els) =>
+        els.flatMap((el) => {
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          const rects = [...range.getClientRects()];
+          return rects.length === 1 &&
+            rects[0].right <= el.getBoundingClientRect().right + 1
+            ? []
+            : [
+                {
+                  name: el.textContent,
+                  lines: rects.length,
+                  width: el.clientWidth,
+                  font: getComputedStyle(el).font,
+                },
+              ];
+        }),
+      );
+  for (const width of [320, 360, 375, 390, 430, 768]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(await fits(), `app rows fit at ${width}px`).toEqual([]);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: `test-results/lineup-two-boats-${testInfo.project.name}.png`,
+    fullPage: true,
+  });
+  const email = lineupEmail(
+    lineup,
+    "Lineup published",
+    "https://mendocean-staging.pages.dev/?tab=Lineups",
+    "https://mendocean-staging.pages.dev/?account=1",
+    "published",
+  );
+  await page.setContent(email.html);
+  for (const width of [320, 360, 375, 390, 430, 640]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(
+      await page.locator(".lineup-email-name").evaluateAll((els) =>
+        els.flatMap((el) => {
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          const rects = [...range.getClientRects()];
+          return rects.length === 1 &&
+            rects[0].right <= el.getBoundingClientRect().right + 1
+            ? []
+            : [
+                {
+                  name: el.textContent,
+                  lines: rects.length,
+                  width: el.clientWidth,
+                  font: getComputedStyle(el).font,
+                },
+              ];
+        }),
+      ),
+      `email names fit at ${width}px`,
+    ).toEqual([]);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  }
 });

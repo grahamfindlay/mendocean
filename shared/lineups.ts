@@ -244,15 +244,15 @@ export function lineupEmail(
         const you = s.athlete_id === lineup.athlete_id;
         const sides = oarSides(s);
         return `<tr style="background:${you ? "#e7efdf" : "#fffdf6"}">
-      <td width="140" style="padding:13px 20px 13px 12px;border-bottom:1px solid #e3e5da;color:${you ? "#244a2d" : "#61736c"};font-size:13px">
-        <table role="presentation" width="112" cellpadding="0" cellspacing="0" style="width:112px;table-layout:fixed"><tr>
-          <td width="29" align="right">${oar("left", sides.left)}</td>
-          <td width="54" align="center" style="white-space:nowrap;font-weight:${you ? "700" : "400"}">${escape(seatLabel(s.seat, boatSeatCount(boat!)))}</td>
-          <td width="29" align="left">${oar("right", sides.right)}</td>
+      <td class="lineup-email-seat" width="140" style="padding:13px 20px 13px 12px;border-bottom:1px solid #e3e5da;color:${you ? "#244a2d" : "#61736c"};font-size:13px">
+        <table class="lineup-email-oars" role="presentation" width="112" cellpadding="0" cellspacing="0" style="width:112px;table-layout:fixed"><tr>
+          <td class="lineup-email-oar-cell" width="30" align="right">${oar("left", sides.left)}</td>
+          <td class="lineup-email-label" width="52" align="center" style="white-space:nowrap;font-weight:${you ? "700" : "400"}">${escape(seatLabel(s.seat, boatSeatCount(boat!)))}</td>
+          <td class="lineup-email-oar-cell" width="30" align="left">${oar("right", sides.right)}</td>
         </tr></table>
       </td>
-      <td style="padding:13px 8px;border-bottom:1px solid #e3e5da;font-size:15px;font-weight:${you ? "700" : "400"};overflow-wrap:anywhere">${escape(s.name)}</td>
-      <td width="44" align="right" style="padding:13px 12px 13px 0;border-bottom:1px solid #e3e5da;font-size:11px;font-weight:700;color:#3b6a3f">${you ? "YOU" : ""}</td>
+      <td class="lineup-email-name"${you ? "" : ' colspan="2"'} style="padding:13px 8px;border-bottom:1px solid #e3e5da;font-size:15px;font-weight:${you ? "700" : "400"};overflow-wrap:anywhere">${escape(s.name)}</td>
+      ${you ? '<td width="30" align="right" style="padding:13px 12px 13px 0;border-bottom:1px solid #e3e5da;font-size:11px;font-weight:700;color:#3b6a3f">YOU</td>' : ""}
     </tr>`;
       })
       .join("") ?? "";
@@ -275,7 +275,10 @@ export function lineupEmail(
     text:
       lines.filter(Boolean).join("\n") +
       `\n\nView lineup: ${url}\nManage lineup notifications: ${accountURL}`,
-    html: `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light"></head><body style="margin:0;padding:0;background:#f8f5ec;color:#183f3a;font-family:Arial,Helvetica,sans-serif">
+    html: `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light"><style>
+      @media(max-width:375px){.lineup-email-name{font-size:14px!important}}
+      @media(max-width:360px){.lineup-email-seat{width:98px!important;padding-left:6px!important;padding-right:4px!important}.lineup-email-oars{width:88px!important}.lineup-email-oar-cell{width:24px!important}.lineup-email-label{width:40px!important}.lineup-email-name{font-size:13px!important}}
+    </style></head><body style="margin:0;padding:0;background:#f8f5ec;color:#183f3a;font-family:Arial,Helvetica,sans-serif">
       <div style="display:none;max-height:0;overflow:hidden">${escape(`${summary} ${lineup.title} · ${date}`)}</div>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f5ec"><tr><td align="center" style="padding:28px 12px">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px"><tr><td>

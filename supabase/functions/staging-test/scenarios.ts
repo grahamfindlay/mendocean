@@ -10,6 +10,37 @@ export const scenarios = [
 ] as const;
 export type Scenario = (typeof scenarios)[number];
 
+export const scenarioBoats = [
+  {
+    boat_id: 920000001,
+    boat_name: "River",
+    boat_type: 4,
+    coxed: "Yes",
+    rigging: "sweep",
+  },
+  {
+    boat_id: 920000002,
+    boat_name: "Cedar",
+    boat_type: 8,
+    coxed: "Yes",
+    rigging: "sweep",
+  },
+];
+// Name-length check against the regular-member MRC directory, October 8, 2026.
+// Synthetic IDs and assignments; this does not represent the member's real crew.
+export const longRowerName = "Polyanna Nunes Da Silva";
+const secondCrew = [
+  [911000001, "Jamie Reed", "coxswain"],
+  [911000002, "Riley Parker", "8"],
+  [911000003, "Avery Quinn", "7"],
+  [911000004, "Cameron Brooks", "6"],
+  [911000005, "Robin Hayes", "5"],
+  [911000006, "Drew Bennett", "4"],
+  [911000007, "Harper Morgan", "3"],
+  [911000008, "Sydney Lane", "2"],
+  [911000009, "Blake Ellis", "1"],
+] as const;
+
 // Standard sweep rig: stroke/even seats port, odd seats starboard.
 const sweepSide = (seat: string) =>
   seat === "coxswain" ? "" : Number(seat) % 2 ? "starboard" : "port";
@@ -21,7 +52,7 @@ export function scenarioAttendance(
 ) {
   const base = [
     [910000001, "Alex Morgan", "coxswain"],
-    [910000002, "Jordan Ellis", "4"],
+    [910000002, longRowerName, "4"],
     [910000003, "Morgan Chen", "2"],
     [910000004, "Taylor Brooks", "1"],
     [athlete, "Graham Findlay", "3"],
@@ -56,6 +87,20 @@ export function scenarioAttendance(
         lineup_boat: 920000001,
         attendance_plan: "Attending",
       }));
+  // Upgrade an existing saved fixture without resetting the owner's assignment.
+  if (!people.some((p) => p.lineup_boat === 920000002)) {
+    people.push(
+      ...secondCrew.map(([custid, fname, lineup_seat]) => ({
+        custid,
+        fname,
+        lname: "",
+        lineup_seat,
+        lineup_side: sweepSide(lineup_seat),
+        lineup_boat: 920000002,
+        attendance_plan: "Attending",
+      })),
+    );
+  }
   const rower = people.find((p) => p.custid === athlete);
   if (action === "seat") {
     if (!rower) throw new Error("Publish a lineup to restore your seat first.");

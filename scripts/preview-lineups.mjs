@@ -5,7 +5,10 @@ import {
   lineupEmail,
   lineupChange,
 } from "../shared/lineups.ts";
-import { scenarioAttendance } from "../supabase/functions/staging-test/scenarios.ts";
+import {
+  scenarioAttendance,
+  scenarioBoats,
+} from "../supabase/functions/staging-test/scenarios.ts";
 import { localDateTime, chicagoToISO } from "../shared/domain.ts";
 const output = resolve("test-results/lineup-design");
 const origin = process.env.LINEUP_PREVIEW_ORIGIN || "http://127.0.0.1:4173";
@@ -21,15 +24,6 @@ const meta = {
   end_time: starts + 5400,
   lineups_set: "Yes",
 };
-const boats = [
-  {
-    boat_id: 920000001,
-    boat_name: "River",
-    boat_type: 4,
-    coxed: "Yes",
-    rigging: "sweep",
-  },
-];
 function change(action, previous) {
   const lineup = normalizeLineup(
     meta,
@@ -41,17 +35,15 @@ function change(action, previous) {
           "Warm up to the first buoy, then three 10-minute pieces at 18–20 strokes per minute. Easy row back.",
       },
       attendance: scenarioAttendance(action, athlete, previous),
-      assigned_coaches: [
-        {
-          boat_id: 920000001,
-          custid: 930000001,
-          fname: "Sam",
-          lname: "Rivera",
-        },
-      ],
+      assigned_coaches: scenarioBoats.map((boat) => ({
+        boat_id: boat.boat_id,
+        custid: 930000001,
+        fname: "Sam",
+        lname: "Rivera",
+      })),
     },
     athlete,
-    boats,
+    scenarioBoats,
   );
   for (const boat of lineup.boats)
     for (const coach of boat.coaches) coach.email = "sam.rivera@example.com";

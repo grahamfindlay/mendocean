@@ -11,7 +11,7 @@ import {
 import { saveLineup, sendLineup } from "../_shared/lineups.ts";
 import { collectWeather } from "../_shared/weather.ts";
 import { liveProviders, type Providers } from "../_shared/providers.ts";
-import { scenarios, scenarioAttendance } from "./scenarios.ts";
+import { scenarios, scenarioAttendance, scenarioBoats } from "./scenarios.ts";
 import type { Lineup } from "../../../shared/lineups.ts";
 export function createStagingHandler(providers: Providers = liveProviders) {
   return async (req: Request): Promise<Response> => {
@@ -100,14 +100,12 @@ export function createStagingHandler(providers: Providers = liveProviders) {
               "Warm up to the first buoy, then three 10-minute pieces at 18–20 strokes per minute. Easy row back.",
           },
           attendance: people,
-          assigned_coaches: [
-            {
-              boat_id: 920000001,
-              custid: 930000001,
-              fname: "Sam",
-              lname: "Rivera",
-            },
-          ],
+          assigned_coaches: scenarioBoats.map((boat) => ({
+            boat_id: boat.boat_id,
+            custid: 930000001,
+            fname: "Sam",
+            lname: "Rivera",
+          })),
         };
         await saveLineup(
           uid,
@@ -116,15 +114,7 @@ export function createStagingHandler(providers: Providers = liveProviders) {
           meta,
           detail,
           c.athlete,
-          [
-            {
-              boat_id: 920000001,
-              boat_name: "River",
-              boat_type: 4,
-              coxed: "Yes",
-              rigging: "sweep",
-            },
-          ],
+          scenarioBoats,
           input.action !== "reset" && input.action !== "refresh",
           async (lineup) => {
             for (const boat of lineup.boats)

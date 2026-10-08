@@ -138,10 +138,10 @@
   fill: currentColor;
   width: 24px;
   height: 17px;
-  transform: translateX(5px);
+  transform: translateX(6px);
 }
 .lineup-oar-right {
-  transform: translateX(-5px) rotate(180deg);
+  transform: translateX(-6px) rotate(180deg);
 }
 .lineup-oar-empty {
   visibility: hidden;
@@ -149,6 +149,9 @@
 .lineup-athlete {
   font-size: 0.95rem;
   overflow-wrap: anywhere;
+}
+.lineup-seats li:not(.lineup-you) .lineup-athlete {
+  grid-column: 2 / -1;
 }
 .lineup-seats .lineup-you {
   background: #e7efdf;
@@ -274,5 +277,16 @@
   }
   .lineup-coaches {
     padding: 14px 16px;
+  }
+}
+@media (max-width: 360px) {
+  .lineup-seats li {
+    grid-template-columns: 88px minmax(0, 1fr) 23px;
+    column-gap: 12px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .lineup-athlete {
+    font-size: 0.8125rem;
   }
 }

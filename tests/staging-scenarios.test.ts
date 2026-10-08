@@ -1,6 +1,8 @@
 import { expect, test } from "vitest";
 import {
   scenarioAttendance,
+  scenarioBoats,
+  longRowerName,
   type Scenario,
 } from "../supabase/functions/staging-test/scenarios";
 import {
@@ -26,15 +28,7 @@ function change(action: Scenario, previous: Lineup | null = null) {
     meta,
     { lineups_set: meta.lineups_set, attendance },
     athlete,
-    [
-      {
-        boat_id: 920000001,
-        boat_name: "River",
-        boat_type: 4,
-        coxed: "Yes",
-        rigging: "sweep",
-      },
-    ],
+    scenarioBoats,
   );
 }
 test("crew-only changes preserve a previous seat move and its side", () => {
@@ -90,4 +84,21 @@ test("presentation refresh preserves assignments, removals and unpublished state
   const removed = change("remove", moved);
   expect(ownSeat(change("refresh", removed))).toBeUndefined();
   expect(change("refresh", change("reset")).published).toBe(false);
+});
+
+test("presentation refresh adds the second boat and long name without moving the owner", () => {
+  const moved = change("seat", change("publish"));
+  const legacy = {
+    ...moved,
+    boats: moved.boats.filter((b) => b.boat_id === 920000001),
+  };
+  const refreshed = change("refresh", legacy);
+  expect(ownSeat(refreshed)).toEqual(ownSeat(legacy));
+  expect(refreshed.boats).toHaveLength(2);
+  expect(refreshed.boats.find((b) => b.name === "Cedar")?.seats).toHaveLength(
+    9,
+  );
+  expect(refreshed.boats[0].seats.some((s) => s.name === longRowerName)).toBe(
+    true,
+  );
 });
