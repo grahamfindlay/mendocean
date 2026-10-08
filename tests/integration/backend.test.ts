@@ -914,9 +914,11 @@ test("weather archives are private, immutable gzip and enrich from the archived 
     .from("weather-archive")
     .download(run.object_path);
   expect(download.error).toBeNull();
-  const forecast = JSON.parse(
+  const archive = JSON.parse(
     gunzipSync(Buffer.from(await download.data!.arrayBuffer())).toString(),
   );
+  const forecast = archive.forecast || archive;
+  expect(archive.raw.hourly.time.length).toBeGreaterThan(120);
   expect(forecast.hours.length).toBeGreaterThan(120);
   expect(forecast.quarter_hours).toHaveLength(196);
   expect(forecast.quarter_hours[0].interval_minutes).toBe(15);
@@ -956,6 +958,36 @@ test("weather archives are private, immutable gzip and enrich from the archived 
       )
     ).rows[0].source_kind,
   ).toBe("archived_forecast");
+});
+test("measured collection preserves raw evidence, survives a buoy failure, and uses each report's interval", async () => {
+  await sql.query("update private.observation_sources set slot=null,locked_until=null");
+  await tick();
+  const cache = (await sql.query("select source,data from private.observation_summaries where starts_at>now()-interval '1 hour'" )).rows;
+  expect(cache.some(r => r.source === 'buoy' && r.data.sample_count === 5)).toBe(true);
+  expect(cache.some(r => r.source === 'iem_msn' && r.data.gust === null)).toBe(true);
+  const captures = (await sql.query("select source,object_path from private.observation_captures where error is null")).rows;
+  expect(captures.some(r => r.source === 'buoy')).toBe(true);
+  const object = await db.storage.from('weather-archive').download(captures.find(r=>r.source==='buoy').object_path);
+  expect(JSON.parse(gunzipSync(Buffer.from(await object.data!.arrayBuffer())).toString()).source).toBe('buoy');
+  await resetJobs(); await fixtures({failure:'buoy'});
+  await sql.query("update private.observation_sources set slot=null,locked_until=null");
+  await tick();
+  const state=(await sql.query("select source,failures from private.observation_sources")).rows;
+  expect(state.find(r=>r.source==='buoy').failures).toBeGreaterThan(0);
+  expect(state.find(r=>r.source==='iem_msn').failures).toBe(0);
+  await resetJobs();
+  const now=Date.now();
+  const o=await createOuting(a,{starts_at:new Date(now-55*60000).toISOString(),ends_at:new Date(now-5*60000).toISOString()});
+  await sql.query('insert into outing_members(outing_id,user_id) values($1,$2)',[o.id,b.id]);
+  const actualStart=new Date(now-40*60000).toISOString(),actualEnd=new Date(now-20*60000).toISOString();
+  expect((await api(a,'report',{outing:o,report:row(o,{actual_start:actualStart,actual_end:actualEnd})})).status).toBe(200);
+  expect((await api(b,'report',{outing:o,report:row(o)})).status).toBe(200);
+  await tick();
+  const own=(await api(a,'account')).data.outings.find((r:any)=>r.id===o.id).measured_conditions;
+  const other=(await api(b,'account')).data.outings.find((r:any)=>r.id===o.id).measured_conditions;
+  expect(own.start).toBe(actualStart);expect(own.end).toBe(actualEnd);
+  expect(other.start).toBe(o.starts_at);
+  expect(own.sources.find((r:any)=>r.source==='buoy').bins).toBeGreaterThan(0);
 });
 test("weather failures retain cache; stale assessment is rejected; historical enrichment works", async () => {
   await sql.query(

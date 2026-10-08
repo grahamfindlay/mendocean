@@ -106,3 +106,7 @@ To repeat the live test, run `deno run --config supabase/functions/deno.json --a
 Known expiry or verified rejection pauses BHC sync, attendance writes and official-practice reminders. Temporary provider failures retain the connection and show stale-data status. Reminder reservation and final delivery require current connection state and a practice refresh after its end. Reconnect replaces credentials atomically, imports current practices and never replays an attendance write. Disconnect erases encrypted credentials while retaining a non-secret revision tombstone and rowing history. It does not revoke tokens at BHC; users can delete their dedicated token in My Profile.
 
 For rollback, disable new password exchanges and retain this migration. Old frontend clients can continue using `bhc/connect` with a provided token, but any supplied club ID must equal Mendota's. Use the new API/workers with the schema; pre-migration workers do not contain the expiry and revision enforcement.
+
+## Weather observations and evaluations
+
+The additive weather implementation and its owner activation checklist are documented in [WEATHER_DATA.md](WEATHER_DATA.md) and [TODO.md](TODO.md). Apply the new migration before deploying compatible API/worker functions. VC and weekly evaluation credentials are optional separate setup steps; buoy/IEM collection is automatic after deployment.

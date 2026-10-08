@@ -1,3 +1,11 @@
+import {
+  collectObservations,
+  enrichMeasurements,
+  scheduleObservations,
+  maintainObservations,
+  observationQuery,
+} from "../_shared/observations.ts";
+import type { ObservationSource } from "../../../shared/observations.ts";
 import { liveProviders, type Providers } from "../_shared/providers.ts";
 import {
   body,
@@ -51,6 +59,59 @@ export function createJobsHandler(
       )
         return json(req, { error: "Unauthorized" }, 401);
       const input = await body(req, 2000000);
+      if (input.action === "weather-export") {
+        if (
+          typeof input.start !== "string" ||
+          typeof input.end !== "string" ||
+          !Number.isFinite(Date.parse(input.start)) ||
+          !Number.isFinite(Date.parse(input.end))
+        )
+          return json(req, { error: "Invalid export dates" }, 400);
+        const start = new Date(input.start).toISOString(),
+          end = new Date(input.end).toISOString();
+        if (
+          Date.parse(end) <= Date.parse(start) ||
+          Date.parse(end) - Date.parse(start) > 14 * 86400000
+        )
+          return json(req, { error: "Invalid export window" }, 400);
+        const window = await observationQuery("window", { start, end });
+        const forecasts = [];
+        for (let offset = 0; offset < 2000; offset += 500) {
+          const batch =
+            check(
+              await service()
+                .from("weather_runs")
+                .select("fetched_at,object_path")
+                .gte(
+                  "fetched_at",
+                  new Date(Date.parse(start) - 86400000).toISOString(),
+                )
+                .lt("fetched_at", end)
+                .order("fetched_at")
+                .range(offset, offset + 499),
+            ) || [];
+          forecasts.push(...batch);
+          if (batch.length < 500) break;
+        }
+        return json(req, {
+          start,
+          end,
+          reports: await observationQuery("export_reports", { start, end }),
+          observations: window,
+          forecasts,
+        });
+      }
+      if (input.action === "weather-vc-trial") {
+        if (!Number.isInteger(input.days) || input.days < 0 || input.days > 60)
+          return json(req, { error: "Invalid trial duration" }, 400);
+        return json(
+          req,
+          await observationQuery("vc_trial", {
+            days: input.days,
+            at: new Date(providers.now()).toISOString(),
+          }),
+        );
+      }
       if (input.action === "training-data")
         return json(req, await query("training_snapshot"));
       if (input.action === "model-shadow") {
@@ -76,6 +137,7 @@ export function createJobsHandler(
       await optionalMonitoring("tick_started", { at: now.toISOString() });
       const stamp = Math.floor(now.getTime() / 900000);
       await enqueue("weather", null, null, now, `weather:15m:${stamp}`);
+      await scheduleObservations(providers);
       const local = localDateTime(now.toISOString());
       if (local.slice(11, 13) === "16")
         for (const c of await query("connections"))
@@ -125,8 +187,23 @@ export function createJobsHandler(
               job.payload?.generation || 0,
               providers,
             );
-          else if (job.kind === "enrich")
+          else if (job.kind === "enrich") {
+            // Measured evidence is independent of historical forecast availability.
+            await enrichMeasurements(job.outing_id, providers);
             await enrichOuting(job.outing_id, providers);
+          } else if (
+            job.kind === "observations" ||
+            job.kind === "observations_backfill"
+          )
+            await collectObservations(
+              job.payload.source as ObservationSource,
+              providers,
+              job.payload.day,
+            );
+          else if (job.kind === "observations_enrich")
+            await enrichMeasurements(job.outing_id, providers);
+          else if (job.kind === "observations_maintenance")
+            await maintainObservations(providers);
           else throw new Error("Unknown job type");
           await query("job_finish", { id: job.id, status: "done" });
           console.info(
@@ -151,7 +228,7 @@ export function createJobsHandler(
                 ? error.message
                 : "Task failed; no credentials or personal data were logged.",
             due_at: new Date(
-              Date.now() + Math.min(3600000, 60000 * 2 ** job.attempts),
+              providers.now() + Math.min(3600000, 60000 * 2 ** job.attempts),
             ).toISOString(),
           });
           results.push({ id: job.id, status: retry ? "retry" : "failed" });

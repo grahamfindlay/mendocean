@@ -1,3 +1,4 @@
+import { observationQuery } from "../_shared/observations.ts";
 import { canLog } from "../../../shared/presentation.ts";
 import {
   DEFAULT_WEEK_PERIODS,
@@ -186,7 +187,7 @@ export function createApiHandler(
         return m;
       };
       const ownOutings = async () => {
-        const [or, mr, rr, states] = await Promise.all([
+        const [or, mr, rr, states, measurements] = await Promise.all([
           client
             .from("outings")
             .select("*")
@@ -194,6 +195,7 @@ export function createApiHandler(
           client.from("outing_members").select("*"),
           client.from("reports").select("*"),
           db.rpc("reminder_states", { uid }),
+          observationQuery("own_measurements", { user_id: uid }),
         ]);
         const members = check(mr) || [];
         const reports = check(rr) || [];
@@ -202,6 +204,10 @@ export function createApiHandler(
           const m = members.find((m) => m.outing_id === o.id);
           return {
             ...o,
+            measured_conditions:
+              measurements.find(
+                (r: { outing_id: string }) => r.outing_id === o.id,
+              )?.conditions || null,
             attendance: m?.attendance,
             attendance_deadline: m?.deadline || null,
             reminder: m?.reminder,
@@ -449,7 +455,7 @@ export function createApiHandler(
           null,
           outing.id,
           new Date(),
-          `enrich:${outing.id}:${data.version}`,
+          `enrich:${outing.id}:${data.id}:${data.version}`,
         );
         return json(req, data);
       }

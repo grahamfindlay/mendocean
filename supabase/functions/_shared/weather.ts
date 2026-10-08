@@ -26,21 +26,32 @@ export async function collectWeather(providers: Providers = liveProviders) {
     if (last && providers.now() - Date.parse(last.fetched_at) < 14 * 60000)
       return;
     stage = "fetch_provider";
+    const requestedAt = new Date(providers.now()).toISOString();
     const response = await providers.fetch(weatherURL(), {
       signal: AbortSignal.timeout(20000),
     });
     if (!response.ok)
       throw new WeatherCollectionError(`provider_http_${response.status}`);
     stage = "normalize";
+    const raw = await response.json();
     const forecast = normalizeWeather(
-      await response.json(),
+      raw,
       new Date(providers.now()).toISOString(),
     );
     const id = crypto.randomUUID();
     const path = forecast.fetched_at.slice(0, 10) + "/" + id + ".json.gz";
     stage = "compress";
     const gzip = await new Response(
-      new Blob([JSON.stringify(forecast)])
+      new Blob([
+        JSON.stringify({
+          schema_version: 2,
+          forecast,
+          raw,
+          request: weatherURL(),
+          requested_at: requestedAt,
+          units: { wind: "mph", temperature: "F" },
+        }),
+      ])
         .stream()
         .pipeThrough(new CompressionStream("gzip")),
     ).arrayBuffer();
@@ -107,16 +118,18 @@ export function weatherFeatures(hours: WeatherHour[], start: string) {
     })),
   };
 }
-export async function enrichOuting(
+async function enrichInterval(
   id: string,
-  providers: Providers = liveProviders,
+  providers: Providers,
+  interval?: { start: string; end: string; report_id: string },
 ) {
   const db = service();
   const outing = check(
     await db.from("outings").select("*").eq("id", id).single(),
   );
-  const effectiveStart = outing.actual_starts_at || outing.starts_at;
-  const effectiveEnd = outing.actual_ends_at || outing.ends_at;
+  const effectiveStart =
+    interval?.start || outing.actual_starts_at || outing.starts_at;
+  const effectiveEnd = interval?.end || outing.actual_ends_at || outing.ends_at;
   const run = check(
     await db
       .from("weather_runs")
@@ -140,9 +153,10 @@ export async function enrichOuting(
         await db.storage.from("weather-archive").download(run.object_path),
       );
       if (!file) throw new Error("Archive unavailable");
-      forecast = await new Response(
+      const archived = await new Response(
         file.stream().pipeThrough(new DecompressionStream("gzip")),
       ).json();
+      forecast = archived.forecast || archived;
     }
   }
   if (!forecast) {
@@ -180,14 +194,54 @@ export async function enrichOuting(
   }
   const features = weatherFeatures(forecast.hours, effectiveStart);
   if (!features) throw new Error("Weather missing for outing time");
-  await query("features_put", {
+  const args = {
     outing_id: id,
     run_id: run?.id || null,
     source_kind: kind,
     features: {
       ...features,
+      forecast_received_at: forecast.fetched_at,
+      forecast_age_minutes_at_start: run
+        ? (Date.parse(effectiveStart) - Date.parse(forecast.fetched_at)) / 60000
+        : null,
+      forecast_convention: run
+        ? "latest archived forecast collected before outing start (within six hours)"
+        : "historical forecast retrieved after the event; advance availability unverified",
       latitude: LOCATION.latitude,
       longitude: LOCATION.longitude,
     },
-  });
+  };
+  if (interval) {
+    check(
+      await db.rpc("observation_query", {
+        action: "report_forecast_put",
+        args: {
+          ...args,
+          report_id: interval.report_id,
+          start: effectiveStart,
+          end: effectiveEnd,
+        },
+      }),
+    );
+  } else await query("features_put", args);
+}
+export async function enrichOuting(
+  id: string,
+  providers: Providers = liveProviders,
+) {
+  await enrichInterval(id, providers);
+  const db = service();
+  const outing = check(
+    await db.from("outings").select("*").eq("id", id).single(),
+  );
+  const reports = check(
+    await db.from("reports").select("id,data").eq("outing_id", id),
+  );
+  for (const report of reports || [])
+    await enrichInterval(id, providers, {
+      report_id: report.id,
+      start:
+        outing.actual_starts_at || report.data.actual_start || outing.starts_at,
+      end: outing.actual_ends_at || report.data.actual_end || outing.ends_at,
+    });
 }

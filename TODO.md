@@ -1,5 +1,7 @@
 # Project TODOs
 
+Weather collection activation, credentials, retention and recurring owner reviews are tracked in [docs/TODO.md](docs/TODO.md). Automatic behavior is documented in [docs/WEATHER_DATA.md](docs/WEATHER_DATA.md).
+
 ## Improve the Lake Mendota webcam feed
 
 - [ ] Ask the UW–Madison Center for Limnology webcam maintainers about an HTTPS snapshot endpoint, cross-origin access, freshness information, and supported use in Mendocean. The draft below has not been sent.
