@@ -206,6 +206,14 @@ export function startFixtures(secret, port = 54328) {
       }
       if (url.hostname === "metobs.ssec.wisc.edu") {
         if (state.failure === "buoy") return reply(503, {});
+        if (
+          !["begin", "end"].every((p) =>
+            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(
+              url.searchParams.get(p) || "",
+            ),
+          )
+        )
+          return reply(400, { code: 400, message: "malformed_timestamp" });
         const end = Math.floor(Date.now() / 60000) * 60000;
         const timestamps = Array.from({ length: 60 }, (_, i) =>
           new Date(end - (60 - i) * 60000).toISOString(),

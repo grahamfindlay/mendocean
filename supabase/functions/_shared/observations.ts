@@ -55,8 +55,9 @@ function requests(
       site: "mendota",
       inst: "buoy",
       symbols: "air_temp:wind_speed:wind_direction:gust:run_wind_speed",
-      begin: new Date(start).toISOString(),
-      end: new Date(end).toISOString(),
+      // The buoy API rejects fractional seconds in otherwise valid ISO timestamps.
+      begin: new Date(start).toISOString().replace(/\.\d{3}Z$/, "Z"),
+      end: new Date(end).toISOString().replace(/\.\d{3}Z$/, "Z"),
       order: "row",
       interval: "1m",
     }).toString();
