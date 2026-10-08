@@ -113,7 +113,7 @@ try {
   }
   console.log(JSON.stringify(diagnostics));
   console.log(
-    "Connected-account read contract passed. Ordinary-member permissions and coach draft/republish semantics still require verification.",
+    "Connected-account read contract passed. This check does not establish account permissions or coach draft/republish behavior; see docs/LINEUPS.md for rollout decisions.",
   );
 } catch (error) {
   console.error(error.message);

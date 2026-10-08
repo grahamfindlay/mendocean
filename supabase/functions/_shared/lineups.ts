@@ -11,7 +11,7 @@ import { validateBHCConnection, recordBHCFailure } from "./bhc-connection.ts";
 import { check, query, service, env } from "./runtime.ts";
 import { liveProviders, type Providers } from "./providers.ts";
 
-// Enable only after ordinary-member visibility and post-publication edits are verified.
+// Provider visibility assumptions and the device rollout check are recorded in docs/LINEUPS.md.
 export const lineupsEnabled = () =>
   Deno.env.get("BHC_LINEUPS_ENABLED") === "true";
 export async function saveLineup(

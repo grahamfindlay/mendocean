@@ -1,6 +1,6 @@
 # Published practice lineups
 
-Implemented locally on October 7, 2026. Not deployed or activated. Live connected-account reads passed; ordinary-member permissions, coach draft/republish behavior and physical iPhone checks remain release requirements.
+Implemented locally on October 7, 2026. Not deployed or activated. Live regular-rower reads passed, and the user accepted the provider visibility assumption described below. Physical iPhone checks remain the release requirement.
 
 ## Behavior
 
@@ -10,7 +10,7 @@ The screen reads Mendocean snapshots immediately and refreshes saved data on ent
 
 ## Synchronization and delivery
 
-Existing full imports establish snapshots. Initial connection and replacement credentials establish a baseline without retrospective alerts. A dedicated job checks practices every five minutes from their signup deadline through 30 minutes after practice starts. Missing deadlines use a 24-hour fallback. Provider metadata and detail must explicitly confirm publication; missing or malformed fields fail closed. Draft crews are never persisted. Verify post-publication draft behavior before enabling the feature.
+Existing full imports establish snapshots. Initial connection and replacement credentials establish a baseline without retrospective alerts. A dedicated job checks practices every five minutes from their signup deadline through 30 minutes after practice starts. Missing deadlines use a 24-hour fallback. Provider metadata and detail must explicitly confirm publication; missing or malformed fields fail closed. Lineups marked unpublished are never persisted. For edits to already-published lineups, the rollout relies on BHC returning only information the regular rower is permitted to see, as accepted by the user below.
 
 Each attendee has a private snapshot scoped to their BHC connection revision. No teammates need Mendocean accounts. Snapshot updates and durable notification events are committed atomically. Relevant versions change for publication status, the attendee's assignment, their own crew/coaches, or practice details. Changes only to another boat or display-name corrections refresh the view without triggering alerts. Crew lists are normalized before comparison.
 
@@ -18,12 +18,13 @@ Account has separate lineup email/push preferences, disabled by default, and a c
 
 Delivery rechecks current attendance, credentials, connection revision, publication, snapshot version, preferences, freshness and expiry before each channel/device. Superseded pending jobs are cancelled. Email content and recipient are pinned to a stable provider idempotency key; successful push devices are checkpointed across retries. Push tags replace prior notifications for the same practice; transport ambiguity can still cause a repeated push. Expired push subscriptions are removed. Email and push fail/retry independently. Lineup and logging emails share the existing 80-per-day reservation budget; authentication remains outside that allowance. Snapshots are removed two days after practice ends, and notification events/content after seven days.
 
-## Provider verification before activation
+## Provider contract and accepted assumptions
 
-1. Use an ordinary attendee's dedicated BHC token to confirm that an attended published practice includes all boats, crew names, seat values, rowing sides and coach-to-boat associations. Confirm actual boat-name and publication-field shapes.
-2. Compare coach drafts before first publication with the athlete-visible API. An assigned seat alone is not publication.
-3. Observe a coach editing an already-published lineup. Confirm whether edits are immediately athlete-visible, reset `lineups_set`, or require republishing. If unpublished edits remain exposed with `lineups_set=Yes`, obtain a published-view endpoint or reliable publication event before enabling the feature.
-4. Confirm acceptable polling frequency with BHC. The project TODO requests a Zapier webhook for publication and changes; no messages to BHC have been sent.
+The live check confirmed an attended published practice includes boats, crew names, seats and coach-to-boat associations using the user's connected token. On October 7, 2026, the user confirmed that this BHC account has only regular rower access, completing ordinary-member permission confirmation.
+
+The user is fairly confident that saving a coach edit does not immediately publish it and explicitly chose to proceed under the assumption that BHC's API will not return information the rower is not supposed to see. Controlled coach draft/republish observations are therefore deferred, rather than an activation prerequisite. This is an accepted assumption, not a behavior established by the live reads. Both explicit publication flags must still be `Yes`; an assigned seat alone never establishes publication.
+
+If later observations contradict that assumption, disable the feature and revisit the provider contract. Coach observations and confirming acceptable polling frequency with BHC remain useful follow-ups. The project TODO requests a Zapier webhook for publication and changes; no messages to BHC have been sent.
 
 `node scripts/bhc-lineup-contract.mjs` performs at most six read requests with a token supplied through `BHC_CONTRACT_TOKEN`. `BHC_CONTRACT_CLUB_ID` and `BHC_CONTRACT_PRACTICE_ID` can identify the test practice; `BHC_CONTRACT_PAST=true` checks recent/past practice listings. Output contains counts and fingerprints, never names, raw payloads or credential-bearing URLs. An optional `BHC_CONTRACT_BASELINE` file stores only these diagnostics to compare observations. The script does not publish/edit lineups, change attendance, send email, or establish that the token is an ordinary member's; verify account permissions separately.
 
@@ -33,11 +34,11 @@ After explicit user approval, the existing encrypted BHC connection was retrieve
 
 The connected account's identity and Mendota membership matched. Six BHC GET requests verified a previously attended, published practice: both metadata and detail returned `lineups_set=Yes`; normalization produced two named boats, nine named crew members, two assigned coaches and the user's own boat/seat. Actual fields matched the implementation: attendance has `custid`, `fname`, `lname`, `lineup_boat`, numeric-string seats or `coxswain`, and `lineup_side`; coaches use `boat_id` plus `custid`; equipment uses `boat_id`, `boat_name`, `boat_type`, `coxed` and `rigging`. Four further GET requests verified an upcoming unpublished practice with `lineups_set=No` in both responses and no assigned crew; normalization suppressed it.
 
-No upcoming attended published practice was available, so the published example came from past practices. These reads confirm visibility for this connected account, but the API did not establish that it has ordinary-member-only permissions. The unpublished example contained no draft assignments. It therefore does not prove suppression of assigned drafts, or the behavior of unpublished edits after first publication. Those controlled coach observations and physical iPhone checks remain pending. Keep the feature disabled until they pass.
+No upcoming attended published practice was available, so the published example came from past practices. The user subsequently confirmed this account has ordinary-member-only permissions. The unpublished example contained no draft assignments, so it does not prove suppression of assigned drafts or the behavior of unpublished edits after first publication. The user accepted proceeding on the provider visibility assumption above. Physical iPhone checks remain pending; the feature stays disabled until the release check is completed.
 
 ## Release and real-device check
 
-Apply migration `202610070002_lineups.sql`, deploy compatible api/jobs functions and the frontend, and keep `BHC_LINEUPS_ENABLED=false` while verifying. Set it to true only after the provider checks pass. Disable the flag to stop polling, lineup sends and client access without deleting rowing reports or practices. No production migration or deployment has been performed in this task.
+Apply migration `202610070002_lineups.sql` and deploy compatible api/jobs functions and the frontend. Enable `BHC_LINEUPS_ENABLED=true` in the test environment for the physical iPhone check; keep it false for general release until that check passes. Provider verification is complete to the extent accepted by the user above; controlled coach observations no longer block rollout. Disable the flag to stop polling, lineup sends and client access without deleting rowing reports or practices. No production migration or deployment has been performed in this task.
 
 On a physical iPhone, add Mendocean to the Home Screen, sign in and register push. Opt in to lineup notifications separately. Receive a publication push with the app closed; tapping it must open the exact practice with the user's boat first and seat highlighted. Repeat for a seat move and removal, a signed-out session, and an email link opened from Mail. Confirm the destination survives OTP sign-in, background return loads the latest snapshot, and Focus/notification settings behave as expected. Mobile WebKit emulation does not establish these OS-level behaviors.
 
