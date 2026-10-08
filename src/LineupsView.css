@@ -138,9 +138,10 @@
   fill: currentColor;
   width: 24px;
   height: 17px;
+  transform: translateX(3px);
 }
 .lineup-oar-right {
-  transform: rotate(180deg);
+  transform: translateX(-3px) rotate(180deg);
 }
 .lineup-oar-empty {
   visibility: hidden;

@@ -237,7 +237,7 @@ export function lineupEmail(
   const origin = new URL(url).origin;
   const oar = (direction: "left" | "right", show: boolean) =>
     show
-      ? `<img src="${escape(origin)}/lineup-oar-${direction}.png" width="24" height="17" alt="" style="display:block;border:0;width:24px;height:17px">`
+      ? `<img src="${escape(origin)}/lineup-oar-${direction}.png" width="24" height="17" alt="" style="display:inline-block;vertical-align:middle;border:0;width:24px;height:17px">`
       : "";
   const rows =
     boat?.seats
@@ -247,9 +247,9 @@ export function lineupEmail(
         return `<tr style="background:${you ? "#e7efdf" : "#fffdf6"}">
       <td width="140" style="padding:13px 20px 13px 12px;border-bottom:1px solid #e3e5da;color:${you ? "#244a2d" : "#61736c"};font-size:13px">
         <table role="presentation" width="112" cellpadding="0" cellspacing="0" style="width:112px;table-layout:fixed"><tr>
-          <td width="24">${oar("left", sides.left)}</td>
-          <td width="64" align="center" style="white-space:nowrap;font-weight:${you ? "700" : "400"}">${escape(seatLabel(s.seat, boatSeatCount(boat!)))}</td>
-          <td width="24">${oar("right", sides.right)}</td>
+          <td width="27" align="right">${oar("left", sides.left)}</td>
+          <td width="58" align="center" style="white-space:nowrap;font-weight:${you ? "700" : "400"}">${escape(seatLabel(s.seat, boatSeatCount(boat!)))}</td>
+          <td width="27" align="left">${oar("right", sides.right)}</td>
         </tr></table>
       </td>
       <td style="padding:13px 8px;border-bottom:1px solid #e3e5da;font-size:15px;font-weight:${you ? "700" : "400"};overflow-wrap:anywhere">${escape(s.name)}</td>
