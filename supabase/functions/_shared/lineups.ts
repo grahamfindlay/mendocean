@@ -1,4 +1,5 @@
 import { normalizePractice } from "../../../shared/bhc.ts";
+import { formatDate } from "../../../shared/domain.ts";
 import {
   normalizeLineup,
   lineupSignatures,
@@ -10,6 +11,7 @@ import { bhcGet, list } from "./bhc-client.ts";
 import { validateBHCConnection, recordBHCFailure } from "./bhc-connection.ts";
 import { check, query, service, env } from "./runtime.ts";
 import { liveProviders, type Providers } from "./providers.ts";
+import { coachContactLookup } from "./coach-contacts.ts";
 
 // Provider visibility assumptions and the device rollout check are recorded in docs/LINEUPS.md.
 export const lineupsEnabled = () =>
@@ -23,9 +25,11 @@ export async function saveLineup(
   athlete: number,
   boats: Record<string, any>[],
   notify: boolean,
+  contacts?: (lineup: Lineup) => Promise<void>,
 ) {
   if (!lineupsEnabled()) return;
   const snapshot = normalizeLineup(meta, detail, athlete, boats);
+  if (snapshot.published && contacts) await contacts(snapshot);
   const previous = check(
     await service().rpc("lineup_previous", { uid, outing, revision }),
   ) as Lineup | null;
@@ -64,6 +68,16 @@ export async function pollLineups(
     throw new Error("BHC connection is busy");
   try {
     const token = await validateBHCConnection(connection, providers);
+    const contacts = coachContactLookup(connection.club_id, async () =>
+      list(
+        await bhcGet(
+          "whitelabel/getWhitelabelUsers",
+          token,
+          { whitelabel_id: connection.club_id },
+          providers,
+        ),
+      ),
+    );
     const args = {
       whitelabel_id: connection.club_id,
       custid: connection.custid,
@@ -147,6 +161,7 @@ export async function pollLineups(
         connection.custid,
         boats,
         true,
+        contacts,
       );
     }
   } catch (error) {
@@ -206,12 +221,13 @@ export async function sendLineup(
             message: {
               from: env("EMAIL_FROM"),
               to: [user.data.user.email],
-              subject: title,
+              subject: `${title} · ${snapshot.title} · ${formatDate(snapshot.starts_at)}`,
               ...lineupEmail(
                 snapshot,
                 current.summary,
                 url,
                 env("APP_URL") + "/?account=1",
+                current.kind === "published" ? "published" : "changed",
               ),
             },
           }),

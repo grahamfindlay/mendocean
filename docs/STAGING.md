@@ -30,7 +30,7 @@ Validation actions: `smoke` verifies hosted assets/precache hashes, closed signu
 
 ## Test controls and delivery
 
-Account contains staging-only controls for Reset to unpublished, Publish test lineup, Move my seat, Change my crew and Remove me from boat. They call a separate function which requires the exact staging backend URL, `STAGING_MODE=true`, and the sole configured owner's authenticated session. Dispatcher access has an independent random secret. These controls are absent from production builds; the staging function is not deployed by `deploy-backend` and is disabled unless both environment guards match.
+Account contains staging-only controls for Reset to unpublished, Publish lineup, Move my seat, Change my crew and Remove me from boat. They call a separate function which requires the exact staging backend URL, `STAGING_MODE=true`, and the sole configured owner's authenticated session. Dispatcher access has an independent random secret. These controls are absent from production builds; the staging function is not deployed by `deploy-backend` and is disabled unless both environment guards match.
 
 The fictional practice uses reserved synthetic identifiers and names. Fixture SQL provides the connection/membership metadata required by the real lineup code, but no valid BHC token. The function calls the actual normalization/snapshot/event code. Its dedicated dispatcher uses actual email/push delivery helpers, leases, idempotency and per-device checkpoints. Only opted-in owner channels receive notifications. Jobs are delayed 30 seconds so the app can be closed, then delivered on the next minute tick. Do not trigger another scenario until the first delivery arrives: superseded pending alerts are intentionally cancelled. Reset followed by Publish creates another publication event. Seat, crew and removal actions now edit the current snapshot: a crew change preserves the rower's seat/side and other edits; repeated seat/crew actions toggle their own change. Publish restores the starting crew. Editing requires a published lineup, and seat/crew edits after removal require Publish to restore the assignment.
 
@@ -39,7 +39,7 @@ The fictional practice uses reserved synthetic identifiers and names. Fixture SQ
 1. Open the stable staging URL in Safari, add it to the Home Screen, and launch Mendocean Test.
 2. Sign in with the invited owner's email and the emailed OTP. This is a separate account/session from production.
 3. Enable push for this installation. Select and save lineup email/push preferences separately; logging reminders are independent.
-4. In Account, Reset to unpublished, then Publish test lineup. Close the app and wait up to 90 seconds. Tap the push: it must select the test practice, put your boat first and highlight You.
+4. In Account, Reset to unpublished, then Publish lineup. Close the app and wait up to 90 seconds. Tap the push: it must select the test practice, put your boat first and highlight You.
 5. Repeat for a seat move, a crew change and removal. For another publication, Reset then Publish.
 6. Open the email from Mail and check the full crew and exact practice link. Repeat after signing out to confirm the selected practice survives OTP sign-in.
 7. Check background return, stale-data refresh, Focus/notification permissions and duplicate delivery. Mobile WebKit emulation is not physical-device confirmation.
@@ -79,3 +79,11 @@ All repository unit/database checks passed (152 tests), including owner/service 
 ## Release and recovery
 
 Staging testing does not merge the PR or enable production. The physical release gate is recorded as passed. The PR can proceed to review; production rollout remains a separate step. For rollout, deploy the same tested code/migrations and compatible functions to production, then enable its lineup flag. Keep the production target separate in every command. Roll back the staging frontend by republishing a previously tested build; retain additive database migrations. To stop test sends, unschedule `mendocean-staging-lineups` and disable `BHC_LINEUPS_ENABLED` in staging. Do not delete or rotate VAPID keys while checking an existing installation.
+
+## Lineup presentation updates
+
+The staging UI has one quiet Staging badge; practice/boat/crew names use Masters Recreational, River, and plausible fictional names. The Home Screen installation and sender retain the Mendocean Test identity so separate accounts remain distinguishable. Fixture practice times use 7:30–9:00 AM in America/Chicago. On upgrade, the old TEST practice is renamed and given a plausible future morning time.
+
+To preview emails without sending, run `node scripts/preview-lineups.mjs` under Node 24. It writes publication, seat-change, crew-change and removal HTML/plain text plus a fictional lineup JSON to ignored `test-results/lineup-design/`. Set `LINEUP_PREVIEW_ORIGIN` to a running frontend origin; the default is `http://127.0.0.1:4173`. Serve the app on that port to load the email oar PNGs. Use these previews at phone and desktop widths before a deployment.
+
+For presentation-only updates, deploy `api`/`jobs`, reinstall fixture helpers, deploy `staging-test`, then deploy the frontend. Run `npm run staging -- scenario refresh` to rename the saved fictional crew and add the fictional coach link without sending notifications or resetting the owner's seat/removal/publication state. This action intentionally skips notification delay/scheduling. Do not run hosted smoke/browser-smoke while the owner has notification preferences on; those checks change the shared fixture. Use read-only asset checks and local browser previews instead. Keep existing VAPID keys and account preferences intact.

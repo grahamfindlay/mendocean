@@ -25,7 +25,7 @@ export default function StagingControls({
         },
       );
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Test failed");
+      if (!response.ok) throw new Error(result.error || "Lineup update failed");
       setMessage(result.message);
       onUpdated();
     } catch (e) {
@@ -35,16 +35,17 @@ export default function StagingControls({
     }
   }
   return (
-    <section aria-label="Lineup notification testing">
-      <h3>Lineup notification testing</h3>
+    <section aria-label="Lineup scenarios">
+      <h3>Lineup scenarios</h3>
       <p>
-        Fictional crew · Sends only to this test account using your saved lineup
-        preferences. After triggering, close the app and wait up to 90 seconds.
+        Fictional crew · Sends only to your staging account using your saved
+        lineup preferences. After triggering, close the app and wait up to 90
+        seconds.
       </p>
       <div className="button-row">
         {[
           ["reset", "Reset to unpublished"],
-          ["publish", "Publish test lineup"],
+          ["publish", "Publish lineup"],
           ["seat", "Move my seat"],
           ["crew", "Change my crew"],
           ["remove", "Remove me from boat"],

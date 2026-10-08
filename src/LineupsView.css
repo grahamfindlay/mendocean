@@ -1,116 +1,277 @@
 .lineups-view {
-  max-width: 900px;
+  max-width: 760px;
   margin: 0 auto;
 }
-.lineups-view .section-heading {
+.lineups-heading {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+.lineups-heading h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  letter-spacing: -0.6px;
+}
+.lineup-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 8px 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.lineup-refresh:hover {
+  background: #edf0e6;
+  color: var(--ink);
+}
+.lineup-refresh-busy {
+  animation: lineup-spin 1.2s linear infinite;
+}
+@keyframes lineup-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lineup-refresh-busy {
+    animation: none;
+  }
+}
+.lineup-practice-picker {
+  display: block;
+  margin-top: 24px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.lineup-practice-picker select {
+  margin-top: 7px;
 }
 .lineup-practice {
-  margin: 24px 0;
+  margin: 28px 0 24px;
+}
+.lineup-practice h2 {
+  margin: 0 0 8px;
+  font-size: 1.75rem;
+  letter-spacing: -0.7px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 .lineup-practice p {
-  margin: 8px 0;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
 }
-.lineup-assignment {
-  font-weight: 700;
+.lineup-practice p span {
+  padding: 0 3px;
 }
 .lineup-boat {
-  border: 1px solid var(--line, #cbd5d1);
+  background: var(--paper);
+  border: 1px solid var(--line);
   border-radius: 16px;
-  padding: 20px;
   min-width: 0;
+  overflow: hidden;
 }
-.lineup-own-boat {
-  border: 2px solid var(--accent, #126b55);
+.lineup-boat-heading {
+  padding: 22px 24px 18px;
 }
 .lineup-boat h2 {
-  margin: 0 0 18px;
-  font-size: 1.15rem;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  font-size: 1.4rem;
+  letter-spacing: -0.4px;
+  line-height: 1.3;
   overflow-wrap: anywhere;
 }
 .lineup-kicker {
-  display: block;
-  font-size: 0.8rem;
-  margin-bottom: 6px;
+  margin: 0 0 6px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  font-weight: 700;
+  font-size: 0.67rem;
 }
 .lineup-class {
+  font-size: 0.85rem;
   font-weight: 400;
-  font-size: 0.9rem;
+  letter-spacing: 0;
+  color: var(--muted);
 }
 .lineup-seats {
   list-style: none;
+  margin: 0 12px;
   padding: 0;
-  margin: 0;
 }
 .lineup-seats li {
   display: grid;
-  grid-template-columns: 80px minmax(0, 1fr) auto;
+  grid-template-columns: 122px minmax(0, 1fr) 30px;
   align-items: center;
-  gap: 10px;
-  padding: 12px 8px;
-  border-bottom: 1px solid var(--line, #cbd5d1);
+  gap: 12px;
+  padding: 13px 12px;
+  border-bottom: 1px solid #e3e5da;
+  min-height: 48px;
 }
-.lineup-seat-label,
-.lineup-side {
-  font-size: 0.85rem;
+.lineup-seats li:last-child {
+  border-bottom: 0;
 }
-.lineup-side {
-  text-transform: capitalize;
+.lineup-seat-label {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 24px;
+  gap: 2px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-align: center;
+  white-space: nowrap;
+}
+.lineup-oar {
+  fill: currentColor;
+  width: 24px;
+  height: 17px;
+}
+.lineup-oar-right {
+  transform: rotate(180deg);
+}
+.lineup-oar-empty {
+  visibility: hidden;
 }
 .lineup-athlete {
+  font-size: 0.95rem;
   overflow-wrap: anywhere;
 }
-.lineup-you {
-  background: #e4f4e9;
-  color: #12362a;
+.lineup-seats .lineup-you {
+  background: #e7efdf;
   border-radius: 8px;
-  font-weight: 600;
+  border-bottom-color: transparent;
+  color: #244a2d;
+  font-weight: 700;
+}
+.lineup-you .lineup-seat-label {
+  color: #3b6a3f;
+  font-weight: 700;
 }
 .lineup-you-label {
-  display: inline-block;
-  border: 1px solid currentColor;
-  border-radius: 6px;
-  margin-left: 8px;
-  padding: 2px 5px;
-  font-size: 0.75rem;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--green);
+  justify-self: end;
 }
 .lineup-coaches {
-  margin: 18px 0 0;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 18px 24px;
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 0.85rem;
+}
+.lineup-coaches > span {
+  color: var(--muted);
+}
+.lineup-coaches a {
+  display: inline-block;
+  padding: 5px 0;
+  color: var(--green);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
 }
 .lineup-other {
   margin-top: 24px;
+  border-top: 1px solid var(--line);
 }
 .lineup-other summary {
-  padding: 12px 0;
+  padding: 18px 0;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 500;
+  font-size: 0.9rem;
 }
 .lineup-boat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
   gap: 16px;
-  margin-top: 12px;
+  padding-bottom: 8px;
 }
 .lineup-plan {
   margin-top: 24px;
+  padding: 0 2px;
+}
+.lineup-plan h2 {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
 }
 .lineup-plan p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.7;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.lineup-freshness {
+  margin: 20px 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.lineup-freshness span {
+  display: block;
+  margin-top: 5px;
+}
+.lineup-stale {
+  color: var(--amber);
+}
+.lineup-unassigned {
+  padding: 22px 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+}
+.lineup-unassigned h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+.lineup-unassigned p {
+  margin: 0;
+  font-size: 0.9rem;
+}
 @media (max-width: 480px) {
-  .lineup-boat {
-    padding: 14px;
+  .lineup-practice h2 {
+    font-size: 1.5rem;
+  }
+  .lineup-boat-heading {
+    padding: 18px 16px 16px;
+  }
+  .lineup-seats {
+    margin: 0 6px;
   }
   .lineup-seats li {
-    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-columns: 112px minmax(0, 1fr) 23px;
+    padding: 12px 10px;
     gap: 6px;
   }
-  .lineup-side {
-    grid-column: 2;
+  .lineup-seat-label {
+    grid-template-columns: 22px minmax(0, 1fr) 22px;
+    font-size: 0.73rem;
+  }
+  .lineup-oar {
+    width: 22px;
+  }
+  .lineup-athlete {
+    font-size: 0.87rem;
+  }
+  .lineup-coaches {
+    padding: 14px 16px;
   }
 }

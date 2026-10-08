@@ -50,7 +50,7 @@ export async function browserSmoke() {
           )
           .waitFor();
         await page
-          .getByRole("button", { name: "Publish test lineup", exact: true })
+          .getByRole("button", { name: "Publish lineup", exact: true })
           .click();
         await page
           .getByText(

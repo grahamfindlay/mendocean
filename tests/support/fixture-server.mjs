@@ -180,6 +180,8 @@ export function startFixtures(secret, port = 54328) {
           );
         if (url.pathname === "/users/getAllWhitelabels")
           return reply(200, state.clubs);
+        if (url.pathname === "/whitelabel/getWhitelabelUsers")
+          return reply(200, [{ custid: 90, email: "coach@example.test", phone_number: "private" }, { custid: 99, email: "unrelated@example.test" }]);
         if (url.pathname === "/equipment/getAllBoats")
           return reply(
             200,
@@ -221,7 +223,7 @@ export function startFixtures(secret, port = 54328) {
                 },
                 ...(state.crew || []),
               ],
-              assigned_coaches: [{ custid: 90, fname: "Charlie" }],
+              assigned_coaches: [{ custid: 90, fname: "Charlie", boat_id: 7 }],
             },
           ]);
         }

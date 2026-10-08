@@ -45,7 +45,13 @@ test("lineup links select the practice, prioritize own boat and highlight the se
           boat_id: 7,
           name: "Pratt",
           boat_class: "8+",
-          coaches: [{ athlete_id: 90, name: "Rose" }],
+          coaches: [
+            {
+              athlete_id: 90,
+              name: "Rose Sears",
+              email: "rsears@mendotarowingclub.com",
+            },
+          ],
           seats: [
             { athlete_id: 10, name: "Peter", seat: "coxswain", side: null },
             { athlete_id: 11, name: "Cricket", seat: "8", side: "port" },
@@ -77,6 +83,20 @@ test("lineup links select the practice, prioritize own boat and highlight the se
   await expect(page.locator(".lineup-boat").first()).toContainText("Pratt");
   await expect(page.locator(".lineup-you")).toContainText("3 seat");
   await expect(page.locator(".lineup-you")).toContainText("You");
+  await expect(page.locator(".lineup-you .lineup-seat-label")).toHaveAttribute(
+    "aria-label",
+    "3 seat, starboard",
+  );
+  await expect(page.locator(".lineup-you .lineup-oar").first()).not.toHaveClass(
+    /empty/,
+  );
+  await expect(page.getByRole("link", { name: "Rose Sears" })).toHaveAttribute(
+    "href",
+    /^mailto:rsears%40mendotarowingclub\.com\?subject=Selected%20practice/,
+  );
+  await expect(page.locator(".lineups-view")).not.toContainText(
+    "MRC Boathouse",
+  );
   await page.getByRole("button", { name: "Forecasts", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Selected practice", exact: true }),

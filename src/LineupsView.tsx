@@ -2,59 +2,108 @@ import { RefreshCw } from "lucide-react";
 import {
   type Lineup,
   type LineupBoat,
+  type LineupSeat,
   ownBoat,
-  ownSeat,
   seatLabel,
 } from "../shared/lineups";
+import {
+  OAR_PATH,
+  boatSeatCount,
+  coachMailto,
+  oarSides,
+} from "../shared/lineup-display";
 import { formatDate, formatTime } from "../shared/domain";
 import { BHCNotice } from "./BHCConnection";
 import type { BHCConnectionStatus } from "../shared/bhcConnection";
 import "./LineupsView.css";
 
+function Seat({ seat, count }: { seat: LineupSeat; count: number }) {
+  const sides = oarSides(seat);
+  const label = seatLabel(seat.seat, count);
+  const accessible =
+    seat.seat !== "coxswain" && seat.side ? `${label}, ${seat.side}` : label;
+  return (
+    <span
+      className="lineup-seat-label"
+      aria-label={accessible}
+      title={accessible}
+    >
+      <svg
+        className={sides.left ? "lineup-oar" : "lineup-oar lineup-oar-empty"}
+        width="24"
+        height="17"
+        viewBox="0 0 32 22"
+        aria-hidden="true"
+      >
+        <path d={OAR_PATH} />
+      </svg>
+      <span aria-hidden="true">{label}</span>
+      <svg
+        className={
+          sides.right
+            ? "lineup-oar lineup-oar-right"
+            : "lineup-oar lineup-oar-empty"
+        }
+        width="24"
+        height="17"
+        viewBox="0 0 32 22"
+        aria-hidden="true"
+      >
+        <path d={OAR_PATH} />
+      </svg>
+    </span>
+  );
+}
 function Boat({
   boat,
-  athlete,
+  lineup,
   own,
 }: {
   boat: LineupBoat;
-  athlete: number;
+  lineup: Lineup;
   own: boolean;
 }) {
-  const count =
-    Number(boat.boat_class?.[0]) ||
-    Math.max(...boat.seats.map((s) => Number(s.seat) || 0));
+  const count = boatSeatCount(boat);
   return (
     <article className={`lineup-boat${own ? " lineup-own-boat" : ""}`}>
-      <h2>
-        {own && <span className="lineup-kicker">Your boat</span>}
-        {boat.name}{" "}
-        {boat.boat_class && (
-          <span className="lineup-class">{boat.boat_class}</span>
-        )}
-      </h2>
+      <header className="lineup-boat-heading">
+        {own && <p className="lineup-kicker">Your boat</p>}
+        <h2>
+          {boat.name}
+          {boat.boat_class && (
+            <span className="lineup-class">{boat.boat_class}</span>
+          )}
+        </h2>
+      </header>
       <ol className="lineup-seats">
         {boat.seats.map((s) => (
           <li
             key={s.seat}
-            className={s.athlete_id === athlete ? "lineup-you" : ""}
+            className={s.athlete_id === lineup.athlete_id ? "lineup-you" : ""}
           >
-            <span className="lineup-seat-label">
-              {seatLabel(s.seat, count)}
-            </span>
-            <span className="lineup-athlete">
-              {s.name}
-              {s.athlete_id === athlete && (
-                <strong className="lineup-you-label">You</strong>
-              )}
-            </span>
-            {s.side && <span className="lineup-side">{s.side}</span>}
+            <Seat seat={s} count={count} />
+            <span className="lineup-athlete">{s.name}</span>
+            {s.athlete_id === lineup.athlete_id && (
+              <strong className="lineup-you-label">You</strong>
+            )}
           </li>
         ))}
       </ol>
       {!!boat.coaches.length && (
-        <p className="lineup-coaches">
-          Coach: {boat.coaches.map((c) => c.name).join(", ")}
-        </p>
+        <footer className="lineup-coaches">
+          <span>{boat.coaches.length > 1 ? "Coaches" : "Coach"}</span>
+          <div>
+            {boat.coaches.map((c, i) => {
+              const href = coachMailto(c.email, lineup);
+              return (
+                <span key={c.athlete_id}>
+                  {i > 0 && ", "}
+                  {href ? <a href={href}>{c.name}</a> : c.name}
+                </span>
+              );
+            })}
+          </div>
+        </footer>
       )}
     </article>
   );
@@ -86,20 +135,28 @@ export default function LineupsView({
   const current = selected
     ? practices.find((l) => l.outing_id === selected)
     : practices[0];
-  const boat = current && ownBoat(current),
-    seat = current && ownSeat(current);
+  const boat = current && ownBoat(current);
   const other = current?.boats.filter((b) => b.boat_id !== boat?.boat_id) ?? [];
+  const minutes = current?.checked_at
+    ? Math.max(0, Math.floor((now - Date.parse(current.checked_at)) / 60000))
+    : null;
+  const stale = !!(
+    status.lineup_error ||
+    status.last_error ||
+    (minutes !== null && minutes > 15)
+  );
   return (
     <section className="lineups-view">
-      <div className="section-heading">
+      <div className="lineups-heading">
         <h1>Lineups</h1>
         <button
-          className="button subtle"
+          className="lineup-refresh"
           disabled={busy || !status.connected || !enabled}
           onClick={onRefresh}
+          aria-label="Check for lineup updates"
         >
-          <RefreshCw size={16} />
-          Check for updates
+          <RefreshCw size={15} className={busy ? "lineup-refresh-busy" : ""} />
+          {busy ? "Checking…" : "Refresh"}
         </button>
       </div>
       <BHCNotice status={status} onReconnect={onReconnect} />
@@ -116,7 +173,7 @@ export default function LineupsView({
       ) : (
         <>
           {practices.length > 1 && (
-            <label>
+            <label className="lineup-practice-picker">
               Practice
               <select
                 value={current?.outing_id ?? ""}
@@ -147,38 +204,27 @@ export default function LineupsView({
             </>
           ) : (
             <>
-              <div className="lineup-practice">
+              <header className="lineup-practice">
                 <h2>{current.title}</h2>
                 <p>
-                  {formatDate(current.starts_at)} ·{" "}
+                  {formatDate(current.starts_at)} <span>·</span>{" "}
                   {formatTime(current.starts_at)} –{" "}
                   {formatTime(current.ends_at)}
                 </p>
-                {current.location && <p>{current.location}</p>}
-                {seat && (
-                  <p className="lineup-assignment">
-                    {boat!.name} ·{" "}
-                    {seatLabel(seat.seat, Number(boat!.boat_class?.[0]) || 8)}
-                  </p>
-                )}
-                <p className="help" role="status">
-                  {current.checked_at
-                    ? `Checked ${Math.max(0, Math.floor((now - Date.parse(current.checked_at)) / 60000))} minutes ago.`
-                    : "Waiting for a freshness check."}{" "}
-                  {status.lineup_error ||
-                  status.last_error ||
-                  (current.checked_at &&
-                    now - Date.parse(current.checked_at) > 15 * 60000)
-                    ? "Updates could not be confirmed. This is the last saved lineup."
-                    : ""}
-                </p>
-              </div>
+              </header>
               {boat ? (
-                <Boat boat={boat} athlete={current.athlete_id} own />
+                <Boat boat={boat} lineup={current} own />
               ) : (
-                <p className="notice">
-                  You have not been assigned a seat. Check with your coach.
-                </p>
+                <div className="lineup-unassigned">
+                  <h2>No seat assigned</h2>
+                  <p>Check with your coach about your assignment.</p>
+                </div>
+              )}
+              {current.plan && (
+                <section className="lineup-plan">
+                  <h2>Practice plan</h2>
+                  <p>{current.plan}</p>
+                </section>
               )}
               {!!other.length && (
                 <details className="lineup-other">
@@ -188,19 +234,31 @@ export default function LineupsView({
                       <Boat
                         key={b.boat_id}
                         boat={b}
-                        athlete={current.athlete_id}
+                        lineup={current}
                         own={false}
                       />
                     ))}
                   </div>
                 </details>
               )}
-              {current.plan && (
-                <div className="lineup-plan">
-                  <h2>Practice plan</h2>
-                  <p>{current.plan}</p>
-                </div>
-              )}
+              <p
+                className={`lineup-freshness${stale ? " lineup-stale" : ""}`}
+                role="status"
+              >
+                {minutes === null
+                  ? "Waiting for a freshness check"
+                  : minutes < 1
+                    ? "Checked just now"
+                    : minutes === 1
+                      ? "Checked 1 minute ago"
+                      : `Checked ${minutes} minutes ago`}
+                {stale && (
+                  <span>
+                    Updates couldn’t be confirmed. Showing the last saved
+                    lineup.
+                  </span>
+                )}
+              </p>
             </>
           )}
         </>

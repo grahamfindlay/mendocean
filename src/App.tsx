@@ -469,8 +469,8 @@ export default function App() {
     <div className="app-shell">
       <UpdateBanner />
       {import.meta.env.VITE_STAGING === "true" && (
-        <div className="setup-note" role="status">
-          Mendocean Test · Separate account and fictional practice data
+        <div className="staging-label" role="status">
+          Staging
         </div>
       )}
       <header className="site-header">
@@ -690,7 +690,7 @@ export default function App() {
                   void act(async () => {
                     if (import.meta.env.VITE_STAGING === "true") {
                       await refresh();
-                      setMessage("Test lineup refreshed.");
+                      setMessage("Lineup refreshed.");
                       return;
                     }
                     await api("lineups/refresh", {});

@@ -14,10 +14,13 @@ const athlete = 900000002;
 function change(action: Scenario, previous: Lineup | null = null) {
   const attendance = scenarioAttendance(action, athlete, previous);
   const meta = {
-    name: "Test practice",
+    name: "Masters Recreational",
     start_time: 1800000000,
     end_time: 1800003600,
-    lineups_set: action === "reset" ? "No" : "Yes",
+    lineups_set:
+      action === "reset" || (action === "refresh" && !previous?.published)
+        ? "No"
+        : "Yes",
   };
   return normalizeLineup(
     meta,
@@ -26,7 +29,7 @@ function change(action: Scenario, previous: Lineup | null = null) {
     [
       {
         boat_id: 920000001,
-        boat_name: "TEST · River",
+        boat_name: "River",
         boat_type: 4,
         coxed: "Yes",
         rigging: "sweep",
@@ -46,7 +49,7 @@ test("crew-only changes preserve a previous seat move and its side", () => {
   );
   expect(lineupSignatures(crew).crew).not.toBe(lineupSignatures(moved).crew);
   expect(crew.boats[0].seats.find((p) => p.seat === "1")?.name).toBe(
-    "Casey Test",
+    "Casey Bennett",
   );
   expect(JSON.stringify(moved)).toBe(before);
 });
@@ -56,12 +59,12 @@ test("repeated edits toggle independently and removal preserves the remaining cr
   const restoredCrew = change("crew", crew);
   expect(ownSeat(restoredCrew)).toEqual(ownSeat(moved));
   expect(restoredCrew.boats[0].seats.find((p) => p.seat === "1")?.name).toBe(
-    "Taylor Test",
+    "Taylor Brooks",
   );
   const restoredSeat = change("seat", crew);
   expect(ownSeat(restoredSeat)?.seat).toBe("3");
   expect(restoredSeat.boats[0].seats.find((p) => p.seat === "1")?.name).toBe(
-    "Casey Test",
+    "Casey Bennett",
   );
   const removed = change("remove", crew);
   expect(ownSeat(removed)).toBeUndefined();
@@ -75,4 +78,11 @@ test("edits require a published lineup and do not silently restore a removed row
   const removed = change("remove", change("publish"));
   expect(() => change("seat", removed)).toThrow("restore your seat");
   expect(() => change("crew", removed)).toThrow("restore your crew");
+});
+test("presentation refresh preserves assignments, removals and unpublished state", () => {
+  const moved = change("seat", change("publish"));
+  expect(ownSeat(change("refresh", moved))).toEqual(ownSeat(moved));
+  const removed = change("remove", moved);
+  expect(ownSeat(change("refresh", removed))).toBeUndefined();
+  expect(change("refresh", change("reset")).published).toBe(false);
 });

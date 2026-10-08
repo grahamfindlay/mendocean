@@ -85,14 +85,19 @@ export function createStagingHandler(providers: Providers = liveProviders) {
           name: c.title,
           start_time: Date.parse(c.starts_at) / 1000,
           end_time: Date.parse(c.ends_at) / 1000,
-          location_name: "Test boathouse",
-          lineups_set: input.action === "reset" ? "No" : "Yes",
+          location_name: "MRC Boathouse",
+          lineups_set:
+            input.action === "reset" ||
+            (input.action === "refresh" && !previous?.published)
+              ? "No"
+              : "Yes",
         };
         const detail = {
           lineups_set: meta.lineups_set,
-          location: { name: "Test boathouse" },
+          location: { name: "MRC Boathouse" },
           session_plan: {
-            session_plan: "Fictional crew for notification-link testing.",
+            session_plan:
+              "Warm up to the first buoy, then three 10-minute pieces at 18–20 strokes per minute. Easy row back.",
           },
           attendance: people,
           assigned_coaches: [
@@ -100,7 +105,7 @@ export function createStagingHandler(providers: Providers = liveProviders) {
               boat_id: 920000001,
               custid: 930000001,
               fname: "Sam",
-              lname: "Test",
+              lname: "Rivera",
             },
           ],
         };
@@ -114,20 +119,28 @@ export function createStagingHandler(providers: Providers = liveProviders) {
           [
             {
               boat_id: 920000001,
-              boat_name: "TEST · River",
+              boat_name: "River",
               boat_type: 4,
               coxed: "Yes",
               rigging: "sweep",
             },
           ],
-          input.action !== "reset",
+          input.action !== "reset" && input.action !== "refresh",
+          async (lineup) => {
+            for (const boat of lineup.boats)
+              for (const coach of boat.coaches)
+                coach.email = "sam.rivera@example.com";
+          },
         );
-        const scheduled = check(await service().rpc("staging_delay", { uid }));
+        const scheduled =
+          input.action === "refresh"
+            ? 0
+            : check(await service().rpc("staging_delay", { uid }));
         return json(req, {
           outing_id: c.outing,
           scheduled,
           message: scheduled
-            ? "Test notifications queued. Close the app; delivery starts in 30 seconds and may take another minute."
+            ? "Notifications queued. Close the app; delivery starts in 30 seconds and may take another minute."
             : "Lineup updated. Enable and save lineup email/push preferences to receive notifications.",
         });
       } finally {

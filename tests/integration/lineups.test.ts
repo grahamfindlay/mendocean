@@ -92,7 +92,9 @@ test("drafts stay private, publication sends full-crew email and direct-link pus
     (d: any) => d.channel === "email",
   ).payload;
   expect(email.text).toContain("Crewmate One");
-  expect(email.html).toContain("View full lineup");
+  expect(email.html).toContain("View lineup");
+  expect(email.html).toContain("mailto:coach%40example.test?subject=");
+  expect(JSON.stringify(saved)).not.toMatch(/unrelated@example|phone_number/);
   expect(email.text).toContain(`tab=Lineups&lineup=${saved[0].outing_id}`);
   const push = state.deliveries.find((d: any) => d.channel === "push").payload;
   expect(push.url).toContain(`tab=Lineups&lineup=${saved[0].outing_id}`);

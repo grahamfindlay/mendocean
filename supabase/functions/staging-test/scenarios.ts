@@ -6,6 +6,7 @@ export const scenarios = [
   "seat",
   "crew",
   "remove",
+  "refresh",
 ] as const;
 export type Scenario = (typeof scenarios)[number];
 
@@ -15,20 +16,25 @@ export function scenarioAttendance(
   previous: Lineup | null,
 ) {
   const base = [
-    [910000001, "Alex Test", "coxswain"],
-    [910000002, "Jordan Test", "4"],
-    [910000003, "Morgan Test", "2"],
-    [910000004, "Taylor Test", "1"],
+    [910000001, "Alex Morgan", "coxswain"],
+    [910000002, "Jordan Ellis", "4"],
+    [910000003, "Morgan Chen", "2"],
+    [910000004, "Taylor Brooks", "1"],
     [athlete, "Graham Findlay", "3"],
   ] as const;
-  const editing = action !== "reset" && action !== "publish";
+  const editing =
+    action !== "reset" &&
+    action !== "publish" &&
+    (action !== "refresh" || previous?.published);
   if (editing && !previous?.published)
-    throw new Error("Publish a test lineup before editing it.");
+    throw new Error("Publish a lineup before editing it.");
   const people = editing
     ? previous!.boats.flatMap((boat) =>
         boat.seats.map((seat) => ({
           custid: seat.athlete_id,
-          fname: seat.name,
+          fname:
+            base.find(([id]) => id === seat.athlete_id)?.[1] ??
+            (seat.athlete_id === 910000005 ? "Casey Bennett" : seat.name),
           lname: "",
           lineup_seat: seat.seat,
           lineup_side: seat.side || "",
@@ -52,8 +58,7 @@ export function scenarioAttendance(
       }));
   const rower = people.find((p) => p.custid === athlete);
   if (action === "seat") {
-    if (!rower)
-      throw new Error("Publish a test lineup to restore your seat first.");
+    if (!rower) throw new Error("Publish a lineup to restore your seat first.");
     const target = rower.lineup_seat === "2" ? "3" : "2";
     const other = people.find(
       (p) => p.lineup_boat === rower.lineup_boat && p.lineup_seat === target,
@@ -73,11 +78,10 @@ export function scenarioAttendance(
         p.custid !== athlete &&
         p.lineup_seat === "1",
     );
-    if (!other)
-      throw new Error("Publish a test lineup to restore your crew first.");
+    if (!other) throw new Error("Publish a lineup to restore your crew first.");
     const useCasey = other.custid !== 910000005;
     other.custid = useCasey ? 910000005 : 910000004;
-    other.fname = useCasey ? "Casey Test" : "Taylor Test";
+    other.fname = useCasey ? "Casey Bennett" : "Taylor Brooks";
   }
   if (action === "remove" && rower) rower.lineup_boat = 0;
   return people;

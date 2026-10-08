@@ -1,5 +1,6 @@
 import { bhcAttendance, bhcBoatClass, type BHCRecord } from "./bhc.ts";
 import { formatDate, formatTime } from "./domain.ts";
+import { boatSeatCount, coachMailto, oarSides } from "./lineup-display.ts";
 
 export interface LineupSeat {
   athlete_id: number;
@@ -12,7 +13,7 @@ export interface LineupBoat {
   name: string;
   boat_class: string | null;
   seats: LineupSeat[];
-  coaches: { athlete_id: number; name: string }[];
+  coaches: { athlete_id: number; name: string; email?: string }[];
 }
 export interface Lineup {
   outing_id?: string;
@@ -207,36 +208,88 @@ export function lineupEmail(
   summary: string,
   url: string,
   accountURL: string,
+  kind: "published" | "changed" = "changed",
 ) {
-  const boat = ownBoat(lineup);
+  const boat = ownBoat(lineup),
+    seat = ownSeat(lineup);
+  const date = `${formatDate(lineup.starts_at)} · ${formatTime(lineup.starts_at)} – ${formatTime(lineup.ends_at)}`;
+  const headline =
+    kind === "published" ? "Your crew is ready" : "Your lineup has changed";
   const lines = [
+    headline,
     summary,
-    `${lineup.title} · ${formatDate(lineup.starts_at)}, ${formatTime(lineup.starts_at)}`,
-    lineup.location,
+    `${lineup.title} · ${date}`,
     boat
       ? `${boat.name}${boat.boat_class ? ` · ${boat.boat_class}` : ""}`
       : "Awaiting a boat assignment",
   ];
   if (boat) {
-    const seats =
-      Number(boat.boat_class?.[0]) ||
-      Math.max(...boat.seats.map((s) => Number(s.seat) || 0));
     for (const s of boat.seats)
       lines.push(
-        `${seatLabel(s.seat, seats)}: ${s.name}${s.athlete_id === lineup.athlete_id ? " (You)" : ""}${s.side ? ` · ${s.side}` : ""}`,
+        `${seatLabel(s.seat, boatSeatCount(boat))}: ${s.name}${s.athlete_id === lineup.athlete_id ? " (You)" : ""}${s.seat !== "coxswain" && s.side ? ` · ${s.side}` : ""}`,
       );
-    for (const c of boat.coaches) lines.push(`Coach: ${c.name}`);
+    for (const c of boat.coaches)
+      lines.push(
+        `Coach: ${c.name}${coachMailto(c.email, lineup) ? ` <${c.email}>` : ""}`,
+      );
   }
   if (lineup.plan) lines.push(`Practice plan: ${lineup.plan}`);
+  const origin = new URL(url).origin;
+  const oar = (direction: "left" | "right", show: boolean) =>
+    show
+      ? `<img src="${escape(origin)}/lineup-oar-${direction}.png" width="24" height="17" alt="" style="display:block;border:0;width:24px;height:17px">`
+      : "";
+  const rows =
+    boat?.seats
+      .map((s) => {
+        const you = s.athlete_id === lineup.athlete_id;
+        const sides = oarSides(s);
+        return `<tr style="background:${you ? "#e7efdf" : "#fffdf6"}">
+      <td width="122" style="padding:13px 8px 13px 12px;border-bottom:1px solid #e3e5da;color:${you ? "#244a2d" : "#61736c"};font-size:13px">
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+          <td width="24">${oar("left", sides.left)}</td>
+          <td width="70" align="center" style="white-space:nowrap;font-weight:${you ? "700" : "400"}">${escape(seatLabel(s.seat, boatSeatCount(boat!)))}</td>
+          <td width="24">${oar("right", sides.right)}</td>
+        </tr></table>
+      </td>
+      <td style="padding:13px 8px;border-bottom:1px solid #e3e5da;font-size:15px;font-weight:${you ? "700" : "400"};overflow-wrap:anywhere">${escape(s.name)}</td>
+      <td width="44" align="right" style="padding:13px 12px 13px 0;border-bottom:1px solid #e3e5da;font-size:11px;font-weight:700;color:#3b6a3f">${you ? "YOU" : ""}</td>
+    </tr>`;
+      })
+      .join("") ?? "";
+  const coaches = boat?.coaches
+    .map((c) => {
+      const href = coachMailto(c.email, lineup);
+      return href
+        ? `<a href="${escape(href)}" style="color:#3b6a3f;text-decoration:underline">${escape(c.name)}</a>`
+        : escape(c.name);
+    })
+    .join(", ");
+  const boatHTML = boat
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fffdf6;border:1px solid #d9ddd1;border-radius:14px">
+    <tr><td colspan="3" style="padding:20px 16px 16px"><p style="margin:0 0 6px;color:#61736c;font-size:11px;letter-spacing:1.2px;font-weight:700">YOUR BOAT${seat ? ` · ${escape(seatLabel(seat.seat, boatSeatCount(boat))).toUpperCase()}` : ""}</p><h2 style="margin:0;font-size:23px;line-height:1.3;font-weight:700">${escape(boat.name)}${boat.boat_class ? ` <span style="font-size:14px;font-weight:400;color:#61736c">${escape(boat.boat_class)}</span>` : ""}</h2></td></tr>
+    ${rows}
+    ${coaches ? `<tr><td colspan="3" style="padding:16px;font-size:14px;color:#61736c">${boat.coaches.length > 1 ? "Coaches" : "Coach"} &nbsp;${coaches}</td></tr>` : ""}
+    </table>`
+    : `<p style="padding:18px;background:#fffdf6;border:1px solid #d9ddd1;border-radius:12px;font-size:15px;line-height:1.6">No seat assigned.</p>`;
   return {
     text:
       lines.filter(Boolean).join("\n") +
-      `\n\nView all boats: ${url}\nManage lineup notifications: ${accountURL}`,
-    html: `<div style="font-family:system-ui,sans-serif;max-width:600px">${lines
-      .filter(Boolean)
-      .map((l) => `<p>${escape(l)}</p>`)
-      .join(
-        "",
-      )}<p><a href="${escape(url)}">View full lineup in Mendocean</a></p><p>This is the lineup when this email was generated. Open Mendocean for updates.</p><p><a href="${escape(accountURL)}">Manage lineup notifications</a></p></div>`,
+      `\n\nView lineup: ${url}\nManage lineup notifications: ${accountURL}`,
+    html: `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light"></head><body style="margin:0;padding:0;background:#f8f5ec;color:#183f3a;font-family:Arial,Helvetica,sans-serif">
+      <div style="display:none;max-height:0;overflow:hidden">${escape(`${summary} ${lineup.title} · ${date}`)}</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f5ec"><tr><td align="center" style="padding:28px 12px">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px"><tr><td>
+          <p style="margin:0 0 28px;font-size:20px;letter-spacing:-0.8px;font-weight:700;color:#3b6a3f">Mendocean</p>
+          <h1 style="margin:0 0 14px;font-size:30px;line-height:1.2;letter-spacing:-0.7px">${headline}</h1>
+          ${kind === "changed" ? `<p style="margin:0 0 20px;font-size:15px;line-height:1.6">${escape(summary)}</p>` : ""}
+          <p style="margin:0 0 5px;font-size:17px;font-weight:700">${escape(lineup.title)}</p>
+          <p style="margin:0 0 24px;font-size:14px;line-height:1.5;color:#61736c">${escape(date)}</p>
+          ${boatHTML}
+          ${lineup.plan ? `<h2 style="margin:24px 0 8px;font-size:15px">Practice plan</h2><p style="margin:0;font-size:14px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere">${escape(lineup.plan)}</p>` : ""}
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0"><tr><td bgcolor="#3b6a3f" style="border-radius:9px"><a href="${escape(url)}" style="display:inline-block;padding:15px 24px;font-size:15px;font-weight:700;color:#fffdf6;text-decoration:none">View lineup</a></td></tr></table>
+          <p style="margin:0;font-size:12px;line-height:1.6;color:#61736c"><a href="${escape(accountURL)}" style="color:#61736c">Manage lineup notifications</a></p>
+        </td></tr></table>
+      </td></tr></table></body></html>`,
   };
 }

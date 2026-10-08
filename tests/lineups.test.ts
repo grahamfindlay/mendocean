@@ -137,3 +137,38 @@ test("email includes full own crew, coach and escaped text, with direct practice
   expect(email.html).not.toContain("<script>");
   expect(email.html).toContain("tab=Lineups&amp;lineup=123");
 });
+
+test("designed emails omit the boathouse and reminder, highlight the rower, and link only valid coach emails", () => {
+  const lineup = normalized();
+  lineup.location = "MRC Boathouse";
+  lineup.boats[0].coaches[0].email = "coach@example.com";
+  const email = lineupEmail(
+    lineup,
+    "Your crew has changed.",
+    "https://mendocean.fyi/?tab=Lineups&lineup=123",
+    "https://mendocean.fyi/?account=1",
+  );
+  expect(email.html).toContain("mailto:coach%40example.com?subject=");
+  expect(email.html).toContain("lineup-oar-right.png");
+  expect(email.html).toContain("YOU");
+  expect(email.html).not.toMatch(/MRC Boathouse|when this email was generated/);
+  expect(email.text).not.toContain("MRC Boathouse");
+  expect(email.text).toContain("Coach: Coach Person <coach@example.com>");
+  const publication = lineupEmail(
+    lineup,
+    "Published",
+    "https://mendocean.fyi/",
+    "https://mendocean.fyi/?account=1",
+    "published",
+  );
+  expect(publication.html).toContain("Your crew is ready");
+  lineup.boats = [];
+  expect(
+    lineupEmail(
+      lineup,
+      "Removed",
+      "https://mendocean.fyi/",
+      "https://mendocean.fyi/?account=1",
+    ).html,
+  ).toContain("No seat assigned");
+});
