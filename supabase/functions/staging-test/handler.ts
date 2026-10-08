@@ -11,13 +11,8 @@ import {
 import { saveLineup, sendLineup } from "../_shared/lineups.ts";
 import { collectWeather } from "../_shared/weather.ts";
 import { liveProviders, type Providers } from "../_shared/providers.ts";
-export const scenarios = [
-  "reset",
-  "publish",
-  "seat",
-  "crew",
-  "remove",
-] as const;
+import { scenarios, scenarioAttendance } from "./scenarios.ts";
+import type { Lineup } from "../../../shared/lineups.ts";
 export function createStagingHandler(providers: Providers = liveProviders) {
   return async (req: Request): Promise<Response> => {
     try {
@@ -73,6 +68,19 @@ export function createStagingHandler(providers: Providers = liveProviders) {
         return json(req, { error: "Unknown test action" }, 400);
       const c = check(await service().rpc("staging_fixture", { uid }));
       try {
+        const previous = check(
+          await service().rpc("lineup_previous", {
+            uid,
+            outing: c.outing,
+            revision: c.revision,
+          }),
+        ) as Lineup | null;
+        let people;
+        try {
+          people = scenarioAttendance(input.action, c.athlete, previous);
+        } catch (error) {
+          return json(req, { error: (error as Error).message }, 409);
+        }
         const meta = {
           name: c.title,
           start_time: Date.parse(c.starts_at) / 1000,
@@ -80,60 +88,6 @@ export function createStagingHandler(providers: Providers = liveProviders) {
           location_name: "Test boathouse",
           lineups_set: input.action === "reset" ? "No" : "Yes",
         };
-        const people = [
-          {
-            custid: 910000001,
-            fname: "Alex",
-            lname: "Test",
-            lineup_seat: "coxswain",
-          },
-          {
-            custid: 910000002,
-            fname: "Jordan",
-            lname: "Test",
-            lineup_seat: "4",
-          },
-          {
-            custid: 910000003,
-            fname: "Morgan",
-            lname: "Test",
-            lineup_seat: "2",
-          },
-          {
-            custid: 910000004,
-            fname: "Taylor",
-            lname: "Test",
-            lineup_seat: "1",
-          },
-          {
-            custid: c.athlete,
-            fname: "Graham",
-            lname: "Findlay",
-            lineup_seat: "3",
-          },
-        ].map((p) => ({
-          ...p,
-          attendance_plan: "Attending",
-          lineup_boat: 920000001,
-          lineup_side:
-            p.lineup_seat === "coxswain"
-              ? ""
-              : Number(p.lineup_seat) % 2
-                ? "port"
-                : "starboard",
-        }));
-        if (input.action === "seat") {
-          people.find((p) => p.custid === c.athlete)!.lineup_seat = "2";
-          people.find((p) => p.custid === c.athlete)!.lineup_side = "starboard";
-          people.find((p) => p.custid === 910000003)!.lineup_seat = "3";
-          people.find((p) => p.custid === 910000003)!.lineup_side = "port";
-        }
-        if (input.action === "crew")
-          people.find((p) => p.custid === 910000004)!.custid = 910000005;
-        if (input.action === "crew")
-          people.find((p) => p.custid === 910000005)!.fname = "Casey";
-        if (input.action === "remove")
-          people.find((p) => p.custid === c.athlete)!.lineup_boat = 0;
         const detail = {
           lineups_set: meta.lineups_set,
           location: { name: "Test boathouse" },

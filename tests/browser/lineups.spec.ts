@@ -5,6 +5,17 @@ test("lineup links select the practice, prioritize own boat and highlight the se
   await page.addInitScript(() => {
     localStorage.setItem("mendocean-preview-bhc", "true");
     const now = Date.now();
+    // A first notification may arrive during an automatic service-worker update.
+    // Its explicit destination must override the old foreground position.
+    sessionStorage.setItem(
+      "mendocean-update-position",
+      JSON.stringify({
+        tab: "Today",
+        selectedLineup: "first",
+        userId: "10000000-0000-4000-8000-000000000001",
+        at: now,
+      }),
+    );
     const make = (id: string, title: string) => ({
       outing_id: id,
       title,
@@ -66,6 +77,36 @@ test("lineup links select the practice, prioritize own boat and highlight the se
   await expect(page.locator(".lineup-boat").first()).toContainText("Pratt");
   await expect(page.locator(".lineup-you")).toContainText("3 seat");
   await expect(page.locator(".lineup-you")).toContainText("You");
+  await page.getByRole("button", { name: "Forecasts", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Selected practice", exact: true }),
+  ).toBeHidden();
+  await page.evaluate(() =>
+    navigator.serviceWorker.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          type: "NOTIFICATION_NAVIGATE",
+          url: location.origin + "/?preview=1&tab=Lineups&lineup=target",
+        },
+      }),
+    ),
+  );
+  await expect(
+    page.getByRole("heading", { name: "Selected practice", exact: true }),
+  ).toBeVisible();
+  await page.evaluate(() =>
+    navigator.serviceWorker.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          type: "NOTIFICATION_NAVIGATE",
+          url: "https://other.test/?tab=Lineups&lineup=first",
+        },
+      }),
+    ),
+  );
+  await expect(
+    page.getByRole("heading", { name: "Selected practice", exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("Other rower", { exact: true })).toBeHidden();
   await page.getByText("Other boats (1)", { exact: true }).click();
   await expect(page.getByText("Other rower", { exact: true })).toBeVisible();

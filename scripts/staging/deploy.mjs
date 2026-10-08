@@ -125,6 +125,7 @@ export async function configure() {
     site_url: c.app_url,
     uri_allow_list: c.app_url,
     disable_signup: true,
+    rate_limit_email_sent: 30,
     external_email_enabled: true,
     mailer_autoconfirm: false,
     smtp_admin_email: "hello@mail.mendocean.fyi",

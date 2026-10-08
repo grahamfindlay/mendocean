@@ -156,5 +156,18 @@ self.addEventListener("notificationclick", (event) => {
     self.location.origin,
   );
   if (url.origin !== self.location.origin) return;
-  event.waitUntil(self.clients.openWindow(url.href));
+  event.waitUntil(
+    (async () => {
+      const opened = await self.clients.openWindow(url.href);
+      if (!opened) return;
+      // A browser may reuse an installed app's existing window. Ensure it
+      // receives the destination even when opening it only brings it forward.
+      const client =
+        opened.url === url.href
+          ? opened
+          : (await opened.navigate(url.href).catch(() => null)) || opened;
+      client.postMessage({ type: "NOTIFICATION_NAVIGATE", url: url.href });
+      await client.focus();
+    })(),
+  );
 });

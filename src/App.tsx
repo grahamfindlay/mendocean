@@ -117,11 +117,13 @@ export default function App() {
   const weatherRequest = useRef<Promise<void> | null>(null);
   const weatherFetchedAt = useRef(0);
   const [tab, setTab] = useState(
-    resume?.tab ||
-      (new URLSearchParams(location.search).has("log")
+    new URLSearchParams(location.search).has("lineup")
+      ? "Lineups"
+      : new URLSearchParams(location.search).has("log")
         ? "Log"
         : resolveDestination(new URLSearchParams(location.search).get("tab")) ||
-          DEFAULT_DESTINATION),
+          resume?.tab ||
+          DEFAULT_DESTINATION,
   );
   const [weather, setWeather] = useState<Forecast | null>(null);
   const [weatherError, setWeatherError] = useState("");
@@ -165,10 +167,40 @@ export default function App() {
     new URLSearchParams(location.search).get("log") || undefined,
   );
   const [selectedLineup, setSelectedLineup] = useState<string | undefined>(
-    resume?.selectedLineup ||
-      new URLSearchParams(location.search).get("lineup") ||
+    new URLSearchParams(location.search).get("lineup") ||
+      resume?.selectedLineup ||
       undefined,
   );
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const onNotification = (event: MessageEvent) => {
+      if (event.data?.type !== "NOTIFICATION_NAVIGATE") return;
+      try {
+        const url = new URL(event.data.url, location.origin);
+        if (url.origin !== location.origin || url.pathname !== "/") return;
+        const lineup = url.searchParams.get("lineup");
+        const log = url.searchParams.get("log");
+        const destination = lineup
+          ? "Lineups"
+          : log
+            ? "Log"
+            : resolveDestination(url.searchParams.get("tab"));
+        if (!destination) return;
+        window.history.replaceState(window.history.state, "", url);
+        setSelectedLineup(lineup || undefined);
+        setSelectedOuting(log || undefined);
+        setTab(destination);
+        setSettings(false);
+        setAuthOpen(false);
+        setEditing(undefined);
+      } catch {
+        // Ignore invalid or foreign notification destinations.
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", onNotification);
+    return () =>
+      navigator.serviceWorker.removeEventListener("message", onNotification);
+  }, []);
   const selectLineup = (id: string) => {
     setSelectedLineup(id);
     setTab("Lineups");
