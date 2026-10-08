@@ -9,12 +9,13 @@ import {
   trigger,
   schedule,
 } from "./staging/deploy.mjs";
-import { smoke, emailCheck } from "./staging/smoke.mjs";
+import { assets, smoke, emailCheck } from "./staging/smoke.mjs";
 import { browserSmoke } from "./staging/browser.mjs";
 import { smtpCheck } from "./staging/smtp.mjs";
 const actions = {
   "smtp-check": smtpCheck,
   "browser-smoke": browserSmoke,
+  assets,
   smoke,
   "email-check": emailCheck,
   init: initialize,

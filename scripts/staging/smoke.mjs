@@ -25,7 +25,7 @@ export async function testSession() {
     throw new Error("Could not verify staging-only test session.");
   return { client, session: verified.data.session };
 }
-export async function smoke() {
+export async function assets() {
   const c = await assertStaging(),
     s = secrets();
   const get = async (path) => {
@@ -74,6 +74,19 @@ export async function smoke() {
     if (![401, 403].includes(r.status))
       throw new Error("Anonymous staging access was not denied.");
   }
+  console.log(
+    JSON.stringify({
+      staging: true,
+      precache_assets: release.assets.length,
+      build: release.id,
+      closed_signup: true,
+      anonymous_denied: true,
+    }),
+  );
+  return { c, s, release };
+}
+export async function smoke() {
+  const { c, s, release } = await assets();
   const { client, session } = await testSession();
   try {
     const account = async () => {
