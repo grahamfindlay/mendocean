@@ -4,6 +4,8 @@ import { check, enqueue, query, service } from "./runtime.ts";
 export { bhcGet, list } from "./bhc-client.ts";
 import { bhcGet, list } from "./bhc-client.ts";
 import { validateBHCConnection, recordBHCFailure } from "./bhc-connection.ts";
+import { saveLineup } from "./lineups.ts";
+import { coachContactLookup } from "./coach-contacts.ts";
 export async function syncBHC(
   uid: string,
   initial = false,
@@ -28,6 +30,16 @@ export async function syncBHC(
   try {
     const token = await validateBHCConnection(connection, providers);
     const club = connection.club_id;
+    const contacts = coachContactLookup(club, async () =>
+      list(
+        await bhcGet(
+          "whitelabel/getWhitelabelUsers",
+          token,
+          { whitelabel_id: club },
+          providers,
+        ),
+      ),
+    );
     const args = { whitelabel_id: club, custid: connection.custid };
     const upcoming = list(
       await bhcGet(
@@ -82,7 +94,12 @@ export async function syncBHC(
           null,
           new Date(),
           `bhc-continuation:${uid}:${connection.revision}:${runId}:${cursor}`,
-          { initial, after_id: cursor, revision: connection.revision, run_id: runId },
+          {
+            initial,
+            after_id: cursor,
+            revision: connection.revision,
+            run_id: runId,
+          },
         );
         return;
       }
@@ -121,6 +138,17 @@ export async function syncBHC(
         }),
       );
       if (!outingId) return;
+      await saveLineup(
+        uid,
+        connection.revision,
+        outingId,
+        meta,
+        detail,
+        connection.custid,
+        boats,
+        !initial,
+        contacts,
+      );
       for (const due of syncTimes(p))
         await enqueue(
           "bhc_sync",

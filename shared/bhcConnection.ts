@@ -3,6 +3,7 @@ export interface BHCConnectionStatus {
   connected: boolean;
   last_sync: string | null;
   last_error: string | null;
+  lineup_error?: string | null;
   state?:
     | "not_connected"
     | "importing"
@@ -87,6 +88,7 @@ export function bhcStatus(
     expires_at: connection.expires_at || null,
     last_sync: connection.last_successful_sync_at || null,
     last_error: connection.last_error || null,
+    lineup_error: connection.lineup_error || null,
   };
   if (!connection.user_id)
     return { ...base, connected: false, state: "not_connected" };

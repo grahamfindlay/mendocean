@@ -1,0 +1,11 @@
+{
+  "organization_slug": "ooqgzjdqsorkoblwarqc",
+  "supabase_name": "mendocean-staging",
+  "region": "us-west-2",
+  "production_supabase_ref": "exhoyifhvultmjryisce",
+  "cloudflare_account_id": "a8be15219afdfbe6f132c702dfca9484",
+  "pages_project": "mendocean-staging",
+  "app_url": "https://mendocean-staging.pages.dev",
+  "supabase_ref": "zkuorkfrwxfnjfgjygah",
+  "supabase_url": "https://zkuorkfrwxfnjfgjygah.supabase.co"
+}

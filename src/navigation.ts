@@ -8,6 +8,7 @@ export const DESTINATIONS = [
   { id: "Rows", group: "Forecasts" },
   { id: "Log", group: null },
   { id: "History", group: null },
+  { id: "Lineups", group: null },
 ] as const;
 export type Destination = (typeof DESTINATIONS)[number]["id"];
 export const FORECASTS = "Forecasts";

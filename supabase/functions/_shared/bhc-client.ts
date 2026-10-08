@@ -6,6 +6,7 @@ const paths = new Set([
   "practices/getAthletePractices",
   "practices/getPractices",
   "equipment/getAllBoats",
+  "whitelabel/getWhitelabelUsers",
 ]);
 export function list(raw: any): Record<string, any>[] {
   if (Array.isArray(raw)) return raw;

@@ -1,4 +1,6 @@
 import type { BHCConnectionStatus } from "../shared/bhcConnection";
+import type { Lineup } from "../shared/lineups";
+import LineupsView from "./LineupsView";
 import { BHCNotice } from "./BHCConnection";
 import { scheduledAttendance } from "../shared/presentation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -82,6 +84,8 @@ function readUpdatePosition() {
   }
 }
 export interface AccountData {
+  lineups?: Lineup[];
+  lineups_enabled?: boolean;
   push_devices?: number;
   outings: Outing[];
   coaches: Coach[];
@@ -92,6 +96,8 @@ export interface AccountData {
     reminder_channel: string;
     reminder_channels?: string[];
     reminders_paused: boolean;
+    lineup_channels?: string[];
+    lineup_changes?: "crew" | "assignment";
   };
   bhc: BHCConnectionStatus;
 }
@@ -111,11 +117,13 @@ export default function App() {
   const weatherRequest = useRef<Promise<void> | null>(null);
   const weatherFetchedAt = useRef(0);
   const [tab, setTab] = useState(
-    resume?.tab ||
-      (new URLSearchParams(location.search).has("log")
+    new URLSearchParams(location.search).has("lineup")
+      ? "Lineups"
+      : new URLSearchParams(location.search).has("log")
         ? "Log"
         : resolveDestination(new URLSearchParams(location.search).get("tab")) ||
-          DEFAULT_DESTINATION),
+          resume?.tab ||
+          DEFAULT_DESTINATION,
   );
   const [weather, setWeather] = useState<Forecast | null>(null);
   const [weatherError, setWeatherError] = useState("");
@@ -158,12 +166,57 @@ export default function App() {
   const [selectedOuting, setSelectedOuting] = useState<string | undefined>(
     new URLSearchParams(location.search).get("log") || undefined,
   );
+  const [selectedLineup, setSelectedLineup] = useState<string | undefined>(
+    new URLSearchParams(location.search).get("lineup") ||
+      resume?.selectedLineup ||
+      undefined,
+  );
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const onNotification = (event: MessageEvent) => {
+      if (event.data?.type !== "NOTIFICATION_NAVIGATE") return;
+      try {
+        const url = new URL(event.data.url, location.origin);
+        if (url.origin !== location.origin || url.pathname !== "/") return;
+        const lineup = url.searchParams.get("lineup");
+        const log = url.searchParams.get("log");
+        const destination = lineup
+          ? "Lineups"
+          : log
+            ? "Log"
+            : resolveDestination(url.searchParams.get("tab"));
+        if (!destination) return;
+        window.history.replaceState(window.history.state, "", url);
+        setSelectedLineup(lineup || undefined);
+        setSelectedOuting(log || undefined);
+        setTab(destination);
+        setSettings(false);
+        setAuthOpen(false);
+        setEditing(undefined);
+      } catch {
+        // Ignore invalid or foreign notification destinations.
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", onNotification);
+    return () =>
+      navigator.serviceWorker.removeEventListener("message", onNotification);
+  }, []);
+  const selectLineup = (id: string) => {
+    setSelectedLineup(id);
+    setTab("Lineups");
+    const url = new URL(location.href);
+    url.searchParams.delete("log");
+    url.searchParams.set("tab", "Lineups");
+    url.searchParams.set("lineup", id);
+    window.history.replaceState(window.history.state, "", url);
+  };
   const updatePosition = useRef({});
   updatePosition.current = {
     tab,
     rowFilters,
     forecastSelection,
     selectedOuting,
+    selectedLineup,
     userId: user?.id,
     at: now,
   };
@@ -206,6 +259,22 @@ export default function App() {
       if (currentUser.current === user.id) setError((e as Error).message);
     }
   }, [user]);
+  useEffect(() => {
+    if (!user || tab !== "Lineups") return;
+    const visible = () => {
+      if (document.visibilityState === "visible" && navigator.onLine)
+        void refresh();
+    };
+    visible();
+    const timer = setInterval(visible, 60000);
+    document.addEventListener("visibilitychange", visible);
+    window.addEventListener("online", visible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", visible);
+      window.removeEventListener("online", visible);
+    };
+  }, [user, tab, refresh]);
   useEffect(() => {
     if (administration) return;
     refreshWeather();
@@ -357,6 +426,12 @@ export default function App() {
       );
     });
   function navigate(name: string) {
+    setSelectedLineup(undefined);
+    const url = new URL(location.href);
+    url.searchParams.delete("lineup");
+    url.searchParams.delete("log");
+    url.searchParams.set("tab", name);
+    window.history.replaceState(window.history.state, "", url);
     setEditing(undefined);
     setSelectedOuting(undefined);
     setTab(name);
@@ -393,6 +468,11 @@ export default function App() {
   return (
     <div className="app-shell">
       <UpdateBanner />
+      {import.meta.env.VITE_STAGING === "true" && (
+        <div className="staging-label" role="status">
+          Staging
+        </div>
+      )}
       <header className="site-header">
         <a
           className="wordmark"
@@ -435,24 +515,34 @@ export default function App() {
         )}
       </header>
       <nav className="main-nav" aria-label="Main navigation">
-        {topLevel.map(({ id, opens }) => (
-          <button
-            key={id}
-            aria-current={
-              (id === FORECASTS ? isForecast(tab) : tab === id)
-                ? "page"
-                : undefined
-            }
-            className={
-              (id === FORECASTS ? isForecast(tab) : tab === id)
-                ? "selected"
-                : ""
-            }
-            onClick={() => navigate(opens)}
-          >
-            {id === "Log" && <Plus size={16} />} {id}
-          </button>
-        ))}
+        {topLevel
+          .filter(
+            ({ id }) =>
+              id !== "Lineups" ||
+              (account?.lineups_enabled &&
+                (account.bhc.connected ||
+                  ["reconnect_required", "membership_missing"].includes(
+                    account.bhc.state || "",
+                  ))),
+          )
+          .map(({ id, opens }) => (
+            <button
+              key={id}
+              aria-current={
+                (id === FORECASTS ? isForecast(tab) : tab === id)
+                  ? "page"
+                  : undefined
+              }
+              className={
+                (id === FORECASTS ? isForecast(tab) : tab === id)
+                  ? "selected"
+                  : ""
+              }
+              onClick={() => navigate(opens)}
+            >
+              {id === "Log" && <Plus size={16} />} {id}
+            </button>
+          ))}
       </nav>
       {/* Kept mounted and hidden rather than unmounted: toggling this row
           between destinations destabilises the tree below it. */}
@@ -499,7 +589,15 @@ export default function App() {
         authReady={authReady}
       >
         <main>
-          {tab === "Rows" && account && <BHCNotice status={account.bhc} onReconnect={()=>{setFocusBHC(true);setSettings(true);}}/>}
+          {tab === "Rows" && account && (
+            <BHCNotice
+              status={account.bhc}
+              onReconnect={() => {
+                setFocusBHC(true);
+                setSettings(true);
+              }}
+            />
+          )}
           {isForecast(tab) ? (
             weather ? (
               <ForecastView
@@ -525,6 +623,18 @@ export default function App() {
                     >
                       <Share size={18} />
                     </button>
+                  ) : account?.lineups?.some(
+                      (l) =>
+                        l.outing_id === o.id &&
+                        l.published &&
+                        Date.parse(l.ends_at) > now,
+                    ) ? (
+                    <button
+                      className="text-button"
+                      onClick={() => selectLineup(o.id)}
+                    >
+                      View lineup
+                    </button>
                   ) : null
                 }
               />
@@ -549,17 +659,51 @@ export default function App() {
             )
           ) : !user ? (
             <section className="empty-state">
-              <h1>How was the water?</h1>
+              <h1>
+                {tab === "Lineups" ? "View your lineup" : "How was the water?"}
+              </h1>
               <p>
-                Your reports help build better wind-wave models and rowing
-                forecasts. Logging takes less than 10 seconds. Receive optional
-                reminders to log after each scheduled row.
+                {tab === "Lineups"
+                  ? "Sign in to Mendocean to view your published practice lineup."
+                  : "Your reports help build better wind-wave models and rowing forecasts. Logging takes less than 10 seconds. Receive optional reminders to log after each scheduled row."}
               </p>
               <button className="button" onClick={() => setAuthOpen(true)}>
                 Sign in <ArrowUpRight size={16} />
               </button>
               <p className="help">The pilot is invitation-only.</p>
             </section>
+          ) : tab === "Lineups" ? (
+            account ? (
+              <LineupsView
+                lineups={account.lineups || []}
+                status={account.bhc}
+                enabled={!!account.lineups_enabled}
+                selected={selectedLineup}
+                onSelect={selectLineup}
+                now={now}
+                busy={busy}
+                onReconnect={() => {
+                  setFocusBHC(true);
+                  setSettings(true);
+                }}
+                onRefresh={() =>
+                  void act(async () => {
+                    if (import.meta.env.VITE_STAGING === "true") {
+                      await refresh();
+                      setMessage("Lineup refreshed.");
+                      return;
+                    }
+                    await api("lineups/refresh", {});
+                    setMessage(
+                      "Checking BHC for updates. Your saved lineup remains available while it refreshes.",
+                    );
+                    await refresh();
+                  })
+                }
+              />
+            ) : (
+              <p role="status">Loading your lineups…</p>
+            )
           ) : tab === "Log" ? (
             <Logger
               key={
@@ -581,9 +725,7 @@ export default function App() {
                   previewMode ? "Sample report saved only on this device." : m,
                 );
                 if (!editing) setRowFilters(NO_FILTERS);
-                setEditing(undefined);
-                setSelectedOuting(undefined);
-                setTab("History");
+                navigate("History");
                 void refresh();
               }}
             />

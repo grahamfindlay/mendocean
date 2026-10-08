@@ -221,6 +221,7 @@ export async function recordBHCFailure(
   connection: Record<string, any>,
   error: unknown,
   providers: Providers,
+  source: "practice" | "lineup" = "practice",
 ) {
   let problem = error;
   if (!(
@@ -247,15 +248,18 @@ export async function recordBHCFailure(
           ? "membership_missing"
           : undefined
       : undefined;
-  await query("connection_problem", {
-    user_id: connection.user_id,
-    revision: connection.revision,
-    ...(state ? { access_state: state } : {}),
-    error:
-      state === "reconnect_required"
-        ? "Reconnect Boathouse Connect to continue."
-        : state === "membership_missing"
-          ? "Check your Mendota membership in BHC."
-          : "Practice import failed. BHC could not update your practices. Try again later.",
-  });
+  await query(
+    source === "lineup" && !state ? "lineup_problem" : "connection_problem",
+    {
+      user_id: connection.user_id,
+      revision: connection.revision,
+      ...(state ? { access_state: state } : {}),
+      error:
+        state === "reconnect_required"
+          ? "Reconnect Boathouse Connect to continue."
+          : state === "membership_missing"
+            ? "Check your Mendota membership in BHC."
+            : "Practice import failed. BHC could not update your practices. Try again later.",
+    },
+  );
 }

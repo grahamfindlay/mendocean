@@ -1,6 +1,7 @@
 # Project TODOs
 
-Weather collection activation, credentials, retention and recurring owner reviews are tracked in [docs/TODO.md](docs/TODO.md). Automatic behavior is documented in [docs/WEATHER_DATA.md](docs/WEATHER_DATA.md).
+- [ ] Ask BHC developers to add a Zapier webhook for lineup publications and changes, so Mendocean can receive timely updates without polling.
+      Weather collection activation, credentials, retention and recurring owner reviews are tracked in [docs/TODO.md](docs/TODO.md). Automatic behavior is documented in [docs/WEATHER_DATA.md](docs/WEATHER_DATA.md).
 
 ## Improve the Lake Mendota webcam feed
 

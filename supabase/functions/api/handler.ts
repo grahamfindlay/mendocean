@@ -29,6 +29,7 @@ import {
   type BackgroundTask,
 } from "../_shared/bhc-background.ts";
 import { bhcStatus } from "../../../shared/bhcConnection.ts";
+import { lineupsEnabled } from "../_shared/lineups.ts";
 import { manageAttendance } from "../_shared/attendance.ts";
 import { assess, assessmentCapabilities } from "../../../shared/model.ts";
 import {
@@ -263,6 +264,10 @@ export function createApiHandler(
           profile,
           push_devices: (await query("push_get", { user_id: uid })).length,
           outings,
+          lineups: lineupsEnabled()
+            ? check(await db.rpc("lineups_get", { uid }))
+            : [],
+          lineups_enabled: lineupsEnabled(),
           coaches: check(
             await client.from("coaches").select("id,name").order("name"),
           ),
@@ -499,6 +504,29 @@ export function createApiHandler(
           periods: path === "week-periods" ? legacyPeriods(periods) : periods,
         });
       }
+      if (path === "lineups/refresh") {
+        if (!lineupsEnabled())
+          throw new HttpError(
+            503,
+            "Lineups are awaiting connection verification.",
+          );
+        const connection = await query("connection_get", { user_id: uid });
+        if (!connection.user_id || connection.access_state !== "active")
+          throw new HttpError(
+            409,
+            "Reconnect Boathouse Connect to check lineups.",
+            "bhc_reconnect_required",
+          );
+        await enqueue(
+          "lineup_poll",
+          uid,
+          null,
+          new Date(),
+          `lineup-manual:${uid}:${connection.revision}:${Math.floor(providers.now() / 60000)}`,
+          { revision: connection.revision },
+        );
+        return json(req, { queued: true });
+      }
       if (path === "settings") {
         const settings = z
           .object({
@@ -509,6 +537,11 @@ export function createApiHandler(
               .max(2)
               .optional(),
             reminders_paused: z.boolean(),
+            lineup_channels: z
+              .array(z.enum(["email", "push"]))
+              .max(2)
+              .optional(),
+            lineup_changes: z.enum(["crew", "assignment"]).optional(),
           })
           .refine(
             (v) =>

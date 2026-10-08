@@ -23,6 +23,22 @@ export default defineConfig({
   define: { "import.meta.env.VITE_APP_BUILD": JSON.stringify(buildId) },
   plugins: [
     react(),
+    {
+      name: "staging-identity",
+      transformIndexHtml(html) {
+        return process.env.VITE_STAGING === "true"
+          ? html.replace("<title>Mendocean", "<title>Mendocean Test")
+          : html;
+      },
+      closeBundle() {
+        if (process.env.VITE_STAGING !== "true") return;
+        const path = resolve("dist/manifest.webmanifest");
+        const manifest = JSON.parse(readFileSync(path, "utf8"));
+        manifest.name = "Mendocean Test";
+        manifest.short_name = "Mendocean Test";
+        writeFileSync(path, JSON.stringify(manifest, null, 2));
+      },
+    },
     (() => {
       let output = "dist";
       let origin = "";

@@ -14,6 +14,12 @@ import { randomBytes } from "node:crypto";
 import { startReleaseServer } from "../tests/support/release-server.mjs";
 import { startFixtures } from "../tests/support/fixture-server.mjs";
 const root = resolve(".");
+const apiPort = Number(process.env.TEST_API_PORT || 54321);
+const dbPort = Number(process.env.TEST_DB_PORT || 54322);
+if (
+  [apiPort, dbPort].some((p) => !Number.isInteger(p) || p < 1024 || p > 65535)
+)
+  throw new Error("Invalid test port");
 const work = mkdtempSync(join(tmpdir(), "mendocean-test-"));
 const id = "mendocean-test-" + randomBytes(4).toString("hex");
 const cli = join(root, "node_modules/.bin/supabase");
@@ -173,10 +179,10 @@ Deno.serve(createJobsHandler({ ...fixtureProviders, now: () => Date.parse('2026-
     join(work, "supabase/config.toml"),
     `project_id = "${id}"
 [api]
-port = 54321
+port = ${apiPort}
 schemas = ["public"]
 [db]
-port = 54322
+port = ${dbPort}
 major_version = 17
 [studio]
 enabled = false
@@ -249,7 +255,11 @@ import_map = "./functions/deno.json"
     ? "host.docker.internal"
     : net[0].IPAM.Config[0].Gateway;
   const functionEnv = `APP_URL=http://127.0.0.1:4175\nALLOWED_ORIGINS=http://127.0.0.1:4175\nJOBS_SECRET=${secret}\nMONITOR_SECRET=${secret}-monitor\nOWNER_DIGEST_SECRET=${secret}-digest\nOWNER_EMAIL=owner@example.test\nOWNER_DIGEST_ENABLED=true\nBHC_ENCRYPTION_KEY=${randomBytes(32).toString("base64")}\nBHC_MENDOTA_CLUB_ID=1\nBHC_PASSWORD_CONNECT_ENABLED=true\nRESEND_API_KEY=synthetic\nEMAIL_FROM=Mendocean <test@example.test>\nFIXTURE_SECRET=${secret}\nFIXTURE_URL=http://${gateway}:54328\n`;
-  writeFileSync(join(work, "functions.env"), functionEnv, { mode: 0o600 });
+  writeFileSync(
+    join(work, "functions.env"),
+    functionEnv + "BHC_LINEUPS_ENABLED=true\n",
+    { mode: 0o600 },
+  );
   background(cli, [
     "functions",
     "serve",
@@ -333,25 +343,31 @@ import_map = "./functions/deno.json"
   if (!process.argv.includes("--updates-only")) {
     console.log("Running real-backend integration tests.");
     console.log(await run("npm", ["run", "test:integration"]));
-    console.log("Running production-build browser journeys.");
-    const browserGrep = process.argv.indexOf("--browser-grep");
-    console.log(
-      await run("npm", [
-        "run",
-        "test:e2e:full",
-        ...(browserGrep >= 0
-          ? ["--", "--grep", process.argv[browserGrep + 1]]
-          : []),
-      ]),
-    );
+    if (process.argv.includes("--integration-only")) {
+      console.log("Isolated integration checks complete.");
+    } else {
+      console.log("Running production-build browser journeys.");
+      const browserGrep = process.argv.indexOf("--browser-grep");
+      console.log(
+        await run("npm", [
+          "run",
+          "test:e2e:full",
+          ...(browserGrep >= 0
+            ? ["--", "--grep", process.argv[browserGrep + 1]]
+            : []),
+        ]),
+      );
+    }
   }
-  console.log("Running real service-worker A → B → C upgrade journeys.");
-  const grepIndex = process.argv.indexOf("--grep");
-  await run("npm", [
-    "run",
-    "test:updates",
-    ...(grepIndex >= 0 ? ["--", "--grep", process.argv[grepIndex + 1]] : []),
-  ]);
+  if (!process.argv.includes("--integration-only")) {
+    console.log("Running real service-worker A → B → C upgrade journeys.");
+    const grepIndex = process.argv.indexOf("--grep");
+    await run("npm", [
+      "run",
+      "test:updates",
+      ...(grepIndex >= 0 ? ["--", "--grep", process.argv[grepIndex + 1]] : []),
+    ]);
+  }
 } catch (e) {
   console.error(e.message);
   for (const c of children) console.error(c.diagnostic());

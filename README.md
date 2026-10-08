@@ -2,6 +2,8 @@
 
 Lake Mendota rowing forecasts and a quick record of what actually happened on the water. Inspired by [Hannah Wayment-Steele’s original forecast](https://github.com/HWaymentSteele/mendota-weather).
 
+Project follow-ups are tracked in [TODO.md](TODO.md).
+
 The implementation uses React, TypeScript and Vite for the website, Supabase for authentication/database/background work, and Cloudflare Pages for hosting. It is designed for an invite-only pilot with public forecasts.
 
 ## Run locally
@@ -44,10 +46,10 @@ Database tests execute the SQL migrations in embedded PostgreSQL (PGlite) and ex
 
 ## Deployment and operation
 
-See [deployment instructions](docs/DEPLOYMENT.md), [implementation notes](docs/IMPLEMENTATION.md), and [pilot launch checks](docs/PILOT.md).
+See [deployment instructions](docs/DEPLOYMENT.md), [hosted test deployments](docs/STAGING.md), [implementation notes](docs/IMPLEMENTATION.md), and [pilot launch checks](docs/PILOT.md).
 
-Project follow-ups are tracked in [the project TODOs](TODO.md), including a draft request to modernize the Lake Mendota webcam feed.
+Project follow-ups are tracked in [the project TODOs](TODO.md), including the BHC lineup webhook request and a draft request to modernize the Lake Mendota webcam feed.
 
-The code has not been deployed to a hosted Supabase project or Cloudflare Pages yet. No real BHC token is committed, no pilot accounts have been created, and reminder sending is not enabled locally.
+Production deployment history is recorded in [DEPLOYMENT_STATUS.md](docs/DEPLOYMENT_STATUS.md). Lineup provider and physical iPhone checks are recorded in [LINEUPS.md](docs/LINEUPS.md), with hosted test procedures in [STAGING.md](docs/STAGING.md). No real BHC token is committed.
 
 Pilot administration is available at `/admin` with separate menu pages for activity and invitations, duplicate reconciliation, actual-time corrections, operations, and model review.
