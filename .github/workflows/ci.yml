@@ -25,7 +25,7 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - run: deno check --config supabase/functions/deno.json supabase/functions/api/index.ts supabase/functions/jobs/index.ts
+      - run: deno check --config supabase/functions/deno.json supabase/functions/api/index.ts supabase/functions/jobs/index.ts supabase/functions/staging-test/index.ts
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

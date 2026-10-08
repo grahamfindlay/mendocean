@@ -2,6 +2,8 @@
 
 See [current deployment status](DEPLOYMENT_STATUS.md) before repeating setup steps.
 
+For hosted test deployments, reusable tooling and the physical iPhone checklist, see [STAGING.md](STAGING.md). Staging has a separate backend and Pages project; production is refused by the staging mutation helpers.
+
 For activity, browser diagnostics, external health checks and the weekly owner digest, see the [monitoring setup and recovery runbook](MONITORING.md).
 
 ## 1. Supabase project

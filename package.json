@@ -17,7 +17,8 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e:full": "playwright test --config playwright.full.config.ts",
     "test:smoke": "node scripts/smoke.mjs",
-    "test:updates": "playwright test --config playwright.updates.config.ts"
+    "test:updates": "playwright test --config playwright.updates.config.ts",
+    "staging": "node scripts/staging.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
@@ -44,6 +45,10 @@
     "supabase": "2.117.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.0",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.0",
+    "wrangler": "4.147.0"
+  },
+  "overrides": {
+    "sharp": "0.35.5"
   }
 }

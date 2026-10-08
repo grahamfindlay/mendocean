@@ -9,6 +9,7 @@ import { UpdateSettings } from "./UpdateControls";
 import { reminderChannels } from "../shared/reminders";
 import { pushEnvironment } from "./pushSupport";
 import type { AccountData } from "./App";
+import StagingControls from "./StagingControls";
 export function Modal({
   title,
   onClose,
@@ -624,14 +625,18 @@ export function SettingsForm({
         </p>
       )}
       <hr />
-      <BHCConnection
-        key={account.profile.id}
-        user={account.profile.id}
-        status={account.bhc}
-        onUpdated={onUpdated}
-        focusConnection={focusConnection}
-        onViewRows={onViewRows}
-      />
+      {import.meta.env.VITE_STAGING === "true" ? (
+        <StagingControls onUpdated={onUpdated} />
+      ) : (
+        <BHCConnection
+          key={account.profile.id}
+          user={account.profile.id}
+          status={account.bhc}
+          onUpdated={onUpdated}
+          focusConnection={focusConnection}
+          onViewRows={onViewRows}
+        />
+      )}
       {account?.profile.role === "admin" && (
         <>
           <hr />

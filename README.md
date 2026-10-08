@@ -46,8 +46,8 @@ Database tests execute the SQL migrations in embedded PostgreSQL (PGlite) and ex
 
 ## Deployment and operation
 
-See [deployment instructions](docs/DEPLOYMENT.md), [implementation notes](docs/IMPLEMENTATION.md), and [pilot launch checks](docs/PILOT.md).
+See [deployment instructions](docs/DEPLOYMENT.md), [hosted test deployments](docs/STAGING.md), [implementation notes](docs/IMPLEMENTATION.md), and [pilot launch checks](docs/PILOT.md).
 
-The code has not been deployed to a hosted Supabase project or Cloudflare Pages yet. No real BHC token is committed, no pilot accounts have been created, and reminder sending is not enabled locally.
+Production deployment history is recorded in [DEPLOYMENT_STATUS.md](docs/DEPLOYMENT_STATUS.md). The lineup feature is deployed to the separate staging environment; production activation awaits physical iPhone testing. No real BHC token is committed.
 
 Pilot administration is available at `/admin` with separate menu pages for activity and invitations, duplicate reconciliation, actual-time corrections, operations, and model review.

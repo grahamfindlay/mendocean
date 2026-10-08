@@ -436,6 +436,11 @@ export default function App() {
   return (
     <div className="app-shell">
       <UpdateBanner />
+      {import.meta.env.VITE_STAGING === "true" && (
+        <div className="setup-note" role="status">
+          Mendocean Test · Separate account and fictional practice data
+        </div>
+      )}
       <header className="site-header">
         <a
           className="wordmark"
@@ -651,6 +656,11 @@ export default function App() {
                 }}
                 onRefresh={() =>
                   void act(async () => {
+                    if (import.meta.env.VITE_STAGING === "true") {
+                      await refresh();
+                      setMessage("Test lineup refreshed.");
+                      return;
+                    }
                     await api("lineups/refresh", {});
                     setMessage(
                       "Checking BHC for updates. Your saved lineup remains available while it refreshes.",
