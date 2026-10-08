@@ -40,9 +40,19 @@ beforeAll(async () => {
   await db.exec(
     "create role anon;create role authenticated;create role service_role bypassrls;create schema storage;create table storage.objects(bucket_id text,metadata jsonb);create schema auth;create table auth.users(id uuid primary key,email text);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;",
   );
-  for (const name of readdirSync("supabase/migrations")
+  const migrations = readdirSync("supabase/migrations")
     .filter((n) => n.endsWith(".sql") && !n.includes("_storage"))
-    .sort())
+    .sort();
+  // Production already applied PR #90's weather migration before lineup rollout.
+  // Exercise the real upgrade order; other database suites cover fresh installs.
+  const lineupMigration = "202610070003_lineups.sql";
+  migrations.splice(migrations.indexOf(lineupMigration), 1);
+  migrations.splice(
+    migrations.indexOf("202610080001_weather_observations.sql") + 1,
+    0,
+    lineupMigration,
+  );
+  for (const name of migrations)
     await db.exec(
       readFileSync("supabase/migrations/" + name, "utf8").replace(
         "create extension if not exists pgcrypto;",
