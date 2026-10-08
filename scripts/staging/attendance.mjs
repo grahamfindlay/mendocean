@@ -183,11 +183,9 @@ export async function attendanceSmoke() {
           .click();
         for (const name of ["Attending", "Unknown", "Not attending"])
           await page.getByRole("checkbox", { name, exact: true }).check();
-        const card = page
-          .locator(".scheduled-row-entry")
-          .filter({
-            has: page.getByRole("button", { name: new RegExp(title) }),
-          });
+        const card = page.locator(".scheduled-row-entry").filter({
+          has: page.getByRole("button", { name: new RegExp(title) }),
+        });
         assert.equal(
           await card.getByRole("button", { name: /Lineup/ }).count(),
           0,
@@ -201,6 +199,12 @@ export async function attendanceSmoke() {
           .getByRole("heading", { name: "Practice attendance" })
           .waitFor();
         await dialog.getByLabel("Your attendance").waitFor();
+        await page.waitForFunction(() => {
+          const select = document.querySelector(
+            'select[aria-label="Your attendance"]',
+          );
+          return select && !select.disabled;
+        });
         assert.equal(
           await dialog.getByLabel("Your attendance").isDisabled(),
           false,
