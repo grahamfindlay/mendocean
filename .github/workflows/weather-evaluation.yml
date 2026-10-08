@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   evaluate:
-    if: vars.PILOT_ENABLED == 'true'
+    if: vars.WEATHER_EVALUATION_ENABLED == 'true' || vars.PILOT_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
