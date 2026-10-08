@@ -9,6 +9,7 @@ import {
 } from "../shared/domain";
 import { Modal } from "./Account";
 import { api, ApiError } from "./client";
+import { AttendanceRoster } from "./AttendanceRoster";
 type Result = {
   state: AttendanceState | null;
   outcome: string;
@@ -36,6 +37,7 @@ export default function AttendanceEditor({
   const [error, setError] = useState("");
   const [needsReconnect, setNeedsReconnect] = useState(false);
   const [uncertain, setUncertain] = useState(false);
+  const stagingPractice = import.meta.env.VITE_STAGING === "true" && outing.id === "e746607c-f17f-4f59-833e-267f21fb7802";
   async function send(change = false) {
     if (!navigator.onLine) {
       setError(
@@ -68,8 +70,8 @@ export default function AttendanceEditor({
       setUncertain(result.outcome === "unconfirmed");
       if (result.message) setError(result.message);
       else if (result.outcome === "confirmed")
-        setMessage("Attendance updated in BHC.");
-      else if (!change) setMessage("Status checked with BHC.");
+        setMessage(stagingPractice ? "Attendance updated for this fictional staging practice." : "Attendance updated in BHC.");
+      else if (!change) setMessage(stagingPractice ? "Test attendance checked." : "Status checked with BHC.");
       await onRefresh();
     } catch (e) {
       if (e instanceof ApiError && e.code === "bhc_reconnect_required")
@@ -102,10 +104,11 @@ export default function AttendanceEditor({
         <br />
         {formatDate(outing.starts_at)} · {formatTime(outing.starts_at)}
       </p>
+      {stagingPractice && <p className="muted">Fictional staging practice. Attendance changes affect only this test account.</p>}
       {state && (
         <>
           <p>
-            In BHC:{" "}
+            {stagingPractice ? "Test attendance:" : "In BHC:"}{" "}
             <strong>
               {state.attendance === "attending"
                 ? "Attending"
@@ -165,17 +168,17 @@ export default function AttendanceEditor({
             </select>
           </label>
           <p className="muted">
-            Saving updates your attendance in Boathouse Connect.
+            {stagingPractice ? "Saving updates only this fictional practice." : "Saving updates your attendance in Boathouse Connect."}
           </p>
           <button
             className="primary"
             disabled={busy || !choice || choice === state?.attendance}
           >
-            Save attendance in BHC
+            {stagingPractice ? "Save test attendance" : "Save attendance in BHC"}
           </button>
         </form>
       )}
-      {busy && <p role="status">Checking with BHC…</p>}
+      {busy && <p role="status">{stagingPractice ? "Checking test attendance…" : "Checking with BHC…"}</p>}
       {message && <p role="status">{message}</p>}
       {error && <p role="alert">{error}</p>}
       {needsReconnect && (
@@ -195,6 +198,7 @@ export default function AttendanceEditor({
           Open Boathouse Connect
         </a>
       </div>
+      <AttendanceRoster outingId={outing.id} user={user} onReconnect={onReconnect} />
     </Modal>
   );
 }

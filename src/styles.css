@@ -1243,6 +1243,26 @@ button:hover:not(:disabled) {
   background: #eee;
   color: var(--ink);
 }
+.attendance-roster {
+  border-top: 1px solid var(--line);
+  margin-top: 20px;
+  padding-top: 4px;
+}
+.attendance-roster summary {
+  cursor: pointer;
+  min-height: 44px;
+  align-content: center;
+  font-weight: 600;
+}
+.attendance-roster ul {
+  list-style: none;
+  margin: 8px 0 12px;
+  padding: 0;
+}
+.attendance-roster li {
+  padding: 5px 0;
+  overflow-wrap: anywhere;
+}
 .attendance-attending {
   background: #e2ecdf;
   border-color: #b9cfb3;

@@ -203,6 +203,7 @@ export function startFixtures(secret, port = 54328) {
           );
         if (url.pathname === "/practices/getPractices") {
           if (state.failure === "lineup_read_failure") return reply(503, {});
+          if (state.failure === "roster_shape") return reply(200, [{ attendance: null }]);
           const meta = state.bhc.find(
             (p) =>
               String(p.practice_id) === url.searchParams.get("practice_id"),

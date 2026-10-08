@@ -35,6 +35,13 @@ export async function api<T>(
     throw new Error(
       "Sign back into the account that created this report before uploading it.",
     );
+  if (import.meta.env.VITE_STAGING === "true" &&
+    ["bhc/attendance", "bhc/attendance-roster"].includes(path) &&
+    body && typeof body === "object" && "outing_id" in body &&
+    body.outing_id === "e746607c-f17f-4f59-833e-267f21fb7802") {
+    const { stagingAttendance } = await import("./stagingAttendance");
+    return stagingAttendance<T>(path, body, session?.access_token);
+  }
   const response = await fetch(`${url}/functions/v1/api/${path}`, {
     method: body === undefined ? "GET" : "POST",
     headers: {

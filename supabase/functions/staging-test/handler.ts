@@ -7,12 +7,15 @@ import {
   service,
   userClient,
   query,
+  HttpError,
 } from "../_shared/runtime.ts";
+import { z } from "zod";
 import { saveLineup, sendLineup } from "../_shared/lineups.ts";
 import { collectWeather } from "../_shared/weather.ts";
 import { liveProviders, type Providers } from "../_shared/providers.ts";
 import { scenarios, scenarioAttendance, scenarioBoats } from "./scenarios.ts";
 import type { Lineup } from "../../../shared/lineups.ts";
+import { stagingPracticeAttendance } from "./attendance.ts";
 export function createStagingHandler(providers: Providers = liveProviders) {
   return async (req: Request): Promise<Response> => {
     try {
@@ -64,6 +67,10 @@ export function createStagingHandler(providers: Providers = liveProviders) {
       }
       if (uid !== env("STAGING_OWNER_ID"))
         return json(req, { error: "Staging owner required" }, 403);
+      if (input.action === "attendance" || input.action === "attendance-roster") {
+        if (dispatcher) return json(req, { error: "Owner session required" }, 403);
+        return json(req, await stagingPracticeAttendance(uid, authorization, input, providers.now()));
+      }
       if (!scenarios.includes(input.action))
         return json(req, { error: "Unknown test action" }, 400);
       const c = check(await service().rpc("staging_fixture", { uid }));
@@ -136,7 +143,9 @@ export function createStagingHandler(providers: Providers = liveProviders) {
       } finally {
         await query("sync_unlock", { user_id: uid, revision: c.revision });
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof HttpError) return json(req, { error: error.message, code: error.code }, error.status);
+      if (error instanceof z.ZodError) return json(req, { error: "Invalid test request" }, 400);
       return json(req, { error: "Staging test could not complete" }, 500);
     }
   };
