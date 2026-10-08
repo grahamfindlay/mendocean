@@ -141,6 +141,17 @@ try {
       join(work, `supabase/functions/${name}/index.ts`),
       `import { create${name === "api" ? "Api" : "Jobs"}Handler } from './handler.ts';\nimport { fixtureProviders } from '../_shared/fixture-provider.ts';\nDeno.serve(create${name === "api" ? "Api" : "Jobs"}Handler(fixtureProviders));\n`,
     );
+  // A separate composition root exercises production background execution
+  // without making the existing explicit-tick fixtures race their assertions.
+  mkdirSync(join(work, "supabase/functions/api-background"));
+  writeFileSync(
+    join(work, "supabase/functions/api-background/index.ts"),
+    `import { createApiHandler } from '../api/handler.ts';
+import { fixtureProviders } from '../_shared/fixture-provider.ts';
+import { edgeBackground } from '../_shared/bhc-background.ts';
+const handler = createApiHandler(fixtureProviders, edgeBackground);
+Deno.serve(req => handler(new Request(req.url.replace('/api-background/', '/api/'), req)));\n`,
+  );
   mkdirSync(join(work, "supabase/functions/jobs-budget"));
   writeFileSync(
     join(work, "supabase/functions/jobs-budget/index.ts"),
@@ -186,6 +197,11 @@ subject = "Your Mendocean sign-in code"
 content_path = "./supabase/templates/magic_link.html"
 [analytics]
 enabled = false
+[edge_runtime]
+policy = "per_worker"
+[functions.api-background]
+verify_jwt = false
+import_map = "./functions/deno.json"
 [functions.api]
 verify_jwt = false
 import_map = "./functions/deno.json"
@@ -232,7 +248,7 @@ import_map = "./functions/deno.json"
   const gateway = ["darwin", "win32"].includes(process.platform)
     ? "host.docker.internal"
     : net[0].IPAM.Config[0].Gateway;
-  const functionEnv = `APP_URL=http://127.0.0.1:4175\nALLOWED_ORIGINS=http://127.0.0.1:4175\nJOBS_SECRET=${secret}\nMONITOR_SECRET=${secret}-monitor\nOWNER_DIGEST_SECRET=${secret}-digest\nOWNER_EMAIL=owner@example.test\nOWNER_DIGEST_ENABLED=true\nBHC_ENCRYPTION_KEY=${randomBytes(32).toString("base64")}\nRESEND_API_KEY=synthetic\nEMAIL_FROM=Mendocean <test@example.test>\nFIXTURE_SECRET=${secret}\nFIXTURE_URL=http://${gateway}:54328\n`;
+  const functionEnv = `APP_URL=http://127.0.0.1:4175\nALLOWED_ORIGINS=http://127.0.0.1:4175\nJOBS_SECRET=${secret}\nMONITOR_SECRET=${secret}-monitor\nOWNER_DIGEST_SECRET=${secret}-digest\nOWNER_EMAIL=owner@example.test\nOWNER_DIGEST_ENABLED=true\nBHC_ENCRYPTION_KEY=${randomBytes(32).toString("base64")}\nBHC_MENDOTA_CLUB_ID=1\nBHC_PASSWORD_CONNECT_ENABLED=true\nRESEND_API_KEY=synthetic\nEMAIL_FROM=Mendocean <test@example.test>\nFIXTURE_SECRET=${secret}\nFIXTURE_URL=http://${gateway}:54328\n`;
   writeFileSync(join(work, "functions.env"), functionEnv, { mode: 0o600 });
   background(cli, [
     "functions",

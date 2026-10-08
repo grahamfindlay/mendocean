@@ -1,13 +1,7 @@
 import { attendanceState, type AttendanceChoice } from "../../../shared/bhc.ts";
+import { validateBHCConnection, recordBHCFailure } from "./bhc-connection.ts";
 import { bhcGet, list } from "./bhc.ts";
-import {
-  check,
-  enqueue,
-  HttpError,
-  query,
-  service,
-  unseal,
-} from "./runtime.ts";
+import { check, enqueue, HttpError, query, service } from "./runtime.ts";
 import { liveProviders, type Providers } from "./providers.ts";
 
 export async function manageAttendance(
@@ -27,20 +21,35 @@ export async function manageAttendance(
   );
   if (outing.kind !== "official")
     throw new HttpError(400, "Only BHC practices have attendance choices.");
-  const lock = await query("sync_lock", { user_id: uid });
+  const connection = await query("connection_get", { user_id: uid });
+  if (!connection.user_id || connection.access_state === "reconnect_required")
+    throw new HttpError(
+      409,
+      "Reconnect Boathouse Connect to continue.",
+      "bhc_reconnect_required",
+    );
+  if (connection.access_state === "membership_missing")
+    throw new HttpError(
+      409,
+      "Check your Mendota membership in BHC.",
+      "bhc_membership_missing",
+    );
+  const lock = await query("sync_lock", {
+    user_id: uid,
+    revision: connection.revision,
+  });
   if (!lock.acquired)
     throw new HttpError(
       409,
       "BHC is disconnected or syncing. Wait a moment, then check again.",
     );
   try {
-    const connection = await query("connection_get", { user_id: uid });
     if (!connection.user_id || connection.club_id !== outing.bhc_club_id)
       throw new HttpError(
         409,
         "Connect the BHC account for this practice in Account.",
       );
-    const token = await unseal(connection.ciphertext, connection.iv);
+    const token = await validateBHCConnection(connection, providers);
     const read = async () => {
       const practices = list(
         await bhcGet(
@@ -63,14 +72,20 @@ export async function manageAttendance(
           "This practice is no longer available to this BHC account. Open Boathouse Connect to check it.",
         );
       const state = attendanceState(meta, providers.now());
-      check(
-        await db.rpc("apply_bhc_attendance", {
+      const applied = check(
+        await db.rpc("apply_bhc_attendance_current", {
           uid,
+          revision: connection.revision,
           outing: outingId,
           choice: state.attendance,
           deadline: state.deadline,
         }),
       );
+      if (!applied)
+        throw new HttpError(
+          409,
+          "Your BHC connection changed. Check status again before saving.",
+        );
       return state;
     };
     let state = await read();
@@ -88,6 +103,8 @@ export async function manageAttendance(
       return { state, outcome: "blocked", message: state.reason };
     const currentConnection = await query("connection_get", { user_id: uid });
     if (
+      currentConnection.access_state !== "active" ||
+      currentConnection.revision !== connection.revision ||
       currentConnection.ciphertext !== connection.ciphertext ||
       currentConnection.club_id !== connection.club_id
     )
@@ -141,7 +158,8 @@ export async function manageAttendance(
     }
     try {
       state = await read();
-    } catch {
+    } catch (error) {
+      await recordBHCFailure(connection, error, providers);
       return {
         state: null,
         outcome: "unconfirmed",
@@ -158,8 +176,11 @@ export async function manageAttendance(
             state.reason ||
             "BHC did not confirm this change. The practice may be full or restricted. Check BHC before trying again.",
         };
+  } catch (error) {
+    await recordBHCFailure(connection, error, providers);
+    throw error;
   } finally {
-    await query("sync_unlock", { user_id: uid });
+    await query("sync_unlock", { user_id: uid, revision: connection.revision });
     // Normal read-only import refreshes lineups and practice details after reconciliation.
     await enqueue(
       "bhc_sync",

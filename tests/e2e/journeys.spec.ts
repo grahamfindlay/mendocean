@@ -58,7 +58,10 @@ async function startLog(page: Page) {
   ).toBeVisible();
 }
 async function chooseRow(page: Page) {
-  const boat = page.getByRole("group", { name: "Select your boat class", exact: true });
+  const boat = page.getByRole("group", {
+    name: "Select your boat class",
+    exact: true,
+  });
   if (!(await boat.getByRole("button", { pressed: true }).count()))
     await boat.getByRole("button", { name: "1x", exact: true }).click();
   await page.getByRole("button", { name: "2 Good", exact: true }).click();
@@ -90,6 +93,258 @@ test("production bundle cannot enable development preview", async ({
   await expect(
     page.getByRole("button", { name: "Account", exact: true }),
   ).toHaveCount(0);
+});
+test("BHC setup recommends an API key, clears secrets, and reconnects without disconnecting", async ({
+  page,
+}) => {
+  await fixtures({
+    bhc: [],
+    failure: null,
+    auth: null,
+    exchange: null,
+    clubs: [
+      { whitelabel_id: 99, whitelabel_name: "Other club" },
+      { whitelabel_id: 1, whitelabel_name: "mendota" },
+    ],
+    calls: [],
+  });
+  await loggedIn(page);
+  await page.getByRole("button", { name: "Account", exact: true }).click();
+  const connection = page.getByRole("region", {
+    name: "Boathouse Connect integration",
+  });
+  await connection
+    .getByRole("button", { name: "Connect Boathouse Connect", exact: true })
+    .click();
+  await expect(
+    connection.getByText("Recommended", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    connection.getByText("Import your practices and manage attendance.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await connection
+    .getByRole("button", { name: "Use an API key", exact: true })
+    .click();
+  await connection
+    .getByLabel("BHC API key", { exact: true })
+    .fill(syntheticToken + "-" + actor.id);
+  await connection
+    .getByRole("button", {
+      name: "Use BHC email and password instead",
+      exact: true,
+    })
+    .click();
+  await connection
+    .getByLabel("BHC email", { exact: true })
+    .fill(`fixture-${actor.id}@example.test`);
+  await connection
+    .getByLabel("BHC password", { exact: true })
+    .fill("wrong-synthetic-password");
+  await connection
+    .getByRole("button", { name: "Connect BHC", exact: true })
+    .click();
+  await expect(connection.getByRole("alert")).toContainText("didn't recognize");
+  await expect(
+    connection.getByLabel("BHC password", { exact: true }),
+  ).toHaveValue("");
+  await connection
+    .getByLabel("BHC password", { exact: true })
+    .fill("synthetic-password-only");
+  await connection
+    .getByRole("button", { name: "Connect BHC", exact: true })
+    .click();
+  await expect(
+    connection
+      .getByText("Connected. Importing practices…", { exact: true })
+      .first(),
+  ).toBeVisible();
+  await tick();
+  await expect(
+    connection.getByText("Connected · No upcoming practices found", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    connection.getByText("Renew connection by", { exact: true }),
+  ).toBeVisible();
+  await sql.query(
+    "update private.bhc_connections set expires_at=now()-interval '1 second' where user_id=$1",
+    [actor.id],
+  );
+  await page.reload();
+  await page.getByRole("button", { name: "Account", exact: true }).click();
+  await connection
+    .getByRole("button", { name: "Reconnect BHC", exact: true })
+    .click();
+  await connection
+    .getByLabel("BHC email", { exact: true })
+    .fill(`fixture-${actor.id}@example.test`);
+  await connection
+    .getByLabel("BHC password", { exact: true })
+    .fill("synthetic-password-only");
+  await connection
+    .getByRole("button", { name: "Reconnect BHC", exact: true })
+    .click();
+  await expect(connection.getByText("Connected. Importing practices…",{exact:true}).first()).toBeVisible();
+  await tick();
+  await expect(
+    connection.getByText("Connected · No upcoming practices found", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await connection
+    .getByRole("button", { name: "Change connection method", exact: true })
+    .click();
+  await connection
+    .getByRole("button", { name: "Use an API key", exact: true })
+    .click();
+  await expect(
+    connection.getByLabel("BHC API key", { exact: true }),
+  ).toHaveValue("");
+  await connection
+    .getByLabel("BHC API key", { exact: true })
+    .fill(syntheticToken + "-" + actor.id);
+  await connection
+    .getByRole("button", { name: "Connect BHC", exact: true })
+    .click();
+  await expect(connection.getByText("Connected. Importing practices…",{exact:true}).first()).toBeVisible();
+  await tick();
+  await expect(
+    connection.getByText("BHC API key", { exact: true }),
+  ).toBeVisible();
+  expect(
+    (await fixtures()).calls.filter((c: any) =>
+      c.path.endsWith("setAttendance"),
+    ),
+  ).toHaveLength(0);
+  expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain(
+    "synthetic-password-only",
+  );
+  expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain(
+    syntheticToken,
+  );
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+});
+test("BHC import polling keeps push status and modal scroll stable and continues after the delay notice", async ({
+  page,
+}) => {
+  const endpoint = "https://web.push.apple.com/" + crypto.randomUUID();
+  await api(actor, "push", {
+    subscription: {
+      endpoint,
+      keys: { auth: "synthetic", p256dh: "synthetic" },
+    },
+  });
+  await api(actor, "settings", {
+    display_name: "Synthetic",
+    reminder_channels: ["push"],
+    reminders_paused: false,
+  });
+  await page.addInitScript((endpoint) => {
+    (window as any).__pushDeviceChecks = 0;
+    Object.defineProperty(navigator, "standalone", {
+      configurable: true,
+      get: () => true,
+    });
+    Object.defineProperty(window, "Notification", {
+      configurable: true,
+      value: class {
+        static permission = "granted";
+      },
+    });
+    Object.defineProperty(window, "PushManager", {
+      configurable: true,
+      value: class {},
+    });
+    Object.defineProperty(ServiceWorkerRegistration.prototype, "pushManager", {
+      configurable: true,
+      get: () => ({
+        getSubscription: async () => {
+          ++(window as any).__pushDeviceChecks;
+          return { endpoint };
+        },
+      }),
+    });
+  }, endpoint);
+  await loggedIn(page);
+  await page.clock.install();
+  await page.getByRole("button", { name: "Account", exact: true }).click();
+  await expect(
+    page.getByText("This device is registered for push.", { exact: true }),
+  ).toBeVisible();
+  const connection = page.getByRole("region", {
+    name: "Boathouse Connect integration",
+  });
+  await connection
+    .getByRole("button", { name: "Connect Boathouse Connect", exact: true })
+    .click();
+  await connection
+    .getByRole("button", { name: "Use an API key", exact: true })
+    .click();
+  await connection
+    .getByLabel("BHC API key", { exact: true })
+    .fill(syntheticToken + "-" + actor.id);
+  await connection
+    .getByRole("button", { name: "Connect BHC", exact: true })
+    .click();
+  await expect(
+    connection.getByText("Connected. Importing practices…", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    connection.getByText("BHC API key", { exact: true }),
+  ).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  const firstRefresh = page.waitForResponse(
+    (r) => r.url().endsWith("/api/account") && r.ok(),
+  );
+  await page.clock.fastForward(4000);
+  await firstRefresh;
+  await connection.scrollIntoViewIfNeeded();
+  const position = await page
+    .getByRole("dialog")
+    .evaluate((el) => el.scrollTop);
+  for (let i = 0; i < 3; i++) {
+    const refreshed = page.waitForResponse(
+      (r) => r.url().endsWith("/api/account") && r.ok(),
+    );
+    await page.clock.fastForward(4000);
+    await refreshed;
+    await expect(
+      page.getByText("Checking this device…", { exact: true }),
+    ).toHaveCount(0);
+    expect(await page.getByRole("dialog").evaluate((el) => el.scrollTop)).toBe(
+      position,
+    );
+  }
+  expect(await page.evaluate(() => (window as any).__pushDeviceChecks)).toBe(1);
+  // Move beyond the former 80-second polling cutoff while the worker is delayed.
+  for (let i = 0; i < 18; i++) {
+    const refreshed = page.waitForResponse(
+      (r) => r.url().endsWith("/api/account") && r.ok(),
+    );
+    await page.clock.fastForward(4000);
+    await refreshed;
+  }
+  await expect(
+    connection.getByText(/The import is taking longer/),
+  ).toBeVisible();
+  await tick();
+  const refreshed = page.waitForResponse(
+    (r) => r.url().endsWith("/api/account") && r.ok(),
+  );
+  await page.clock.fastForward(4000);
+  await refreshed;
+  await expect(
+    connection.getByText("Connected · No upcoming practices found", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(connection.getByText(/The import is taking longer/)).toHaveCount(
+    0,
+  );
+  expect(await page.evaluate(() => (window as any).__pushDeviceChecks)).toBe(1);
 });
 test("real invited email OTP succeeds and an invalid code is rejected", async ({
   page,
@@ -168,7 +423,9 @@ test("imported practice prefills boat and survives report submission", async ({
     .selectOption(o.id);
   await chooseRow(page);
   await expect(
-    page.getByRole("group", { name: "Select your boat class", exact: true }).getByRole("button", { name: "2x", exact: true }),
+    page
+      .getByRole("group", { name: "Select your boat class", exact: true })
+      .getByRole("button", { name: "2x", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Save report", exact: true }).click();
   await expect.poll(async () => (await records())[0]?.boat_class).toBe("2x");
@@ -432,10 +689,16 @@ test("push setup explains dismissed permission and tests only the saved device",
   // Registration refreshes the account and then verifies this device again.
   // Wait for both real responses before clicking through the transient state.
   const refreshed = page.waitForResponse(
-    (r) => r.url().endsWith("/api/account") && r.request().method() === "GET" && r.ok(),
+    (r) =>
+      r.url().endsWith("/api/account") &&
+      r.request().method() === "GET" &&
+      r.ok(),
   );
-  const checked = page.waitForResponse(async (r) =>
-    r.url().endsWith("/api/push/status") && r.ok() && (await r.json()).registered === true,
+  const checked = page.waitForResponse(
+    async (r) =>
+      r.url().endsWith("/api/push/status") &&
+      r.ok() &&
+      (await r.json()).registered === true,
   );
   await page
     .getByRole("button", { name: "Enable push on this device", exact: true })
@@ -477,15 +740,23 @@ test("upcoming, past and saved outing actions follow server reminder state", asy
     m.createOuting(actor, { title: "Finished independent", reminder: true }),
   );
   await loggedIn(page);
-  await page.getByRole("button", { name: "Scheduled rows", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Scheduled rows", exact: true })
+    .click();
   await expect(page.getByRole("heading", { name: future.title })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Log this row" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Log this row" })).toHaveCount(
+    0,
+  );
   await page.getByRole("button", { name: "History", exact: true }).click();
-  await expect(page.getByRole("heading", { name: future.title })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: future.title })).toHaveCount(
+    0,
+  );
   await expect(page.getByRole("heading", { name: past.title })).toBeVisible();
   // Reminder state stays visible without per-row reminder controls.
   const pastCard = page.locator(".outing-card").filter({ hasText: past.title });
-  await expect(pastCard.getByRole("button", { name: /Remind me/ })).toHaveCount(0);
+  await expect(pastCard.getByRole("button", { name: /Remind me/ })).toHaveCount(
+    0,
+  );
   await page.getByRole("button", { name: "Log this row" }).click();
   await chooseRow(page);
   await page.getByRole("button", { name: "Save report", exact: true }).click();
@@ -543,7 +814,10 @@ test("Scheduled forecasts remain chart-only when model contexts are available", 
       .getByRole("button", { name: "Scheduled rows", exact: true })
       .click();
     await expect(page.locator(".weather-chart")).toHaveCount(0);
-    await page.locator(".row-card").filter({ hasText: "Model context row" }).click();
+    await page
+      .locator(".row-card")
+      .filter({ hasText: "Model context row" })
+      .click();
     await expect(page.locator('.row-card[aria-pressed="true"] h3')).toHaveText(
       "Model context row",
     );
@@ -634,7 +908,9 @@ test("production timeline offers quarter-hour inspection and selectable daily fo
     "aria-pressed",
     "true",
   );
-  await expect(page.getByText("Detailed forecast for this day", { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByText("Detailed forecast for this day", { exact: true }),
+  ).toHaveCount(0);
   await expect(page.locator(".chart-period-highlight")).toHaveCount(2);
 });
 
@@ -700,25 +976,29 @@ test("attendance changes persist in BHC, closed windows and uncertain sends stay
   await api(actor, "bhc/connect", { token: syntheticToken });
   await tick();
   await loggedIn(page);
-  await page.getByRole("button", { name: "Scheduled rows", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Scheduled rows", exact: true })
+    .click();
   await page.getByRole("checkbox", { name: "Unknown", exact: true }).check();
   const card = page.locator(".scheduled-row-entry").filter({ hasText: p.name });
-  await card
-    .getByRole("button", { name: /^Practice attendance:/ })
-    .click();
+  await card.getByRole("button", { name: /^Practice attendance:/ }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("Status checked with BHC.")).toBeVisible();
   await dialog.getByLabel("Your attendance").selectOption("attending");
   await dialog.getByRole("button", { name: "Save attendance in BHC" }).click();
   await expect(dialog.getByText("Attendance updated in BHC.")).toBeVisible();
   await dialog.getByRole("button", { name: "Close", exact: true }).click();
-  await expect(card.getByRole("button", { name: /^Practice attendance:/ })).toHaveText("Attending");
+  await expect(
+    card.getByRole("button", { name: /^Practice attendance:/ }),
+  ).toHaveText("Attending");
   await page.reload();
-  await page.getByRole("button", { name: "Scheduled rows", exact: true }).click();
-  await expect(card.getByRole("button", { name: /^Practice attendance:/ })).toHaveText("Attending");
-  await card
-    .getByRole("button", { name: /^Practice attendance:/ })
+  await page
+    .getByRole("button", { name: "Scheduled rows", exact: true })
     .click();
+  await expect(
+    card.getByRole("button", { name: /^Practice attendance:/ }),
+  ).toHaveText("Attending");
+  await card.getByRole("button", { name: /^Practice attendance:/ }).click();
   await expect(dialog.getByText("Status checked with BHC.")).toBeVisible();
   await fixtures({ failure: "attendance_unreadable" });
   await dialog.getByLabel("Your attendance").selectOption("declined");
@@ -774,15 +1054,18 @@ test("attendance changes persist in BHC, closed windows and uncertain sends stay
 test.describe("Week preference persistence", () => {
   test.use({serviceWorkers: "block"});
 test("Week periods save to the account, survive a new device, and retain choices on failure", async ({page, browser}) => {
-  await loggedIn(page);
+  // Preferences preload at sign-in, before opening the Week destination.
   await page.route('**/api/week-periods/v2', route => route.fulfill({status:503,json:{error:'Unavailable'}}));
+  await loggedIn(page);
   await page.getByRole('button',{name:'Week',exact:true}).click();
+  const status = page.locator('.week-preferences-status');
+  await expect(status.getByRole('alert')).toContainText('Could not load');
+  await expect(page.locator('.week-card, .week-periods')).toHaveCount(0);
+  await page.unroute('**/api/week-periods/v2');
+  await status.getByRole('button',{name:'Retry',exact:true}).click();
+  await expect(page.locator('.week-card')).toHaveCount(7);
   await page.getByText('Times of interest',{exact:true}).click();
   const editor = page.locator('.week-periods');
-  await expect(editor.getByRole('alert')).toContainText('Could not load');
-  await expect(editor.getByRole('button',{name:'Add period',exact:true})).toBeDisabled();
-  await page.unroute('**/api/week-periods/v2');
-  await editor.getByRole('button',{name:'Retry',exact:true}).click();
   await editor.getByRole('button',{name:'Add period',exact:true}).click();
   await editor.getByLabel('Period name').fill('Mid morning');
   await editor.getByLabel('Start time').fill('09:00');

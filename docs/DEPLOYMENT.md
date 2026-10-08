@@ -59,6 +59,8 @@ Administration → Accounts & activity (`/admin/accounts`) lets the administrato
 
 Create two Supabase Vault entries: `mendocean_project_url` and `mendocean_jobs_secret`. The second must match the Edge Function’s `JOBS_SECRET`. Run `supabase/setup_cron.sql` once. It schedules a dispatcher every five minutes; each queued action has its own due time and deduplication key. Re-running the named schedule updates the same cron job.
 
+BHC setup and manual refresh also start the account's durable queued import immediately with an API background task. Apply `202610070002_bhc_immediate_import.sql` before deploying the API and jobs functions. Account status reads resume pending import pages; the five-minute dispatcher remains the fallback for interrupted work. The immediate runner claims only that account's BHC jobs, retains connection revision checks, and never dispatches reminder jobs. A busy connection lease defers work rather than falsely marking the job done. Local background-task testing needs `[edge_runtime] policy = "per_worker"`; see [Supabase background tasks](https://supabase.com/docs/guides/functions/background-tasks).
+
 Run a first dispatch, then confirm that public weather appears and that scheduled invocations succeed. The dispatcher fetches weather every 15 minutes, polls BHC daily during the 16:00 Madison hour, and runs deadline/start/end refreshes already in the queue.
 
 Reference: [Supabase scheduling with Cron, pg_net and Vault](https://supabase.com/docs/guides/functions/schedule-functions).
@@ -86,6 +88,24 @@ Test recovery into an isolated disposable database/project before launch. Decryp
 The admin-only health endpoint lists shadow model IDs and validation metrics. Review eligibility, chronological holdout, calibration, outcome balance and sample sizes. Publishing is an explicit admin call to `models/publish` with the chosen ID. The database rejects a model trained against an older data revision. `models/rollback` retires the active model and returns forecasts to Hannah’s rule.
 
 New reports can accumulate between weekly fits; edits and deletions retire an active model. No model is approved or active on initial deployment.
+
+## BHC connection rollout
+
+The guided API-key flow and optional password exchange are implemented in [the connection plan](BHC_CONNECTION_PLAN.md). Deploy migration `202610070001_bhc_connection.sql`, then the `api` and `jobs` functions, then the frontend. Keep `BHC_PASSWORD_CONNECT_ENABLED=false` initially; it defaults to disabled when unset. This flag controls new password exchanges; existing generated tokens continue to validate normally.
+
+Pin Mendota once before member rollout. Either set the verified numeric `BHC_MENDOTA_CLUB_ID` in function secrets, or have a Mendocean administrator connect a BHC account with exactly one membership whose name contains `mendota` (case insensitive). That first match is pinned in `private.bhc_settings`; subsequent connections check the numeric ID even if BHC renames the club. Regular members cannot configure it. Do not use synthetic fixture ID `1` in production. A conflicting environment ID is rejected instead of overwriting the pinned value. Existing connections to another club become membership problems when configuration is pinned, preserving all outings and reports.
+
+Before enabling password exchange, verify the documented request, rejected-credential/expiry response semantics and recurring six-month use with BHC using a deliberate test account. Verify the signed-in My Profile link and token-creation instructions on desktop and a physical mobile device. Then enable `BHC_PASSWORD_CONNECT_ENABLED=true` for the intended release. Local fixtures test these paths without contacting BHC; they do not establish real-provider or password-manager behavior. The UI shows the password option as unavailable while the flag is disabled.
+
+Live failure checks on October 7, 2026 confirmed HTTP 200 error objects rather than the documented empty arrays: rejected credentials return `status: "Error"` with `error: "email, or password incorrect"`; rejected tokens return `status: "error"`, null token/customer IDs, and the message `Token was not found, or is expired. Do not attempt to re-use this token.` The adapter recognizes these specific responses; other unexpected errors remain temporary failures. The integration fixtures reproduce these envelopes without retaining credentials.
+
+The owner's deliberate live test on October 7, 2026 verified successful password exchange, token validation, Mendota ID 2362, Unix-second expiry metadata, deletion of newly generated test tokens and rejection after deletion. BHC returned a 365-day expiry rather than the documented six months. Mendocean uses the actual expiry; renewal copy avoids a fixed duration. No Mendocean connection, practice, attendance or notification was changed by the live test. Physical-device password-manager behavior and invalidation following a real email/password change were not tested.
+
+To repeat the live test, run `deno run --config supabase/functions/deno.json --allow-net=127.0.0.1:5184,api.boathouseconnect.com --allow-env scripts/bhc-password-contract.ts`. Open the printed local URL and enter the BHC login directly into the form. The check uses the production adapter, verifies Mendota ID 2362 and expiry metadata, and never writes to Mendocean. It deletes only a test token whose provider creation timestamp confirms it was newly generated during the test, then checks rejection after deletion. Credentials and tokens are never printed or persisted. If creation or cleanup is unconfirmed, review the BHC profile manually; do not repeat the exchange automatically. The form stops after twenty minutes or three attempts.
+
+Known expiry or verified rejection pauses BHC sync, attendance writes and official-practice reminders. Temporary provider failures retain the connection and show stale-data status. Reminder reservation and final delivery require current connection state and a practice refresh after its end. Reconnect replaces credentials atomically, imports current practices and never replays an attendance write. Disconnect erases encrypted credentials while retaining a non-secret revision tombstone and rowing history. It does not revoke tokens at BHC; users can delete their dedicated token in My Profile.
+
+For rollback, disable new password exchanges and retain this migration. Old frontend clients can continue using `bhc/connect` with a provided token, but any supplied club ID must equal Mendota's. Use the new API/workers with the schema; pre-migration workers do not contain the expiry and revision enforcement.
 
 ## Weather observations and evaluations
 

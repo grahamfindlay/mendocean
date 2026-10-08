@@ -2,14 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { Download, X } from "lucide-react";
 import { api, supabase } from "./client";
 import { track, telemetryActor, captureFailure } from "./telemetry";
-import {
-  BOAT_CLASSES,
-  chicagoToISO,
-  localDateTime,
-  formatDate,
-  formatTime,
-} from "../shared/domain";
+import { BOAT_CLASSES, chicagoToISO, localDateTime } from "../shared/domain";
 import { Link } from "react-router-dom";
+import { BHCConnection } from "./BHCConnection";
 import { UpdateSettings } from "./UpdateControls";
 import { reminderChannels } from "../shared/reminders";
 import { pushEnvironment } from "./pushSupport";
@@ -244,22 +239,24 @@ export function SettingsForm({
   onExport,
   onSignOut,
   onAdministration,
+  focusConnection,
 }: {
   account: AccountData | null;
   onUpdated: () => void;
   onExport: () => Promise<void>;
   onSignOut: () => void;
   onAdministration: () => void;
+  focusConnection?: boolean;
 }) {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const [token, setToken] = useState("");
-  const [club, setClub] = useState("");
   const [pushProgress, setPushProgress] = useState("");
   const [registered, setRegistered] = useState(false);
   const [deviceChecked, setDeviceChecked] = useState(false);
   const push = pushEnvironment();
+  const pushUser = account?.profile.id;
+  const pushDevices = account?.push_devices;
   useEffect(() => {
     let active = true;
     setDeviceChecked(false);
@@ -268,7 +265,7 @@ export function SettingsForm({
       !push.supported ||
       push.permission !== "granted" ||
       (push.ios && !push.installed) ||
-      !account
+      !pushUser
     ) {
       setDeviceChecked(true);
       return;
@@ -279,9 +276,13 @@ export function SettingsForm({
       .then(async (subscription) => {
         if (!subscription) return false;
         return (
-          await api<{ registered: boolean }>("push/status", {
-            endpoint: subscription.endpoint,
-          })
+          await api<{ registered: boolean }>(
+            "push/status",
+            {
+              endpoint: subscription.endpoint,
+            },
+            pushUser,
+          )
         ).registered;
       })
       .then((value) => {
@@ -296,7 +297,14 @@ export function SettingsForm({
     return () => {
       active = false;
     };
-  }, [account, push.supported, push.permission, push.ios, push.installed]);
+  }, [
+    pushUser,
+    pushDevices,
+    push.supported,
+    push.permission,
+    push.ios,
+    push.installed,
+  ]);
   const [pushAction, setPushAction] = useState<"enable" | "test" | null>(null);
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -579,101 +587,13 @@ export function SettingsForm({
         </p>
       )}
       <hr />
-      <h3>Boathouse Connect</h3>
-      <p className="help">
-        Optional. Import your practices and planned lineups. Your app login is
-        separate.
-      </p>
-      {account?.bhc.connected ? (
-        <>
-          <p>
-            Connected
-            {account.bhc.last_sync
-              ? " · Synced " +
-                formatDate(account.bhc.last_sync) +
-                " " +
-                formatTime(account.bhc.last_sync)
-              : ""}
-          </p>
-          {account.bhc.last_error && (
-            <p className="alert">{account.bhc.last_error}</p>
-          )}
-          <div className="card-actions">
-            <button
-              className="button subtle"
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  await api("bhc/sync", {});
-                  setMessage(
-                    "Practice refresh queued. Check back in a few minutes.",
-                  );
-                })
-              }
-            >
-              Refresh practices
-            </button>
-            <button
-              className="text-button danger"
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  await api("bhc/disconnect", {});
-                  track(
-                    "bhc_connection_changed",
-                    { action: "disconnect" },
-                    account.profile.id,
-                  );
-                  setMessage("Disconnected. Existing reports are preserved.");
-                })
-              }
-            >
-              Disconnect
-            </button>
-          </div>
-        </>
-      ) : (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void run(async () => {
-              await api("bhc/connect", {
-                token,
-                club_id: club ? Number(club) : undefined,
-              });
-              track(
-                "bhc_connection_changed",
-                { action: "connect" },
-                account.profile.id,
-              );
-              setToken("");
-              setMessage("Connected. Your practices are being imported.");
-            });
-          }}
-        >
-          <label>
-            BHC API token
-            <input
-              type="password"
-              autoComplete="off"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              required
-            />
-          </label>
-          <label>
-            Club ID (only if you belong to multiple clubs)
-            <input
-              inputMode="numeric"
-              value={club}
-              onChange={(e) => setClub(e.target.value)}
-            />
-          </label>
-          <button className="button subtle" disabled={busy}>
-            Connect account
-          </button>
-        </form>
-      )}
+      <BHCConnection
+        key={account.profile.id}
+        user={account.profile.id}
+        status={account.bhc}
+        onUpdated={onUpdated}
+        focusConnection={focusConnection}
+      />
       {account?.profile.role === "admin" && (
         <>
           <hr />
@@ -696,13 +616,6 @@ export function SettingsForm({
           {error}
         </p>
       )}
-      <p className="help">
-        Mendocean records account activity and save, sync, and reminder outcomes
-        to help keep the app working. When usage analytics is enabled, it also
-        collects feature-use events and sanitized errors. Sign-in codes, BHC
-        credentials, and private report contents are excluded. Session recording
-        is disabled.
-      </p>
       <hr />
       <button className="text-button" onClick={onSignOut}>
         Sign out

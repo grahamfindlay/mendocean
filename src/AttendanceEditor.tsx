@@ -8,7 +8,7 @@ import {
   type Outing,
 } from "../shared/domain";
 import { Modal } from "./Account";
-import { api } from "./client";
+import { api, ApiError } from "./client";
 type Result = {
   state: AttendanceState | null;
   outcome: string;
@@ -20,18 +20,21 @@ export default function AttendanceEditor({
   now,
   onClose,
   onRefresh,
+  onReconnect,
 }: {
   outing: Outing;
   user: string;
   now: number;
   onClose: () => void;
   onRefresh: () => Promise<void>;
+  onReconnect: () => void;
 }) {
   const [state, setState] = useState<AttendanceState | null>(null);
   const [choice, setChoice] = useState<AttendanceChoice | "">("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [needsReconnect, setNeedsReconnect] = useState(false);
   const [uncertain, setUncertain] = useState(false);
   async function send(change = false) {
     if (!navigator.onLine) {
@@ -69,6 +72,9 @@ export default function AttendanceEditor({
       else if (!change) setMessage("Status checked with BHC.");
       await onRefresh();
     } catch (e) {
+      if (e instanceof ApiError && e.code === "bhc_reconnect_required")
+        setNeedsReconnect(true);
+      void onRefresh();
       setUncertain(change || uncertain);
       setError(
         change
@@ -172,6 +178,11 @@ export default function AttendanceEditor({
       {busy && <p role="status">Checking with BHC…</p>}
       {message && <p role="status">{message}</p>}
       {error && <p role="alert">{error}</p>}
+      {needsReconnect && (
+        <button className="button" onClick={onReconnect}>
+          Reconnect BHC
+        </button>
+      )}
       <div className="card-actions">
         <button
           className="text-button"

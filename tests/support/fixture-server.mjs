@@ -2,6 +2,9 @@ import { createServer } from "node:http";
 export function startFixtures(secret, port = 54328) {
   let heldAttendance = [];
   let state = {
+    clubs: [{ whitelabel_id: 1, whitelabel_name: "mendota" }],
+    auth: null,
+    exchange: null,
     bhc: [],
     lineup: false,
     failure: null,
@@ -75,6 +78,40 @@ export function startFixtures(secret, port = 54328) {
         method: data.method,
       }); // Never retain token-bearing URLs.
       if (url.hostname === "api.boathouseconnect.com") {
+        if (url.pathname === "/authenticate/generateApiToken") {
+          const form = new URLSearchParams(data.body);
+          if (data.method !== "POST" || form.get("apptokentype") !== "api")
+            return reply(400, {});
+          if (state.exchange === "unavailable") return reply(503, {});
+          if (state.exchange === "malformed")
+            return reply(200, { unexpected: true });
+          if (
+            form.get("password") !== "synthetic-password-only" ||
+            state.exchange === "invalid"
+          )
+            return reply(200, {
+              status: "Error",
+              error: "email, or password incorrect",
+              email: form.get("email"),
+            });
+          const identity =
+            form
+              .get("email")
+              ?.match(/^fixture-([a-f0-9-]+)@example.test$/)?.[1] || "default";
+          return reply(200, {
+            status: "Success",
+            token:
+              "synthetic-bhc-token-for-tests-only-" + identity + "-generated",
+          });
+        }
+        const token = url.searchParams.get("token") || "";
+        const identity = token
+          .slice("synthetic-bhc-token-for-tests-only-".length)
+          .replace(/-/g, "")
+          .slice(0, 12);
+        const custid = /^[a-f0-9]{12}$/.test(identity)
+          ? parseInt(identity, 16) + 1
+          : 101;
         if (url.pathname === "/practices/setAttendance") {
           if (state.hold_attendance)
             await new Promise((resolve) => heldAttendance.push(resolve));
@@ -83,7 +120,7 @@ export function startFixtures(secret, port = 54328) {
             data.method !== "POST" ||
             form.has("custid") ||
             form.get("whitelabel_id") !== "1" ||
-            form.get("token") !== "synthetic-bhc-token-for-tests-only"
+            !form.get("token")?.startsWith("synthetic-bhc-token-for-tests-only")
           )
             return reply(400, {});
           const p = state.bhc.find(
@@ -106,17 +143,43 @@ export function startFixtures(secret, port = 54328) {
           return reply(200, { status: "success" });
         }
         if (state.failure === "attendance_read_failed") return reply(503, {});
-        if (
-          state.failure === "bhc" ||
-          url.searchParams.get("token")?.startsWith("invalid")
-        )
+        if (state.failure === "bhc" || token.startsWith("invalid"))
           return reply(401, {});
         if (state.failure === "malformed")
           return reply(200, { unexpected: true });
         if (url.pathname === "/authenticate/checkApiKey")
-          return reply(200, { custid: 101 });
+          return reply(
+            200,
+            state.auth === "invalid"
+              ? {
+                  status: "error",
+                  message:
+                    "Token was not found, or is expired. Do not attempt to re-use this token.",
+                  token_id: null,
+                  custid: null,
+                  token_hash: null,
+                  expires: 0,
+                  type: null,
+                  created_at: null,
+                  last_used: null,
+                  descr: null,
+                }
+              : {
+                  custid,
+                  ...(state.auth === "expired"
+                    ? { expires: Math.floor(Date.now() / 1000) - 1 }
+                    : state.auth === "unknown"
+                      ? {}
+                      : token.endsWith("-generated")
+                        ? {
+                            expires:
+                              Math.floor(Date.now() / 1000) + 180 * 86400,
+                          }
+                        : {}),
+                },
+          );
         if (url.pathname === "/users/getAllWhitelabels")
-          return reply(200, [{ whitelabel_id: 1 }]);
+          return reply(200, state.clubs);
         if (url.pathname === "/equipment/getAllBoats")
           return reply(200, [
             { boat_id: 7, boat_type: 2, rigging: "sculling" },
@@ -131,7 +194,7 @@ export function startFixtures(secret, port = 54328) {
             {
               attendance: [
                 {
-                  custid: 101,
+                  custid,
                   lineup_boat: state.lineup ? 7 : null,
                   lineup_seat: "2",
                 },

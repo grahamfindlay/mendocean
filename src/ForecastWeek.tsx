@@ -1,6 +1,6 @@
 import { useState } from "react";
 import WeekPeriodsEditor from "./WeekPeriodsEditor";
-import { useWeekPeriods } from "./useWeekPeriods";
+import { useWeekPeriodPreferences } from "./WeekPeriodsProvider";
 import { periodsForDay } from "../shared/weekPeriods";
 import {
   formatDate,
@@ -43,7 +43,6 @@ function PeriodLabel({ window: w }: { window: PracticeWindow }) {
 
 export default function ForecastWeek({
   weather,
-  userId,
   days,
   today,
   daySamples,
@@ -52,7 +51,6 @@ export default function ForecastWeek({
   onSelectDay,
 }: {
   weather: Forecast;
-  userId?: string;
   days: string[];
   day: string;
   today: string;
@@ -61,8 +59,27 @@ export default function ForecastWeek({
   now: number;
   onSelectDay: (day: string) => void;
 }) {
-  const preferences = useWeekPeriods(userId);
+  const preferences = useWeekPeriodPreferences();
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
+  if (!preferences.ready) {
+    return (
+      <section
+        className="week-preferences-status"
+        aria-busy={preferences.loading}
+      >
+        {preferences.loading ? (
+          <p role="status">Loading your forecast periods…</p>
+        ) : (
+          <>
+            <p role="alert">{preferences.error}</p>
+            <button type="button" onClick={preferences.retry}>
+              Retry
+            </button>
+          </>
+        )}
+      </section>
+    );
+  }
   const summaries = days.map((date) => ({
     date,
     windows: practiceWindows(

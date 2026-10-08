@@ -21,13 +21,15 @@ const operations = new Set([
   "dispatcher",
 ]);
 export const operationName = (path: string) =>
-  operations.has(path)
-    ? path
-    : path.startsWith("admin/")
-      ? "admin"
-      : path.startsWith("push/")
-        ? "push"
-        : "unknown";
+  path === "bhc/connect-password"
+    ? "bhc/connect"
+    : operations.has(path)
+      ? path
+      : path.startsWith("admin/")
+        ? "admin"
+        : path.startsWith("push/")
+          ? "push"
+          : "unknown";
 export async function monitoring(
   action: string,
   args: Record<string, unknown> = {},
