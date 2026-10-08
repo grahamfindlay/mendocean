@@ -25,6 +25,55 @@ test.beforeEach(async ({ page }) => {
     }),
   );
 });
+for (const signedIn of [false, true]) {
+  test(`BHC API key guide preserves setup when returning from ${signedIn ? "API Keys" : "login and Dashboard"}`, async ({ page, context }, testInfo) => {
+    if (testInfo.project.name.startsWith("phone"))
+      await page.setViewportSize({ width: 320, height: 740 });
+    // Simulate both known provider landing pages; never send a real BHC request.
+    await context.route("https://app.boathouseconnect.com/**", (route) => {
+      const dashboard = new URL(route.request().url()).pathname === "/dashboard";
+      return route.fulfill({
+        contentType: "text/html",
+        body: signedIn
+          ? "<h1>API Keys</h1>"
+          : dashboard
+            ? "<h1>Dashboard</h1>"
+            : '<h1>BHC login fixture</h1><a href="/dashboard">Continue</a>',
+      });
+    });
+    await page.goto("/?preview=1");
+    await page.getByRole("button", { name: "Account", exact: true }).click();
+    const connection = page.getByRole("region", { name: "Boathouse Connect integration" });
+    await connection.getByRole("button", { name: "Connect Boathouse Connect", exact: true }).click();
+    await connection.getByRole("button", { name: "Use an API key", exact: true }).click();
+    const key = connection.getByLabel("BHC API key", { exact: true });
+    await key.fill("synthetic-key-preserved-on-return");
+    await expect(page.getByRole("dialog")).toBeVisible();
+    expect(await page.getByRole("dialog").evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+    const popupReady = page.waitForEvent("popup");
+    await connection.getByRole("link", { name: "Open BHC API Keys", exact: true }).click();
+    const popup = await popupReady;
+    await expect(popup).toHaveURL("https://app.boathouseconnect.com/profile/api");
+    await popup.waitForLoadState("domcontentloaded");
+    expect(await popup.evaluate(() => ({ opener: window.opener === null, referrer: document.referrer }))).toEqual({ opener: true, referrer: "" });
+    if (!signedIn) {
+      await popup.getByRole("link", { name: "Continue", exact: true }).click();
+      await expect(popup.getByRole("heading", { name: "Dashboard", exact: true })).toBeVisible();
+    }
+    await popup.close();
+    await expect(connection.getByRole("heading", { name: "Connect using an API key", exact: true })).toBeVisible();
+    await expect(key).toHaveValue("synthetic-key-preserved-on-return");
+    await expect(connection.getByRole("button", { name: "Connect BHC", exact: true })).toBeEnabled();
+    await page.getByRole("button", { name: "Close", exact: true }).click();
+    await page.getByRole("button", { name: "Account", exact: true }).click();
+    await connection.getByRole("button", { name: "Connect Boathouse Connect", exact: true }).click();
+    await connection.getByRole("button", { name: "Use an API key", exact: true }).click();
+    await expect(key).toHaveValue("");
+    await connection.locator(".bhc-steps").scrollIntoViewIfNeeded();
+    if (signedIn)
+      await page.screenshot({ path: `test-results/bhc-guide-${testInfo.project.name}.png` });
+  });
+}
 test("public forecast, planner, and invitation boundary", async ({ page }) => {
   await page.goto("/");
   await expect(

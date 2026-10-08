@@ -89,7 +89,11 @@ export function startFixtures(secret, port = 54328) {
             form.get("password") !== "synthetic-password-only" ||
             state.exchange === "invalid"
           )
-            return reply(200, []);
+            return reply(200, {
+              status: "Error",
+              error: "email, or password incorrect",
+              email: form.get("email"),
+            });
           const identity =
             form
               .get("email")
@@ -147,7 +151,19 @@ export function startFixtures(secret, port = 54328) {
           return reply(
             200,
             state.auth === "invalid"
-              ? []
+              ? {
+                  status: "error",
+                  message:
+                    "Token was not found, or is expired. Do not attempt to re-use this token.",
+                  token_id: null,
+                  custid: null,
+                  token_hash: null,
+                  expires: 0,
+                  type: null,
+                  created_at: null,
+                  last_used: null,
+                  descr: null,
+                }
               : {
                   custid,
                   ...(state.auth === "expired"

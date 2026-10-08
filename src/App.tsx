@@ -831,11 +831,6 @@ export default function App() {
           <SettingsForm
             account={account}
             focusConnection={focusBHC}
-            onViewRows={() => {
-              setSettings(false);
-              setFocusBHC(false);
-              setTab("Rows");
-            }}
             onExport={async () =>
               download(
                 "mendocean-my-data.json",

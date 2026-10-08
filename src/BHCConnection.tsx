@@ -81,13 +81,11 @@ export function BHCConnection({
   status,
   onUpdated,
   focusConnection = false,
-  onViewRows,
 }: {
   user: string;
   status: BHCConnectionStatus;
   onUpdated: () => void;
   focusConnection?: boolean;
-  onViewRows?: () => void;
 }) {
   const id = useId();
   const section = useRef<HTMLElement>(null);
@@ -109,6 +107,7 @@ export function BHCConnection({
   const [message, setMessage] = useState("");
   const [polling, setPolling] = useState(false);
   const [delay, setDelay] = useState(false);
+  const [pollStopped, setPollStopped] = useState(false);
   const refresh = useRef(onUpdated);
   refresh.current = onUpdated;
   const needsReconnect = status.state === "reconnect_required";
@@ -129,22 +128,27 @@ export function BHCConnection({
     setStep(next);
   }
   useEffect(() => {
-    if (delay || (!polling && status.state !== "importing")) return;
+    if (pollStopped || (!polling && status.state !== "importing")) return;
     let count = 0;
     const timer = setInterval(() => {
       refresh.current();
-      if (++count >= 20) {
+      ++count;
+      if (count === 20) setDelay(true);
+      // The durable worker may need a five-minute dispatch plus import pages.
+      // Keep checking after the delay notice rather than freezing the status.
+      if (count >= 150) {
         clearInterval(timer);
         setPolling(false);
-        setDelay(true);
+        setPollStopped(true);
       }
     }, 4000);
     return () => clearInterval(timer);
-  }, [polling, status.state, delay]);
+  }, [polling, status.state, pollStopped]);
   useEffect(() => {
-    if (status.state === "healthy") {
+    if (status.state && status.state !== "importing") {
       setPolling(false);
       setDelay(false);
+      setPollStopped(false);
       setMessage("");
     }
   }, [status.state, status.last_sync]);
@@ -169,6 +173,7 @@ export function BHCConnection({
         user,
       );
       setDelay(false);
+      setPollStopped(false);
       setPolling(true);
       route("status");
       setMessage("Connected. Importing practices…");
@@ -200,8 +205,12 @@ export function BHCConnection({
       if (action === "sync") {
         setMessage("Practice refresh queued.");
         setDelay(false);
+        setPollStopped(false);
         setPolling(true);
       } else {
+        setPolling(false);
+        setDelay(false);
+        setPollStopped(false);
         route("status");
         track("bhc_connection_changed", { action: "disconnect" }, user);
       }
@@ -299,11 +308,6 @@ export function BHCConnection({
                   Refresh practices
                 </button>
               )}
-              {status.state === "healthy" && onViewRows && (
-                <button className="button subtle" onClick={onViewRows}>
-                  View my rows
-                </button>
-              )}
               <div className="card-actions">
                 <button
                   className="text-button"
@@ -353,7 +357,7 @@ export function BHCConnection({
           </button>
           <p className="help">
             {status.password_enabled
-              ? "Requires reconnecting every six months, or if your BHC email or password changes."
+              ? "Requires reconnecting when the connection expires, or if your BHC email or password changes."
               : "Password connection is currently unavailable."}
           </p>
           <button className="text-button" onClick={() => route("status")}>
@@ -379,20 +383,36 @@ export function BHCConnection({
           {step === "key" && (
             <ol className="bhc-steps">
               <li>
-                Open your profile in BHC.
-                <p>
-                  <a
-                    className="button subtle"
-                    href="https://app.boathouseconnect.com/profile/myprofile"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Open BHC profile
-                  </a>
+                <a
+                  className="button subtle"
+                  href="https://app.boathouseconnect.com/profile/api"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open BHC API Keys
+                </a>
+                <p className="help">
+                  Sign in if needed. If BHC opens Dashboard, choose{" "}
+                  <strong>My Profile → API Keys</strong>.
                 </p>
               </li>
-              <li>Create an API token named Mendocean.</li>
-              <li>Copy it and return here.</li>
+              <li>
+                Select <strong>+</strong> to create a key.
+              </li>
+              <li>
+                Keep <strong>Token Type</strong> as{" "}
+                <strong>General API Token</strong>. Enter{" "}
+                <strong>Mendocean</strong> in <strong>Description</strong>, then
+                select <strong>Save</strong>.
+              </li>
+              <li>
+                Copy the new key at the bottom of the page. Return here, paste
+                it below, and select{" "}
+                <strong>
+                  {needsReconnect ? "Reconnect BHC" : "Connect BHC"}
+                </strong>
+                .
+              </li>
             </ol>
           )}
           <form onSubmit={(e) => void connect(e)}>
@@ -469,8 +489,8 @@ export function BHCConnection({
                   We use your password to connect to BHC and don't save it.
                 </p>
                 <p className="help">
-                  Requires reconnecting every six months, or if your BHC email
-                  or password changes.
+                  Requires reconnecting when the connection expires, or if your
+                  BHC email or password changes.
                 </p>
               </>
             )}
@@ -516,11 +536,15 @@ export function BHCConnection({
           </a>
         </p>
       )}
-      {message && (
-        <p className="notice" role="status">
-          {message}
-        </p>
-      )}
+      {message &&
+        !(
+          message === "Connected. Importing practices…" &&
+          status.state === "importing"
+        ) && (
+          <p className="notice" role="status">
+            {message}
+          </p>
+        )}
       {delay && (
         <p role="status">
           The import is taking longer than expected. You can keep using

@@ -116,15 +116,25 @@ export function createJobsHandler(
         }
         try {
           if (job.kind === "weather") await collectWeather(providers);
-          else if (job.kind === "bhc_sync")
-            await syncBHC(
+          else if (job.kind === "bhc_sync") {
+            const result = await syncBHC(
               job.user_id,
               job.payload?.initial,
               job.payload?.after_id || 0,
               providers,
               job.payload?.revision,
+              job.payload?.run_id || String(job.id),
             );
-          else if (job.kind === "lineup_poll")
+            if (result === "busy") {
+              await query("job_finish", {
+                id: job.id,
+                status: "pending",
+                due_at: new Date(Date.now() + 15000).toISOString(),
+              });
+              results.push({ id: job.id, status: "deferred" });
+              continue;
+            }
+          } else if (job.kind === "lineup_poll")
             await pollLineups(job.user_id, job.payload.revision, providers);
           else if (job.kind === "lineup_notify")
             await sendLineup(

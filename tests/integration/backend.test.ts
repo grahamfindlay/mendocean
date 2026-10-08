@@ -57,6 +57,131 @@ const row = (
   o: ReturnType<typeof import("../support/stack").outing>,
   changes = {},
 ) => report({ actual_start: o.starts_at, actual_end: o.ends_at, ...changes });
+async function immediateAPI(actor: Actor, path: string, body?: unknown) {
+  const r = await fetch(`${url}/functions/v1/api-background/${path}`, {
+    method: body === undefined ? "GET" : "POST",
+    headers: {
+      apikey: anon,
+      Authorization: `Bearer ${actor.token}`,
+      "Content-Type": "application/json",
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  return { status: r.status, data: await r.json() };
+}
+test.each(["provided_token", "password_exchange"])(
+  "BHC %s imports all pages without a scheduled tick and leaves other users' jobs alone",
+  async (method) => {
+    const base = method === "provided_token" ? 880000 : 881000;
+    await fixtures({
+      bhc: Array.from({ length: 15 }, (_, i) => practice(base + i)),
+    });
+    await api(b, "bhc/connect", { token: syntheticToken });
+    const input =
+      method === "provided_token"
+        ? { token: syntheticToken + "-" + a.id }
+        : {
+            email: `fixture-${a.id}@example.test`,
+            password: "synthetic-password-only",
+          };
+    expect(
+      (
+        await immediateAPI(
+          a,
+          method === "provided_token" ? "bhc/connect" : "bhc/connect-password",
+          input,
+        )
+      ).status,
+    ).toBe(200);
+    await expect
+      .poll(async () => (await api(a, "account")).data.bhc.state, {
+        timeout: 15000,
+      })
+      .toBe("healthy");
+    expect(
+      (
+        await sql.query(
+          "select count(*) from outings o join outing_members m on m.outing_id=o.id where m.user_id=$1 and o.bhc_practice_id between $2 and $3",
+          [a.id, base, base + 14],
+        )
+      ).rows[0].count,
+    ).toBe("15");
+    expect(
+      (
+        await sql.query(
+          "select status from private.jobs where user_id=$1 and kind='bhc_sync'",
+          [b.id],
+        )
+      ).rows.every((j) => j.status === "pending"),
+    ).toBe(true);
+    expect((await fixtures()).deliveries).toHaveLength(0);
+    // Explicit refresh must still enqueue after an earlier job in this time
+    // bucket has finished, rather than reporting queued for a completed key.
+    for (let i = 15; i < 17; i++) {
+      await fixtures({
+        bhc: Array.from({ length: i + 1 }, (_, n) => practice(base + n)),
+      });
+      expect((await immediateAPI(a, "bhc/sync", {})).status).toBe(200);
+      await expect
+        .poll(
+          async () =>
+            (
+              await sql.query(
+                "select count(*) from outings o join outing_members m on m.outing_id=o.id where m.user_id=$1 and o.bhc_practice_id between $2 and $3",
+                [a.id, base, base + i],
+              )
+            ).rows[0].count,
+          { timeout: 15000 },
+        )
+        .toBe(String(i + 1));
+      await expect
+        .poll(
+          async () =>
+            (
+              await sql.query(
+                "select count(*) from private.jobs where user_id=$1 and kind='bhc_sync' and status='running'",
+                [a.id],
+              )
+            ).rows[0].count,
+          { timeout: 15000 },
+        )
+        .toBe("0");
+    }
+    await api(a, "bhc/disconnect", {});
+    await api(b, "bhc/disconnect", {});
+  },
+);
+test("a busy BHC lease defers a queued import instead of marking it done", async () => {
+  await api(a, "bhc/connect", { token: syntheticToken });
+  await sql.query(
+    "update private.bhc_connections set sync_locked_until=now()+interval '1 minute' where user_id=$1",
+    [a.id],
+  );
+  await tick();
+  expect(
+    (
+      await sql.query(
+        "select status from private.jobs where user_id=$1 and kind='bhc_sync'",
+        [a.id],
+      )
+    ).rows[0].status,
+  ).toBe("pending");
+  await sql.query(
+    "update private.bhc_connections set sync_locked_until=null where user_id=$1",
+    [a.id],
+  );
+  await sql.query(
+    "update private.jobs set due_at=now() where user_id=$1 and kind='bhc_sync'",
+    [a.id],
+  );
+  await immediateAPI(a, "account");
+  await expect
+    .poll(async () => (await api(a, "account")).data.bhc.state, {
+      timeout: 15000,
+    })
+    .toBe("healthy");
+  await api(a, "bhc/disconnect", {});
+});
 test("BHC password connection validates membership/expiry and persists only an encrypted token", async () => {
   await fixtures({
     clubs: [
@@ -120,6 +245,8 @@ test("failed credential/membership/expiry checks preserve the existing BHC conne
   let response = await api(a, "bhc/connect-password", input);
   expect(response.status).toBe(400);
   expect(response.data.code).toBe("bhc_credentials");
+  expect(JSON.stringify(response.data)).not.toContain(input.email);
+  expect(JSON.stringify(response.data)).not.toContain(input.password);
   await fixtures({
     clubs: [{ whitelabel_id: 99, whitelabel_name: "Another club" }],
   });

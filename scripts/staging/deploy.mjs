@@ -19,19 +19,41 @@ export async function migrate() {
   await query(
     "create schema if not exists supabase_migrations; create table if not exists supabase_migrations.schema_migrations(version text primary key, statements text[], name text)",
   );
-  const applied = new Set(
+  const files = readdirSync(resolve(root, "supabase/migrations"))
+    .filter((f) => /^\d+_.+\.sql$/.test(f))
+    .sort();
+  if (new Set(files.map((f) => f.split("_")[0])).size !== files.length)
+    throw new Error("Duplicate migration versions; resolve before deploying.");
+  // The first staging deployment used 002 for lineups. Main subsequently used
+  // 002 for immediate imports. Relocate only the exact known lineup SQL record;
+  // retain its applied schema/data, then apply the newly introduced 002 normally.
+  const lineupSQL = readFileSync(
+    resolve(root, "supabase/migrations/202610070003_lineups.sql"),
+    "utf8",
+  );
+  await query(
+    `update supabase_migrations.schema_migrations set version='202610070003'
+     where version='202610070002' and name='lineups'
+     and statements=array[${literal(lineupSQL)}]
+     and not exists(select 1 from supabase_migrations.schema_migrations where version='202610070003')`,
+  );
+  const applied = new Map(
     (
       await query(
-        "select version from supabase_migrations.schema_migrations",
+        "select version,name from supabase_migrations.schema_migrations",
         true,
       )
-    ).map((x) => x.version),
+    ).map((x) => [x.version, x.name]),
   );
-  for (const file of readdirSync(resolve(root, "supabase/migrations"))
-    .filter((f) => /^\d+_.+\.sql$/.test(f))
-    .sort()) {
+  for (const file of files) {
     const [version, ...rest] = file.replace(/\.sql$/, "").split("_");
-    if (applied.has(version)) continue;
+    if (applied.has(version)) {
+      if (applied.get(version) !== rest.join("_"))
+        throw new Error(
+          "Migration history differs from repository: " + version,
+        );
+      continue;
+    }
     const sql = readFileSync(
       resolve(root, "supabase/migrations", file),
       "utf8",

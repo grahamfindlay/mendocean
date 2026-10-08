@@ -81,7 +81,10 @@ export async function generateBHCToken(
       );
     if (!response.ok) throw new Error();
     const raw = await response.json();
-    if (Array.isArray(raw) && raw.length === 0)
+    if (
+      (Array.isArray(raw) && raw.length === 0) ||
+      (raw?.status === "Error" && raw?.error === "email, or password incorrect")
+    )
       throw new HttpError(
         400,
         "BHC didn't recognize that email and password. Check them and try again.",

@@ -241,7 +241,6 @@ export function SettingsForm({
   onSignOut,
   onAdministration,
   focusConnection,
-  onViewRows,
 }: {
   account: AccountData | null;
   onUpdated: () => void;
@@ -249,7 +248,6 @@ export function SettingsForm({
   onSignOut: () => void;
   onAdministration: () => void;
   focusConnection?: boolean;
-  onViewRows?: () => void;
 }) {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -258,6 +256,8 @@ export function SettingsForm({
   const [registered, setRegistered] = useState(false);
   const [deviceChecked, setDeviceChecked] = useState(false);
   const push = pushEnvironment();
+  const pushUser = account?.profile.id;
+  const pushDevices = account?.push_devices;
   useEffect(() => {
     let active = true;
     setDeviceChecked(false);
@@ -266,7 +266,7 @@ export function SettingsForm({
       !push.supported ||
       push.permission !== "granted" ||
       (push.ios && !push.installed) ||
-      !account
+      !pushUser
     ) {
       setDeviceChecked(true);
       return;
@@ -277,9 +277,13 @@ export function SettingsForm({
       .then(async (subscription) => {
         if (!subscription) return false;
         return (
-          await api<{ registered: boolean }>("push/status", {
-            endpoint: subscription.endpoint,
-          })
+          await api<{ registered: boolean }>(
+            "push/status",
+            {
+              endpoint: subscription.endpoint,
+            },
+            pushUser,
+          )
         ).registered;
       })
       .then((value) => {
@@ -294,7 +298,14 @@ export function SettingsForm({
     return () => {
       active = false;
     };
-  }, [account, push.supported, push.permission, push.ios, push.installed]);
+  }, [
+    pushUser,
+    pushDevices,
+    push.supported,
+    push.permission,
+    push.ios,
+    push.installed,
+  ]);
   const [pushAction, setPushAction] = useState<"enable" | "test" | null>(null);
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -634,7 +645,6 @@ export function SettingsForm({
           status={account.bhc}
           onUpdated={onUpdated}
           focusConnection={focusConnection}
-          onViewRows={onViewRows}
         />
       )}
       {account?.profile.role === "admin" && (
@@ -659,13 +669,6 @@ export function SettingsForm({
           {error}
         </p>
       )}
-      <p className="help">
-        Mendocean records account activity and save, sync, and reminder outcomes
-        to help keep the app working. When usage analytics is enabled, it also
-        collects feature-use events and sanitized errors. Sign-in codes, BHC
-        credentials, and private report contents are excluded. Session recording
-        is disabled.
-      </p>
       <hr />
       <button className="text-button" onClick={onSignOut}>
         Sign out

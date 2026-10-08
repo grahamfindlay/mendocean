@@ -82,6 +82,8 @@ test("pinning is permanent and connection requests are serialized/idempotent", a
   expect(
     (await db.query("select * from private.jobs where kind='bhc_sync'")).rows,
   ).toHaveLength(1);
+  const queued = (await db.query<{ payload: any }>("select payload from private.jobs where kind='bhc_sync'")).rows[0];
+  expect(queued.payload.revision).toBe((await query("connection_get", { user_id: ALICE })).revision);
 });
 test("failed replacement preserves credentials and blocks changing the athlete or linking it twice", async () => {
   const before = await query("connection_get", { user_id: ALICE });
@@ -215,4 +217,39 @@ test("a late failed request cannot release the newer setup lease",async()=>{
   expect(await query("sync_lock",{user_id:ALICE,revision:current.revision})).toEqual({acquired:false});
   await query("bhc_connect_fail",current);
   expect((await query("connection_get",{user_id:ALICE})).sync_locked_until).toBeNull();
+});
+test("immediate imports claim only this user's queue and keep the connection revision", async () => {
+  await db.exec("truncate private.jobs; truncate private.bhc_connect_requests");
+  await connect();
+  const revision = (await query("connection_get", { user_id: ALICE })).revision;
+  const claim = async (uid: string) =>
+    (
+      await db.query<{ job: any }>("select public.claim_bhc_sync($1) job", [
+        uid,
+      ])
+    ).rows[0].job;
+  expect(await claim(BOB)).toEqual({});
+  const job = await claim(ALICE);
+  expect(job).toMatchObject({
+    status: "running",
+    attempts: 1,
+    payload: { revision, initial: true },
+  });
+  expect(await claim(ALICE)).toEqual({});
+  await query("connection_delete", { user_id: ALICE });
+  await connect();
+  // Running old work stays bound to the prior revision even after replacement.
+  expect(
+    (
+      await db.query<{ payload: any }>(
+        "select payload from private.jobs where id=$1",
+        [job.id],
+      )
+    ).rows[0].payload.revision,
+  ).toBe(revision);
+  await query("job_finish", { id: job.id, status: "done" });
+  expect((await claim(ALICE)).payload.revision).toBe(revision + 2);
+  await db.exec("set role authenticated");
+  await expect(claim(ALICE)).rejects.toThrow();
+  await db.exec("reset role");
 });

@@ -11,6 +11,7 @@ export async function syncBHC(
   afterId = 0,
   providers: Providers = liveProviders,
   expectedRevision?: number,
+  runId = crypto.randomUUID(),
 ) {
   const connection = await query("connection_get", { user_id: uid });
   if (!connection.user_id || connection.access_state !== "active") return;
@@ -23,7 +24,7 @@ export async function syncBHC(
     user_id: uid,
     revision: connection.revision,
   });
-  if (!lock.acquired) return;
+  if (!lock.acquired) return "busy";
   const started = Date.now();
   try {
     const token = await validateBHCConnection(connection, providers);
@@ -81,8 +82,8 @@ export async function syncBHC(
           uid,
           null,
           new Date(),
-          `bhc-continuation:${uid}:${connection.revision}:${cursor}:${Math.floor(Date.now() / 300000)}`,
-          { initial, after_id: cursor, revision: connection.revision },
+          `bhc-continuation:${uid}:${connection.revision}:${runId}:${cursor}`,
+          { initial, after_id: cursor, revision: connection.revision, run_id: runId },
         );
         return;
       }

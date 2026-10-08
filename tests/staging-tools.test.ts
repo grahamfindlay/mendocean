@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { readdirSync } from "node:fs";
 // @ts-expect-error JavaScript deployment helper has no declaration file.
 import { validateStagingConfig } from "../scripts/staging/lib.mjs";
 const target = {
@@ -29,4 +30,11 @@ test("staging deployment refuses production database even if editable config is 
     expect(() => validateStagingConfig({ ...target, ...override })).toThrow(
       "Refusing",
     );
+});
+
+test("repository migration versions are unique for hosted and CLI deployment", () => {
+  const versions = readdirSync("supabase/migrations")
+    .filter((name) => /^\d+_.+\.sql$/.test(name))
+    .map((name) => name.split("_")[0]);
+  expect(new Set(versions).size).toBe(versions.length);
 });
