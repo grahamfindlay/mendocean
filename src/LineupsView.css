@@ -282,9 +282,9 @@
 @media (max-width: 360px) {
   .lineup-seats li {
     grid-template-columns: 88px minmax(0, 1fr) 23px;
-    column-gap: 12px;
-    padding-left: 8px;
-    padding-right: 8px;
+    column-gap: 10px;
+    padding-left: 4px;
+    padding-right: 4px;
   }
   .lineup-athlete {
     font-size: 0.8125rem;
