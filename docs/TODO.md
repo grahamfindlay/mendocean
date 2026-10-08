@@ -2,13 +2,14 @@
 
 This checklist distinguishes implemented automation from actions that require credentials, deployment, judgment, or independent recovery keys. Do not mark a task complete based only on local tests.
 
-## Activate the weather implementation once
+## Weather activation status — October 8, 2026 (UTC)
 
-- [ ] Apply `202610080001_weather_observations.sql` using the deployment workflow, after checking the migration dry run. Deploy both `jobs` and `api`, then the frontend. Database migration must precede functions that call the new RPC. Preserve existing migration history and Cron/Vault secrets.
-- [ ] Verify live collections: forecast, buoy and IEM archives exist; summaries have correct observation/receipt timestamps and nulls; delayed-source failure does not block the others. Verify an own report's association and deny another member's access. Test both the historical-fallback label and old forecast archive readability.
+- [x] Applied `202610080001_weather_observations.sql` after the dry run identified it as the only pending migration. Deployed both functions, then merged [PR #90](https://github.com/grahamfindlay/mendocean/pull/90). The exact merged commit passed live frontend, asset-integrity, Auth/privacy and readiness checks. Existing Cron/Vault secrets were preserved.
+- [x] Verified live forecast, buoy and IEM collections, private raw archive readback, observation/receipt timestamps, station IDs and preserved null gusts. The latest forecast archive contains both original response and normalized forecast (schema 2); legacy archives remain readable. Prior-day buoy/IEM backfills and enrichment for all seven existing reports completed, with no overdue or failed jobs at the verification checkpoint. Their missing historical measurements remain explicit; forecast associations preserve their provenance. Anonymous archive/report access and unrelated-user report lookup were denied. Required integration/browser CI additionally verified source-failure isolation, cross-member access denial and historical-fallback labels.
 - [ ] Supply a free **Visual Crossing API key** as server secret `VISUAL_CROSSING_API_KEY` to start the default James Madison Park trial. First attempt starts its 60-day clock. Verify `queryCost=1`, source `obs`, stations and attribution. No public Query Builder scraping runs in production.
-- [ ] Install `SUPABASE_URL`, `JOBS_SECRET`, and `SUPABASE_SERVICE_ROLE_KEY` as private GitHub secrets for `weather-evaluation.yml`. Set `WEATHER_EVALUATION_ENABLED=true` independently of backup/training activation; run the workflow manually once and inspect its metrics and figures. Download an evaluation artifact before its 90-day GitHub expiration if it needs permanent retention; the raw evidence remains in Supabase.
-- [ ] Verify the existing external readiness monitor is running and delivers incident/recovery notifications. The updated readiness endpoint includes observation failures and storage warnings. Confirm the weekly owner digest includes source state and VC review due.
+- [x] Installed the three private evaluation secrets and set `WEATHER_EVALUATION_ENABLED=true` independently of backup/training activation. The [first live workflow](https://github.com/grahamfindlay/mendocean/actions/runs/37729642918) succeeded; its default seven-day window ends before observation collection began and correctly has no observations. A separate latest-hour evaluation successfully plotted actual buoy/IEM data and archived forecasts. Download artifacts before their 90-day expiration if permanent retention is needed.
+- [x] Both existing external monitors were verified active and healthy. The updated readiness endpoint returned 200, and a read-only owner digest preview included weather and storage state; no email was sent.
+- [ ] Confirm recovery-email inbox receipt and the first scheduled Monday digest. The earlier incident-email receipt was confirmed; recovery receipt and the October 12 digest remain owner checks.
 - [ ] Activate the existing encrypted database/weather backup workflow, install its recovery/encryption secrets, and perform an isolated restore drill using [DEPLOYMENT.md](DEPLOYMENT.md). Keep the decryption/recovery keys outside Supabase/GitHub. Free Supabase has no automatic database backups, and database backups do not include Storage file contents.
 
 ## Recurring owner reviews
@@ -27,4 +28,4 @@ Collection, delayed-observation repair and five-minute summaries: [WEATHER_DATA.
 Deployment and independent recovery: [DEPLOYMENT.md](DEPLOYMENT.md).
 Existing provider/account monitoring setup: [MONITORING.md](MONITORING.md).
 
-Live activation and credential-dependent verification are outstanding until individually checked above. This task does not authorize automatic model publication or a paid-plan purchase.
+Core weather collection and weekly evaluation are live. VC credentials and independent backup recovery setup remain outstanding. This task does not authorize automatic model publication or a paid-plan purchase.
