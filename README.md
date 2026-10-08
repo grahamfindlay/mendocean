@@ -48,6 +48,8 @@ Database tests execute the SQL migrations in embedded PostgreSQL (PGlite) and ex
 
 See [deployment instructions](docs/DEPLOYMENT.md), [hosted test deployments](docs/STAGING.md), [implementation notes](docs/IMPLEMENTATION.md), and [pilot launch checks](docs/PILOT.md).
 
-Production deployment history is recorded in [DEPLOYMENT_STATUS.md](docs/DEPLOYMENT_STATUS.md). The lineup feature is deployed to the separate staging environment; production activation awaits physical iPhone testing. No real BHC token is committed.
+Project follow-ups are tracked in [the project TODOs](TODO.md), including the BHC lineup webhook request and a draft request to modernize the Lake Mendota webcam feed.
+
+Production deployment history is recorded in [DEPLOYMENT_STATUS.md](docs/DEPLOYMENT_STATUS.md). Lineup provider and physical iPhone checks are recorded in [LINEUPS.md](docs/LINEUPS.md), with hosted test procedures in [STAGING.md](docs/STAGING.md). No real BHC token is committed.
 
 Pilot administration is available at `/admin` with separate menu pages for activity and invitations, duplicate reconciliation, actual-time corrections, operations, and model review.

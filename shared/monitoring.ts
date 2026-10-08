@@ -1,4 +1,21 @@
+export interface ObservationHealth {
+  sources: {
+    source: string;
+    enabled_at: string;
+    last_success: string | null;
+    latest_observed_at: string | null;
+    failures: number;
+    last_error: string | null;
+    trial_ends_at: string | null;
+    review_due: boolean;
+  }[];
+  database_bytes: number;
+  storage_bytes: number;
+  archive_days: number;
+  unenriched_reports: number;
+}
 export interface Operations {
+  weather_observations?: ObservationHealth;
   started_at: string;
   last_weather: string | null;
   last_tick_started_at: string | null;
@@ -83,5 +100,24 @@ export function readiness(operations: Operations, now = Date.now()) {
     operations.api_affected_users_15m >= HEALTH_LIMITS.affectedUsers
   )
     reasons.push("api_failures");
+  const observations = operations.weather_observations;
+  if (observations) {
+    if (observations.database_bytes >= 350e6) reasons.push("database_capacity");
+    if (observations.storage_bytes >= 700e6) reasons.push("archive_capacity");
+    for (const source of observations.sources) {
+      if (
+        source.review_due ||
+        (source.trial_ends_at && Date.parse(source.trial_ends_at) <= now)
+      )
+        continue;
+      if (now - Date.parse(source.enabled_at) < 3600000) continue;
+      if (
+        source.failures >= 3 ||
+        old(source.last_success, 60) ||
+        old(source.latest_observed_at, source.source === "buoy" ? 30 : 120)
+      )
+        reasons.push(`observations_${source.source}_stale`);
+    }
+  }
   return { status: reasons.length ? "unhealthy" : "ready", reasons };
 }

@@ -15,3 +15,6 @@ __pycache__/
 
 *.tsbuildinfo
 .wrangler/
+data/weather-studies/
+
+weather-evaluation/

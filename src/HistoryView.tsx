@@ -1,3 +1,4 @@
+import { MeasuredConditions } from "./MeasuredConditions";
 import {
   formatDate,
   formatTime,
@@ -193,6 +194,7 @@ export default function HistoryView({
                   {status === "pending" && <span>Waiting to upload.</span>}
                 </div>
               )}
+              {report && <MeasuredConditions outing={o} />}
               <div className="card-actions outing-card-actions">
                 {report ? (
                   <button

@@ -229,6 +229,68 @@ export function startFixtures(secret, port = 54328) {
         }
         return reply(500, { error: "Unexpected BHC path" });
       }
+      if (url.hostname === "metobs.ssec.wisc.edu") {
+        if (state.failure === "buoy") return reply(503, {});
+        if (
+          !["begin", "end"].every((p) =>
+            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(
+              url.searchParams.get(p) || "",
+            ),
+          )
+        )
+          return reply(400, { code: 400, message: "malformed_timestamp" });
+        const end = Math.floor(Date.now() / 60000) * 60000;
+        const timestamps = Array.from({ length: 60 }, (_, i) =>
+          new Date(end - (60 - i) * 60000).toISOString(),
+        );
+        return reply(200, {
+          code: 200,
+          results: {
+            timestamps,
+            symbols: [
+              "air_temp",
+              "wind_speed",
+              "wind_direction",
+              "gust",
+              "run_wind_speed",
+            ],
+            data: timestamps.map(() => [18, 4, 180, 6, 4]),
+          },
+        });
+      }
+      if (url.hostname === "mesonet.agron.iastate.edu") {
+        if (state.failure === "iem") return reply(503, {});
+        const end = Math.floor(Date.now() / 300000) * 300000;
+        const data = Array.from({ length: 12 }, (_, i) => ({
+          station: "MSN",
+          utc_valid: new Date(end - (12 - i) * 300000).toISOString(),
+          sknt: 5,
+          drct: 180,
+          tmpf: 65,
+          gust: null,
+          raw: "KMSN 081200Z AUTO 18005KT RMK MADISHF",
+        }));
+        return reply(
+          200,
+          url.pathname.includes("current.py")
+            ? { last_ob: data.at(-1) }
+            : { data },
+        );
+      }
+      if (url.hostname === "weather.visualcrossing.com") {
+        return reply(200, {
+          queryCost: 1,
+          currentConditions: {
+            datetimeEpoch: Math.floor(Date.now() / 1000) - 600,
+            windspeed: 3,
+            windgust: null,
+            winddir: 180,
+            temp: 65,
+            source: "obs",
+            stations: ["KMSN", "F3620"],
+          },
+        });
+      }
       if (
         [
           "api.open-meteo.com",

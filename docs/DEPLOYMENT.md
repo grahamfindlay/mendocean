@@ -93,7 +93,7 @@ New reports can accumulate between weekly fits; edits and deletions retire an ac
 
 ## BHC connection rollout
 
-Published lineup rollout and its provider/device release checks are documented in [LINEUPS.md](LINEUPS.md). Keep `BHC_LINEUPS_ENABLED=false` until those checks pass.
+Published lineup rollout and its provider/device release checks are documented in [LINEUPS.md](LINEUPS.md). The provider and physical iPhone release checks passed in staging. The user authorized production rollout on October 8, 2026, after PR #90 was merged and deployed. Apply `202610070003_lineups.sql`, deploy compatible API/jobs functions, and activate `BHC_LINEUPS_ENABLED=true` for the lineup release. Lineup email/push preferences remain off by default; staging preferences and sample crews are never copied to production.
 
 The guided API-key flow and optional password exchange are implemented in [the connection plan](BHC_CONNECTION_PLAN.md). Deploy migration `202610070001_bhc_connection.sql`, then the `api` and `jobs` functions, then the frontend. Keep `BHC_PASSWORD_CONNECT_ENABLED=false` initially; it defaults to disabled when unset. This flag controls new password exchanges; existing generated tokens continue to validate normally.
 
@@ -110,3 +110,15 @@ To repeat the live test, run `deno run --config supabase/functions/deno.json --a
 Known expiry or verified rejection pauses BHC sync, attendance writes and official-practice reminders. Temporary provider failures retain the connection and show stale-data status. Reminder reservation and final delivery require current connection state and a practice refresh after its end. Reconnect replaces credentials atomically, imports current practices and never replays an attendance write. Disconnect erases encrypted credentials while retaining a non-secret revision tombstone and rowing history. It does not revoke tokens at BHC; users can delete their dedicated token in My Profile.
 
 For rollback, disable new password exchanges and retain this migration. Old frontend clients can continue using `bhc/connect` with a provided token, but any supplied club ID must equal Mendota's. Use the new API/workers with the schema; pre-migration workers do not contain the expiry and revision enforcement.
+
+## Weather observations and evaluations
+
+The additive weather implementation and its owner activation checklist are documented in [WEATHER_DATA.md](WEATHER_DATA.md) and [TODO.md](TODO.md). Apply the new migration before deploying compatible API/worker functions. VC and weekly evaluation credentials are optional separate setup steps; buoy/IEM collection is automatic after deployment.
+
+### Lineup release after the weather-observation migration
+
+Production already has `202610080001_weather_observations.sql`. The older-numbered lineup migration is additive and must still be applied; do not reset or rewrite existing migration records. When using `supabase db push`, inspect the dry run and use `--include-all` for this earlier pending version. Record the exact source SQL in migration history if applying it transactionally through the management API. Verify the reminder-budget contract, service-only lineup RPC grants and both migrations before deploying the combined functions.
+
+Deploy only `api` and `jobs` to production. `staging-test`, fixture SQL and sample lineup refreshes belong solely to staging. Preserve existing VAPID keys, BHC credentials, observation sources, Auth configuration and schedules. The existing five-minute dispatcher picks up lineup polling when the flag is enabled; no new cron is required. Rollback disables `BHC_LINEUPS_ENABLED` while retaining the additive schema and compatible functions.
+
+After merging, check `https://mendocean.fyi/build.json` and run `EXPECTED_SHA=<merged commit> npm run test:smoke`, followed by the production browser smoke. Also check anonymous denial on `/functions/v1/api/lineups` and `/functions/v1/api/lineups/refresh`, hosted oar PNGs, zero synthetic lineup identifiers in production, and notification opt-ins. These checks need no login email or notification send.

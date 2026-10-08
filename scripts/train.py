@@ -37,6 +37,9 @@ def records(rows, outcome):
     result = []
     for row in rows:
         report = row['report']
+        # A retrospectively retrieved forecast is not verified advance information.
+        if row.get('source_kind') not in (None, 'archived_forecast'):
+            continue
         x = features(row['weather'])
         if x is None:
             continue

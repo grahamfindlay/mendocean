@@ -57,6 +57,12 @@ export function digestText(
       : "PostHog summary unavailable or not configured; no zero values inferred.",
     `Current operations: overdue jobs ${operations.overdue_jobs}; job retries ${operations.retries_24h} and terminal failures ${operations.failed_jobs_24h} in 24 hours; BHC problems ${operations.bhc_problems}; reminder problems ${operations.reminder_problems}.`,
     `Last weather: ${operations.last_weather || "not collected"}. Last completed dispatch: ${operations.last_tick_completed_at || "not observed"}.`,
+    ...(operations.weather_observations
+      ? [
+          `Measured weather: ${operations.weather_observations.sources.map((s) => `${s.source}: latest ${s.latest_observed_at || "missing"}, consecutive failures ${s.failures}${s.review_due ? "; VC trial stopped—review required" : ""}`).join(". ")}.`,
+          `Database ${(operations.weather_observations.database_bytes / 1e6).toFixed(1)} MB; file storage ${(operations.weather_observations.storage_bytes / 1e6).toFixed(1)} MB. Reports awaiting measured-weather association: ${operations.weather_observations.unenriched_reports}.`,
+        ]
+      : []),
     "Offline use may be missing. Reminder provider acceptance does not establish inbox placement or device display.",
     `Owner dashboard: ${site}/?account=1`,
     `Analytics: ${analyticsSite}/`,
