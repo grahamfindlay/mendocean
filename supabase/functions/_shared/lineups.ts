@@ -191,7 +191,7 @@ export async function sendLineup(
   const url = env("APP_URL") + "/?tab=Lineups&lineup=" + current.outing_id;
   const title =
     current.kind === "published"
-      ? "Your lineup is published"
+      ? "Lineup published"
       : "Your lineup has changed";
   const active = async (endpoint: string | null = null) =>
     check(

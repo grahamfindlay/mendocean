@@ -161,7 +161,10 @@ test("designed emails omit the boathouse and reminder, highlight the rower, and 
     "https://mendocean.fyi/?account=1",
     "published",
   );
-  expect(publication.html).toContain("Your crew is ready");
+  expect(publication.html).not.toContain("Your crew is ready");
+  expect(publication.html).not.toContain("<h1");
+  expect(publication.text).not.toContain("Your crew is ready");
+  expect(lineupChange(null, lineup)).toMatch(/^Lineup published:/);
   lineup.boats = [];
   expect(
     lineupEmail(

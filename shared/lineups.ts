@@ -179,8 +179,8 @@ export function lineupChange(previous: Lineup | null, current: Lineup): string {
     seat = ownSeat(current);
   if (!previous?.published)
     return seat
-      ? `Your lineup is published: ${boat!.name} · ${seatLabel(seat.seat, Number(boat!.boat_class?.[0]) || 8)}.`
-      : "Lineups are published. You have not been assigned a seat yet.";
+      ? `Lineup published: ${boat!.name} · ${seatLabel(seat.seat, Number(boat!.boat_class?.[0]) || 8)}.`
+      : "Lineup published. You have not been assigned a seat yet.";
   const beforeBoat = ownBoat(previous),
     beforeSeat = ownSeat(previous);
   if (!seat && beforeSeat)
@@ -213,8 +213,7 @@ export function lineupEmail(
   const boat = ownBoat(lineup),
     seat = ownSeat(lineup);
   const date = `${formatDate(lineup.starts_at)} · ${formatTime(lineup.starts_at)} – ${formatTime(lineup.ends_at)}`;
-  const headline =
-    kind === "published" ? "Your crew is ready" : "Your lineup has changed";
+  const headline = kind === "published" ? "" : "Your lineup has changed";
   const lines = [
     headline,
     summary,
@@ -281,7 +280,7 @@ export function lineupEmail(
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f5ec"><tr><td align="center" style="padding:28px 12px">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px"><tr><td>
           <p style="margin:0 0 28px;font-size:20px;letter-spacing:-0.8px;font-weight:700;color:#3b6a3f">Mendocean</p>
-          <h1 style="margin:0 0 14px;font-size:30px;line-height:1.2;letter-spacing:-0.7px">${headline}</h1>
+          ${headline ? `<h1 style="margin:0 0 14px;font-size:30px;line-height:1.2;letter-spacing:-0.7px">${headline}</h1>` : ""}
           ${kind === "changed" ? `<p style="margin:0 0 20px;font-size:15px;line-height:1.6">${escape(summary)}</p>` : ""}
           <p style="margin:0 0 5px;font-size:17px;font-weight:700">${escape(lineup.title)}</p>
           <p style="margin:0 0 24px;font-size:14px;line-height:1.5;color:#61736c">${escape(date)}</p>
