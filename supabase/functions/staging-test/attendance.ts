@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { normalizeAttendanceRoster } from "../../../shared/attendanceRoster.ts";
 import type { AttendanceState } from "../../../shared/bhc.ts";
-import type { Lineup } from "../../../shared/lineups.ts";
 import {
   check,
   HttpError,
@@ -9,7 +8,7 @@ import {
   service,
   userClient,
 } from "../_shared/runtime.ts";
-import { scenarioAttendance } from "./scenarios.ts";
+import { attendanceFixtureId, signupFixture } from "./attendance-fixture.ts";
 
 // Called only after staging URL/environment and sole-owner authentication guards.
 export async function stagingPracticeAttendance(
@@ -21,7 +20,10 @@ export async function stagingPracticeAttendance(
   const parsed = z
     .object({
       action: z.enum(["attendance", "attendance-roster"]),
-      outing_id: z.literal("e746607c-f17f-4f59-833e-267f21fb7802"),
+      outing_id: z.enum([
+        "e746607c-f17f-4f59-833e-267f21fb7802",
+        attendanceFixtureId,
+      ]),
       change: z
         .object({
           attendance: z.enum(["attending", "declined"]),
@@ -55,7 +57,8 @@ export async function stagingPracticeAttendance(
     !connection.user_id ||
     connection.access_state !== "active" ||
     Number(connection.club_id) !== 900000001 ||
-    Number(outing.bhc_practice_id) !== 900000003
+    Number(outing.bhc_practice_id) !==
+      (outing.id === attendanceFixtureId ? 900000004 : 900000003)
   )
     throw new HttpError(
       409,
@@ -64,37 +67,9 @@ export async function stagingPracticeAttendance(
   if (parsed.action === "attendance-roster") {
     if (parsed.change)
       throw new HttpError(400, "Attendance lists are read-only.");
-    const previous = check(
-      await service().rpc("lineup_previous", {
-        uid,
-        outing: outing.id,
-        revision: connection.revision,
-      }),
-    ) as Lineup | null;
-    const people = [
-      ...scenarioAttendance("refresh", Number(connection.custid), previous),
-      {
-        custid: 912000001,
-        fname: "Jordan",
-        lname: "Ellis",
-        attendance_plan: "Attending",
-      },
-      {
-        custid: 912000002,
-        fname: "Pat",
-        lname: "Lee",
-        attendance_plan: "Not Attending",
-      },
-      {
-        custid: 912000003,
-        fname: "Sam",
-        lname: "Avery",
-        attendance_plan: "Unknown",
-      },
-    ];
     return {
       attendees: normalizeAttendanceRoster(
-        { attendance: people },
+        signupFixture(Number(connection.custid)),
         Number(connection.custid),
       ),
       checked_at: new Date(now).toISOString(),

@@ -37,7 +37,7 @@ export default function AttendanceEditor({
   const [error, setError] = useState("");
   const [needsReconnect, setNeedsReconnect] = useState(false);
   const [uncertain, setUncertain] = useState(false);
-  const stagingPractice = import.meta.env.VITE_STAGING === "true" && outing.id === "e746607c-f17f-4f59-833e-267f21fb7802";
+  const stagingPractice = import.meta.env.VITE_STAGING === "true" && ["e746607c-f17f-4f59-833e-267f21fb7802", "c68221b7-f064-4b4d-aec5-4b616329925e"].includes(outing.id);
   async function send(change = false) {
     if (!navigator.onLine) {
       setError(

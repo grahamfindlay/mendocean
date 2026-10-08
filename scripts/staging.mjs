@@ -12,8 +12,12 @@ import {
 import { assets, smoke, emailCheck } from "./staging/smoke.mjs";
 import { browserSmoke } from "./staging/browser.mjs";
 import { smtpCheck } from "./staging/smtp.mjs";
-import { attendanceSmoke } from "./staging/attendance.mjs";
+import {
+  attendanceSmoke,
+  prepareAttendanceFixture,
+} from "./staging/attendance.mjs";
 const actions = {
+  "attendance-fixture": prepareAttendanceFixture,
   "attendance-smoke": attendanceSmoke,
   "smtp-check": smtpCheck,
   "browser-smoke": browserSmoke,

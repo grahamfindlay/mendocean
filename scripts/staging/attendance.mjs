@@ -1,9 +1,72 @@
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { chromium, webkit, devices } from "@playwright/test";
-import { assertStaging, query, root, secrets } from "./lib.mjs";
+import { assertStaging, literal, query, root, secrets } from "./lib.mjs";
 import { testSession } from "./smoke.mjs";
+
+const outingId = "c68221b7-f064-4b4d-aec5-4b616329925e";
+const title = "Upcoming attendance test";
+const existingState = () =>
+  query(
+    `select
+ (select jsonb_agg(to_jsonb(o) order by id) from public.outings o where id<>${literal(outingId)}) outings,
+ (select jsonb_agg(to_jsonb(m) order by user_id,outing_id) from public.outing_members m where outing_id<>${literal(outingId)}) members,
+ (select jsonb_agg(md5(to_jsonb(c)::text) order by user_id) from private.bhc_connections c) connections,
+ (select jsonb_agg(jsonb_build_object('id',id,'channels',lineup_channels,'changes',lineup_changes) order by id) from public.profiles) preferences,
+ (select jsonb_agg(to_jsonb(l) order by user_id,outing_id) from private.lineup_snapshots l) lineups,
+ (select count(*) from private.lineup_events) events`,
+    true,
+  );
+
+export async function prepareAttendanceFixture() {
+  await assertStaging();
+  const s = secrets();
+  const before = await existingState();
+  const result = await query(
+    `begin;\n${readFileSync(resolve(root, "scripts/staging/attendance-fixture.sql"), "utf8")}\nselect public.staging_attendance_fixture(${literal(s.STAGING_OWNER_ID)}) fixture;\ncommit;`,
+  );
+  assert.deepEqual(
+    await existingState(),
+    before,
+    "Attendance setup changed an existing practice, lineup, connection or notification preference",
+  );
+  console.log(JSON.stringify(result));
+  console.log(
+    "Separate upcoming practice prepared with an open signup deadline and no lineup history. Existing lineup scenario preserved.",
+  );
+}
+
+async function assertUnpublishedFixture(uid) {
+  const [fixture] = await query(
+    `select o.starts_at,m.deadline,
+    (select count(*) from private.lineup_snapshots where outing_id=o.id) snapshots,
+    (select count(*) from private.lineup_events where outing_id=o.id) events
+    from public.outings o join public.outing_members m on m.outing_id=o.id
+    where o.id=${literal(outingId)} and m.user_id=${literal(uid)}`,
+    true,
+  );
+  assert(fixture, "Run attendance-fixture first");
+  assert(
+    Date.parse(fixture.starts_at) > Date.now(),
+    "Test practice must be upcoming; rerun attendance-fixture",
+  );
+  assert(
+    Date.parse(fixture.deadline) > Date.now(),
+    "Signup deadline must be open; rerun attendance-fixture",
+  );
+  assert(Date.parse(fixture.deadline) < Date.parse(fixture.starts_at));
+  assert.equal(
+    Number(fixture.snapshots),
+    0,
+    "Test practice has a lineup snapshot",
+  );
+  assert.equal(
+    Number(fixture.events),
+    0,
+    "Test practice has a publication event",
+  );
+}
 
 // Read-only fixture/UI checks. Safe with the owner's notification preferences on;
 // never reset/publish/edit the practice or save attendance during this check.
@@ -22,6 +85,7 @@ export async function attendanceSmoke() {
     );
   const before = await state();
   try {
+    await assertUnpublishedFixture(session.user.id);
     const post = async (body, token = session.access_token) => {
       const response = await fetch(
         c.supabase_url + "/functions/v1/staging-test",
@@ -39,12 +103,22 @@ export async function attendanceSmoke() {
     };
     const request = {
       action: "attendance-roster",
-      outing_id: "e746607c-f17f-4f59-833e-267f21fb7802",
+      outing_id: outingId,
     };
     const roster = await post(request);
     assert.equal(roster.response.status, 200);
     const names = roster.data.attendees.map((p) => p.name);
     assert(names.includes("Jordan Ellis"), "Unassigned attendee missing");
+    assert.deepEqual(names, [
+      "Jordan Ellis",
+      "Micah Rivera",
+      "Nora Sullivan",
+      "Polyanna Nunes Da Silva",
+    ]);
+    const status = await post({ action: "attendance", outing_id: outingId });
+    assert.equal(status.response.status, 200);
+    assert.equal(status.data.state.allowed, true);
+    assert(Date.parse(status.data.state.deadline) > Date.now());
     assert(
       !names.includes("Graham Findlay") &&
         !names.includes("Pat Lee") &&
@@ -86,6 +160,14 @@ export async function attendanceSmoke() {
         const context = await browser.newContext(devices["iPhone 13"]);
         const page = await context.newPage();
         const errors = [];
+        let rosterReads = 0;
+        page.on("request", (request) => {
+          if (
+            request.url().endsWith("/functions/v1/staging-test") &&
+            request.postDataJSON()?.action === "attendance-roster"
+          )
+            rosterReads++;
+        });
         page.on("pageerror", () => errors.push("pageerror"));
         await page.addInitScript(
           ({ key, session }) =>
@@ -101,18 +183,40 @@ export async function attendanceSmoke() {
           .click();
         for (const name of ["Attending", "Unknown", "Not attending"])
           await page.getByRole("checkbox", { name, exact: true }).check();
-        const badge = page
-          .getByRole("button", { name: /^Practice attendance:/ })
-          .first();
+        const card = page
+          .locator(".scheduled-row-entry")
+          .filter({
+            has: page.getByRole("button", { name: new RegExp(title) }),
+          });
+        assert.equal(
+          await card.getByRole("button", { name: /Lineup/ }).count(),
+          0,
+        );
+        const badge = card.getByRole("button", {
+          name: /^Practice attendance:/,
+        });
         await badge.click();
         const dialog = page.getByRole("dialog");
         await dialog
           .getByRole("heading", { name: "Practice attendance" })
           .waitFor();
+        await dialog.getByLabel("Your attendance").waitFor();
+        assert.equal(
+          await dialog.getByLabel("Your attendance").isDisabled(),
+          false,
+        );
+        assert.equal(
+          await dialog
+            .getByText("The attendance deadline has passed.", { exact: true })
+            .count(),
+          0,
+        );
+        assert.equal(rosterReads, 0, "Roster fetched before expansion");
         const details = dialog.locator(".attendance-roster");
         assert.equal(await details.getAttribute("open"), null);
         await details.locator("summary").click();
         await details.getByText("Jordan Ellis", { exact: true }).waitFor();
+        assert.equal(rosterReads, 1);
         assert.deepEqual(
           await details.getByRole("listitem").allTextContents(),
           names,
@@ -125,6 +229,11 @@ export async function attendanceSmoke() {
           .waitFor({ state: "visible" });
         await page.waitForFunction(
           () => !document.querySelector(".attendance-roster button")?.disabled,
+        );
+        assert.equal(
+          rosterReads,
+          2,
+          "Refresh must make another roster request",
         );
         assert.deepEqual(
           await details.getByRole("listitem").allTextContents(),
@@ -159,6 +268,7 @@ export async function attendanceSmoke() {
       before,
       "Read-only attendance checks changed staging state",
     );
+    await assertUnpublishedFixture(session.user.id);
     console.log(
       "Staging attendance access checks passed; memberships, lineups, preferences and event counts preserved. No email or notifications sent by these checks.",
     );

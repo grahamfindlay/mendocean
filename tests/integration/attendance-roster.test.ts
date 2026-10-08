@@ -26,8 +26,7 @@ const crew = [
     fname: "Alex",
     lname: "Morgan",
     attendance_plan: "Attending",
-    lineup_boat: 7,
-    lineup_seat: "1",
+    lineup_boat: null,
     phone: "private",
     email: "private@example.test",
   },
@@ -69,6 +68,59 @@ beforeEach(async () => {
 });
 const roster = () =>
   api(actor, "bhc/attendance-roster", { outing_id: outing.id });
+test("an upcoming open-signup practice returns changing signup data with no saved lineups", async () => {
+  expect(Date.parse(outing.starts_at)).toBeGreaterThan(Date.now());
+  const status = await api(actor, "bhc/attendance", { outing_id: outing.id });
+  expect(status.data.state.allowed).toBe(true);
+  expect(Date.parse(status.data.state.deadline)).toBeGreaterThan(Date.now());
+  const noLineups = async () => {
+    expect(
+      (
+        await sql.query(
+          "select * from private.lineup_snapshots where outing_id=$1",
+          [outing.id],
+        )
+      ).rows,
+    ).toEqual([]);
+    expect(
+      (
+        await sql.query(
+          "select * from private.lineup_events where outing_id=$1",
+          [outing.id],
+        )
+      ).rows,
+    ).toEqual([]);
+  };
+  await noLineups();
+  expect((await roster()).data.attendees.map((p: any) => p.name)).toEqual([
+    "Alex Morgan",
+    "Zoe Reed",
+  ]);
+  await fixtures({
+    crew: [
+      crew[0],
+      {
+        ...crew[2],
+        fname: "New",
+        lname: "Signup",
+        attendance_plan: "Attending",
+      },
+    ],
+  });
+  expect((await roster()).data.attendees.map((p: any) => p.name)).toEqual([
+    "New Signup",
+    "Zoe Reed",
+  ]);
+  await noLineups();
+  const provider = await fixtures();
+  expect(
+    provider.calls.some((c: any) => c.path === "/practices/getPractices"),
+  ).toBe(true);
+  expect(
+    provider.calls.some((c: any) => c.path === "/practices/setAttendance"),
+  ).toBe(false);
+  expect(provider.deliveries).toEqual([]);
+});
 test("roster reads are private, name-only, independent of publication and the viewer's signup", async () => {
   const before = (
     await sql.query(
