@@ -97,3 +97,5 @@ That correction is deployed to staging at `41818c5b7d3acbc73fd4614edc4f9cac6b24f
 A final spacing refinement moves each oar 3 CSS pixels inward toward its seat label, preserving the label/name column positions and the gap before rower names. HTML email cells apply the same 3-pixel inset without CSS transforms. Type checks and phone/desktop email rendering passed; this presentation-only deployment requires no fixture action or notification send.
 
 Publication email copy now starts directly with practice details, without an introductory headline. Publication subjects, push titles and summaries use “Lineup published”. This wording preference is recorded in the lineup specification for future edits. Deploy compatible api/jobs and staging-test functions; no fixture reset, preference change or notification send is needed.
+
+The oar inset is now 5 pixels toward the seat labels (an additional 2 pixels over the previous refinement), in both the app and HTML emails. Seat-label and rower-name positions remain fixed.
