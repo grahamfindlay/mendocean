@@ -208,7 +208,7 @@ export function startFixtures(secret, port = 54328) {
         if (state.failure === "buoy") return reply(503, {});
         if (
           !["begin", "end"].every((p) =>
-            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(
+            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(
               url.searchParams.get(p) || "",
             ),
           )
