@@ -131,7 +131,7 @@ test("email includes full own crew, coach and escaped text, with direct practice
     "https://mendocean.fyi/?account=1",
   );
   expect(email.text).toContain("3 seat: Rower 42 (You)");
-  expect(email.text).toContain("Coxswain: Rower 44");
+  expect(email.text).toContain("Cox: Rower 44");
   expect(email.text).toContain("Coach: Coach Person");
   expect(email.html).toContain("&lt;script&gt;");
   expect(email.html).not.toContain("<script>");

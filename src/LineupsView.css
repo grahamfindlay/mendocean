@@ -116,7 +116,7 @@
   display: grid;
   grid-template-columns: 122px minmax(0, 1fr) 30px;
   align-items: center;
-  gap: 12px;
+  column-gap: 20px;
   padding: 13px 12px;
   border-bottom: 1px solid #e3e5da;
   min-height: 48px;
@@ -259,7 +259,7 @@
   .lineup-seats li {
     grid-template-columns: 112px minmax(0, 1fr) 23px;
     padding: 12px 10px;
-    gap: 6px;
+    column-gap: 16px;
   }
   .lineup-seat-label {
     grid-template-columns: 22px minmax(0, 1fr) 22px;

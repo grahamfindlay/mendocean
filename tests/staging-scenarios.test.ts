@@ -39,10 +39,15 @@ function change(action: Scenario, previous: Lineup | null = null) {
 }
 test("crew-only changes preserve a previous seat move and its side", () => {
   const published = change("publish");
+  expect(published.boats[0].seats.find((s) => s.seat === "4")?.side).toBe(
+    "port",
+  );
+  expect(ownSeat(published)?.side).toBe("starboard");
   const moved = change("seat", published);
   const before = JSON.stringify(moved);
   const crew = change("crew", moved);
   expect(ownSeat(moved)?.seat).toBe("2");
+  expect(ownSeat(moved)?.side).toBe("port");
   expect(ownSeat(crew)).toEqual(ownSeat(moved));
   expect(lineupSignatures(crew).assignment).toBe(
     lineupSignatures(moved).assignment,

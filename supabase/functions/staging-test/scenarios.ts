@@ -10,6 +10,10 @@ export const scenarios = [
 ] as const;
 export type Scenario = (typeof scenarios)[number];
 
+// Standard sweep rig: stroke/even seats port, odd seats starboard.
+const sweepSide = (seat: string) =>
+  seat === "coxswain" ? "" : Number(seat) % 2 ? "starboard" : "port";
+
 export function scenarioAttendance(
   action: Scenario,
   athlete: number,
@@ -37,7 +41,8 @@ export function scenarioAttendance(
             (seat.athlete_id === 910000005 ? "Casey Bennett" : seat.name),
           lname: "",
           lineup_seat: seat.seat,
-          lineup_side: seat.side || "",
+          lineup_side:
+            action === "refresh" ? sweepSide(seat.seat) : seat.side || "",
           lineup_boat: boat.boat_id,
           attendance_plan: "Attending",
         })),
@@ -47,12 +52,7 @@ export function scenarioAttendance(
         fname,
         lname: "",
         lineup_seat: String(lineup_seat),
-        lineup_side:
-          lineup_seat === "coxswain"
-            ? ""
-            : Number(lineup_seat) % 2
-              ? "port"
-              : "starboard",
+        lineup_side: sweepSide(String(lineup_seat)),
         lineup_boat: 920000001,
         attendance_plan: "Attending",
       }));
@@ -68,7 +68,7 @@ export function scenarioAttendance(
       other.lineup_side = rower.lineup_side;
     }
     rower.lineup_seat = target;
-    rower.lineup_side = target === "2" ? "starboard" : "port";
+    rower.lineup_side = sweepSide(target);
   }
   if (action === "crew") {
     const boat = previous && ownBoat(previous);

@@ -90,6 +90,12 @@ test("lineup links select the practice, prioritize own boat and highlight the se
   await expect(page.locator(".lineup-you .lineup-oar").first()).not.toHaveClass(
     /empty/,
   );
+  const stroke = page
+    .locator(".lineup-seats li")
+    .filter({ hasText: "Cricket" });
+  await expect(stroke.locator(".lineup-oar").first()).toHaveClass(/empty/);
+  await expect(stroke.locator(".lineup-oar").last()).not.toHaveClass(/empty/);
+  await expect(page.locator(".lineup-seats li").first()).toContainText("Cox");
   await expect(page.getByRole("link", { name: "Rose Sears" })).toHaveAttribute(
     "href",
     /^mailto:rsears%40mendotarowingclub\.com\?subject=Selected%20practice/,
@@ -147,6 +153,13 @@ test("lineup links select the practice, prioritize own boat and highlight the se
     page.getByRole("heading", { name: "Earlier practice", exact: true }),
   ).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
+  const seatBox = await page
+    .locator(".lineup-you .lineup-seat-label")
+    .boundingBox();
+  const nameBox = await page
+    .locator(".lineup-you .lineup-athlete")
+    .boundingBox();
+  expect(nameBox!.x - (seatBox!.x + seatBox!.width)).toBeGreaterThanOrEqual(16);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
