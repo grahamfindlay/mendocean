@@ -157,6 +157,52 @@ export function AdminOperations() {
           </dl>
         </section>
       )}
+      {operations.data?.weather_observations && (
+        <section className="admin-panel">
+          <h2>Measured weather collection</h2>
+          {operations.data.weather_observations.sources.map((source) => (
+            <div key={source.source}>
+              <h3>
+                {source.source === "buoy"
+                  ? "Mendota buoy"
+                  : source.source === "iem_msn"
+                    ? "MSN airport · IEM"
+                    : "James Madison Park · Visual Crossing"}
+              </h3>
+              <p>
+                Last successful collection: {adminStamp(source.last_success)}.
+                Latest measurement: {adminStamp(source.latest_observed_at)}.
+              </p>
+              {source.failures > 0 && (
+                <p className="alert">
+                  {source.failures} consecutive collection failures ·{" "}
+                  {source.last_error}
+                </p>
+              )}
+              {source.trial_ends_at && (
+                <p className={source.review_due ? "alert" : "help"}>
+                  {source.review_due
+                    ? "VC trial completed. Collection stopped pending review."
+                    : `VC trial review due ${adminStamp(source.trial_ends_at)}.`}
+                </p>
+              )}
+            </div>
+          ))}
+          {!operations.data.weather_observations.sources.some(
+            (s) => s.source === "vc_jmp",
+          ) && (
+            <p className="help">
+              VC comparison has not started. A server API key is required.
+            </p>
+          )}
+          <p className="help">
+            Reports awaiting measured weather:{" "}
+            {operations.data.weather_observations.unenriched_reports}. Archived
+            observation days:{" "}
+            {operations.data.weather_observations.archive_days}.
+          </p>
+        </section>
+      )}
       {health.data && (
         <section className="admin-panel">
           <h2>Storage & jobs</h2>

@@ -86,3 +86,7 @@ Test recovery into an isolated disposable database/project before launch. Decryp
 The admin-only health endpoint lists shadow model IDs and validation metrics. Review eligibility, chronological holdout, calibration, outcome balance and sample sizes. Publishing is an explicit admin call to `models/publish` with the chosen ID. The database rejects a model trained against an older data revision. `models/rollback` retires the active model and returns forecasts to Hannah’s rule.
 
 New reports can accumulate between weekly fits; edits and deletions retire an active model. No model is approved or active on initial deployment.
+
+## Weather observations and evaluations
+
+The additive weather implementation and its owner activation checklist are documented in [WEATHER_DATA.md](WEATHER_DATA.md) and [TODO.md](TODO.md). Apply the new migration before deploying compatible API/worker functions. VC and weekly evaluation credentials are optional separate setup steps; buoy/IEM collection is automatic after deployment.

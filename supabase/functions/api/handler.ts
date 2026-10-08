@@ -1,5 +1,10 @@
+import { observationQuery } from "../_shared/observations.ts";
 import { canLog } from "../../../shared/presentation.ts";
-import { DEFAULT_WEEK_PERIODS, legacyPeriods, weekPeriodsSchema } from "../../../shared/weekPeriods.ts";
+import {
+  DEFAULT_WEEK_PERIODS,
+  legacyPeriods,
+  weekPeriodsSchema,
+} from "../../../shared/weekPeriods.ts";
 import { liveProviders, type Providers } from "../_shared/providers.ts";
 import { z } from "zod";
 import { sendTestPush } from "../_shared/notifications.ts";
@@ -173,7 +178,7 @@ export function createApiHandler(providers: Providers = liveProviders) {
         return m;
       };
       const ownOutings = async () => {
-        const [or, mr, rr, states] = await Promise.all([
+        const [or, mr, rr, states, measurements] = await Promise.all([
           client
             .from("outings")
             .select("*")
@@ -181,6 +186,7 @@ export function createApiHandler(providers: Providers = liveProviders) {
           client.from("outing_members").select("*"),
           client.from("reports").select("*"),
           db.rpc("reminder_states", { uid }),
+          observationQuery("own_measurements", { user_id: uid }),
         ]);
         const members = check(mr) || [];
         const reports = check(rr) || [];
@@ -189,6 +195,10 @@ export function createApiHandler(providers: Providers = liveProviders) {
           const m = members.find((m) => m.outing_id === o.id);
           return {
             ...o,
+            measured_conditions:
+              measurements.find(
+                (r: { outing_id: string }) => r.outing_id === o.id,
+              )?.conditions || null,
             attendance: m?.attendance,
             attendance_deadline: m?.deadline || null,
             reminder: m?.reminder,
@@ -387,8 +397,16 @@ export function createApiHandler(providers: Providers = liveProviders) {
       if (path === "report") {
         const outing = outingSchema.parse(input.outing);
         const report = reportSchema.parse(input.report);
-        if (!canLog({ starts_at: report.actual_start || outing.starts_at }, Date.now()))
-          throw new HttpError(400, "Logging opens 15 minutes before the row starts.");
+        if (
+          !canLog(
+            { starts_at: report.actual_start || outing.starts_at },
+            Date.now(),
+          )
+        )
+          throw new HttpError(
+            400,
+            "Logging opens 15 minutes before the row starts.",
+          );
         if (outing.kind === "independent") {
           const m = check(
             await client
@@ -417,7 +435,7 @@ export function createApiHandler(providers: Providers = liveProviders) {
           null,
           outing.id,
           new Date(),
-          `enrich:${outing.id}:${data.version}`,
+          `enrich:${outing.id}:${data.id}:${data.version}`,
         );
         return json(req, data);
       }

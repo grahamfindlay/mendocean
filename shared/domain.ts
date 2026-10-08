@@ -248,6 +248,20 @@ export const outingSchema = z
   );
 export type OutingInput = z.infer<typeof outingSchema>;
 export interface Outing extends OutingInput {
+  measured_conditions?: {
+    start: string;
+    end: string;
+    interval_definition: string;
+    forecast?: {
+      wind: number | null;
+      gust: number | null;
+      direction: number | null;
+      temperature: number | null;
+      forecast_received_at?: string;
+    };
+    forecast_source_kind?: string;
+    sources: ReturnType<typeof import("./observations.ts").outingMeasurements>;
+  } | null;
   owner_id: string | null;
   bhc_practice_id: number | null;
   attendance?: string;

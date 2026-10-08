@@ -1,0 +1,32 @@
+name: Weekly measured weather evaluation
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "47 11 * * 1"
+permissions:
+  contents: read
+concurrency:
+  group: weather-evaluation
+  cancel-in-progress: false
+jobs:
+  evaluate:
+    if: vars.PILOT_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      JOBS_SECRET: ${{ secrets.JOBS_SECRET }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install matplotlib==3.11.2
+      - run: python scripts/weather_evaluate.py --out weather-evaluation
+      - uses: actions/upload-artifact@v4
+        with:
+          name: weather-evaluation-${{ github.run_id }}
+          path: weather-evaluation/
+          retention-days: 90
+          if-no-files-found: error
