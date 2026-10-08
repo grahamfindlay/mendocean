@@ -25,3 +25,9 @@ The reserved fictional practice routes attendance status, explicit test saves an
 ## Local validation
 
 Passed: 173 unit/database tests, 66 isolated backend integration tests, nine production-build attendance browser cases across Chromium/WebKit/mobile Chromium, three existing attendance-badge preview cases, eight service-worker upgrade cases (two existing WebKit platform exclusions), 14 Python tests, TypeScript/Deno checks, and a production build. Production output was checked to exclude the staging attendance adapter and its fictional-save controls. Browser coverage includes lazy loading, collapse/reopen, alphabetical names, empty responses, retry, independent attendance saving during roster failure, keyboard opening/focus return, and preserving forecast selection.
+
+## Hosted staging validation — October 8, 2026
+
+Deployed source revision `4142002f4ebcc71945767774f0600310f5c90aa8`, build `4142002f4ebcc71945767774f0600310f5c90aa8-f114d1c6`, to [Mendocean Test](https://mendocean-staging.pages.dev). The missing baseline migration `202610080001_weather_observations.sql` was applied before deploying compatible api/jobs, staging-test and frontend builds. No feature-specific migration or fixture reset was needed.
+
+Hosted checks verified all ten precache hashes, staging identity, closed signup and anonymous denial. The roster endpoint rejected anonymous sessions, unrelated outing IDs and attempts to attach a change to the roster read. Mobile Chromium and WebKit passed expansion, refresh and modal layout checks at 320/390/430 pixels. Both screenshots were visually inspected. Before/after reads confirmed identical attendance/reminder memberships, lineup snapshots/versions, notification preferences and publication-event counts. No login email or notifications were sent by the checks. The owner's existing two enabled notification channels were preserved. Production was not deployed by this task.
