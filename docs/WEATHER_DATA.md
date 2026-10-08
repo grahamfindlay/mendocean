@@ -1,6 +1,6 @@
 # Forecast and measured-weather collection
 
-The weather implementation archives advance forecasts separately from measured conditions. The schema/function changes must be deployed before collection starts; a local implementation is not evidence of a live collector.
+Production collection was activated on October 8, 2026 (UTC). Advance forecasts are archived separately from measured conditions; buoy and IEM collection are live, while the optional default-station VC trial awaits an API key. Verification evidence is recorded in [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md); remaining owner actions are in [TODO.md](TODO.md).
 
 ## Automatic operation after deployment
 
