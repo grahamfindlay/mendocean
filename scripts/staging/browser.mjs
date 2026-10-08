@@ -1,12 +1,22 @@
 import { chromium, webkit, devices } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { assertStaging, root } from "./lib.mjs";
+import { assertStaging, query, root } from "./lib.mjs";
 import { testSession } from "./smoke.mjs";
 export async function browserSmoke() {
   const c = await assertStaging();
   const { client, session } = await testSession();
   try {
+    const [profile] = await query(
+      "select lineup_channels from public.profiles where id='" +
+        session.user.id +
+        "'",
+      true,
+    );
+    if (profile.lineup_channels?.length)
+      throw new Error(
+        "Browser smoke requires notification preferences off to avoid sending.",
+      );
     for (const [type, label] of [
       [chromium, "chromium"],
       [webkit, "webkit"],
@@ -74,6 +84,6 @@ export async function browserSmoke() {
       }
     }
   } finally {
-    await client.auth.signOut();
+    await client.auth.signOut({ scope: "local" });
   }
 }
